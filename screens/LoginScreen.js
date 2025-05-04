@@ -10,8 +10,12 @@ import {
 } from "react-native";
 import React, { useState } from "react";
 import * as Device from "expo-device";
+import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen({ navigation }) {
+
+  const { login } = useAuth();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
@@ -25,6 +29,7 @@ export default function LoginScreen({ navigation }) {
 
     if (result) {
       console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
+      login(result); // guarda los datos globalmente
       navigation.replace("Home", { userData: result });
     } else {
       Alert.alert("Error", "Usuario o contraseña incorrectos");

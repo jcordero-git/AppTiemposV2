@@ -16,8 +16,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { useAuth } from "../context/AuthContext";
+import SorteoSelectorModal from "../components/SorteoSelectorModal";
 
 export default function VentaScreen({ navigation }) {
+  const { userData, logout } = useAuth();
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [sorteoNombre, setSorteoNombre] = useState("");
+  const [sorteoId, setSorteoId] = useState(null);
+
   const [menuVisible, setMenuVisible] = useState(false);
   const [limpiar, setLimpiar] = useState(true);
   const [reventar, setReventar] = useState(false);
@@ -52,7 +60,7 @@ export default function VentaScreen({ navigation }) {
   );
 
   const formattedDate = format(fecha, "EE dd/MM/yyyy", { locale: es });
-
+  
   const toInputDateFormat = (date) => {
     return date.toISOString().split("T")[0]; // "2025-04-29"
   };
@@ -68,7 +76,7 @@ export default function VentaScreen({ navigation }) {
 
   // Crear un JSON que contenga ambos valores
   const data = {
-    sorteo: sorteo,
+    sorteo: sorteoId,
     fecha: format(fecha, "EEEE dd/MM/yyyy", { locale: es }),
   };
 
@@ -81,7 +89,7 @@ export default function VentaScreen({ navigation }) {
   // Al cambiar el sorteo o la fecha, actualizamos los parámetros
   useEffect(() => {
     navigation.setParams({ data: data });
-  }, [sorteo, fecha]);
+  }, [sorteoId, fecha]);
 
   // Efecto para verificar si el número tiene 2 dígitos
   useEffect(() => {
@@ -183,12 +191,23 @@ export default function VentaScreen({ navigation }) {
         {/* Formulario */}
         <View style={[styles.formContainer, isWeb && styles.webFormContainer]}>
           <View style={styles.formRow}>
-            <TextInput
-              placeholder="Sorteo"
+            <Pressable
               style={styles.inputSmall}
-              value={sorteo}
-              onChangeText={setSorteo}
+              onPress={() => setModalVisible(true)}
+            >
+              <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
+                {sorteoNombre || "Seleccione sorteo"}
+              </Text>
+            </Pressable>
+            <SorteoSelectorModal
+              visible={modalVisible}
+              onClose={() => setModalVisible(false)}
+              onSelect={(sorteo) => {
+                setSorteoId(sorteo.id);
+                setSorteoNombre(sorteo.name);
+              }}
             />
+
             {Platform.OS === "web" ? (
               <input
                 type="date"
@@ -228,7 +247,8 @@ export default function VentaScreen({ navigation }) {
           <TextInput
             placeholder="Nombre Cliente"
             style={styles.input}
-            value={nombreCliente}
+            //value={nombreCliente}
+            value={userData?.name}
             onChangeText={setNombreCliente}
           />
 
@@ -285,7 +305,7 @@ export default function VentaScreen({ navigation }) {
                 if (!isNaN(montoNum) && montoNum % 50 === 0) {
                   numeroRef.current?.focus();
                 } else {
-                  Alert.alert("Monto inválido", "Debe ser un múltiplo de 100.");
+                  Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
                 }
               }}
             />

@@ -4,7 +4,7 @@ import { View, Text, StyleSheet } from "react-native";
 const VentaScreen = () => {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>VENTA</Text>
+      <Text style={styles.text}>SORTEOS</Text>
     </View>
   );
 };
