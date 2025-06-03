@@ -22,7 +22,8 @@
     "expo-device": "~7.0.3",
     "expo-status-bar": "~2.0.1",
     "react": "18.3.1",
-    "react-datepicker": "^8.3.0",
+    "react-datepicker": "^8.4.0",
+    "react-day-picker": "^9.7.0",
     "react-dom": "18.3.1",
     "react-native": "0.76.9",
     "react-native-gesture-handler": "~2.20.2",
@@ -35,11 +36,13 @@
   "devDependencies": {
     "@babel/core": "^7.20.0",
     "@types/react": "^18.3.20",
+    "css-loader": "^7.1.2",
     "eslint": "^8.57.0",
     "eslint-config-expo": "~8.0.1",
     "eslint-config-prettier": "^10.1.2",
     "eslint-plugin-prettier": "^5.2.6",
-    "prettier": "^3.5.3"
+    "prettier": "^3.5.3",
+    "style-loader": "^4.0.0"
   },
   "private": true
 }

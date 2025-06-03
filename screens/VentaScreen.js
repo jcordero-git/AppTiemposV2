@@ -19,12 +19,14 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { format } from "date-fns";
 import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
+import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 
 export default function VentaScreen({ navigation, route }) {
+  console.log("🎯 RENDER VentaScreen");
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const menuAnchorRef = useRef(null);
 
@@ -38,12 +40,14 @@ export default function VentaScreen({ navigation, route }) {
     </TouchableOpacity>
   );
 
-  React.useLayoutEffect(() => {
-    const data = route.params?.data || {
-      sorteo: "No Sorteo",
-      fecha: "No Fecha",
-    };
+  const [tiempo, setTiempo] = useState({
+    sorteoId: null,
+    fecha: null,
+    nombreCliente: "",
+    montoNumeros: [],
+  });
 
+  React.useLayoutEffect(() => {
     navigation.setOptions({
       title: "VENTA",
       headerStyle: { backgroundColor: "#4CAF50" },
@@ -97,7 +101,7 @@ export default function VentaScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, route.params, menuVisibleHeader, tiempo]);
+  }, [navigation, menuVisibleHeader]);
 
   const { userData, logout } = useAuth();
 
@@ -151,21 +155,19 @@ export default function VentaScreen({ navigation, route }) {
     </View>
   );
 
-  const [tiempo, setTiempo] = useState({
-    sorteoId: null,
-    fecha: null,
-    nombreCliente: "",
-    montoNumeros: [],
-  });
-
   const tiempoRef = useRef(tiempo);
 
   const toInputDateFormat = (date) => {
-    setTiempo((prev) => ({
-      ...prev,
-      fecha: date,
-    }));
+    // setTiempo((prev) => ({
+    //   ...prev,
+    //   fecha: date,
+    // }));
     return date.toISOString().split("T")[0]; // "2025-04-29"
+  };
+
+  const parseFechaLocalDesdeInput = (value) => {
+    const [year, month, day] = value.split("-");
+    return new Date(Number(year), Number(month) - 1, Number(day));
   };
 
   const formatDate = (fecha) => {
@@ -193,10 +195,10 @@ export default function VentaScreen({ navigation, route }) {
     setShowPicker(false);
     if (selectedDate) {
       setFecha(selectedDate);
-      // setTiempo((prev) => ({
-      //   ...prev,
-      //   fecha: selectedDate,
-      // }));
+      setTiempo((prev) => ({
+        ...prev,
+        fecha: selectedDate,
+      }));
     }
   };
 
@@ -360,6 +362,23 @@ export default function VentaScreen({ navigation, route }) {
     //}
   };
 
+  const actualizarMontoNumerosEnTiempo = (montoNumeros) => {
+    setTiempo((prev) => {
+      const nuevo = {
+        ...prev,
+        montoNumeros: montoNumeros,
+      };
+
+      if (
+        JSON.stringify(prev.montoNumeros) === JSON.stringify(nuevo.montoNumeros)
+      ) {
+        return prev; // Evita el re-render
+      }
+
+      return nuevo;
+    });
+  };
+
   const addNumeroToListAdapter = (monto, numero, reventado, montoRevetado) => {
     // Verificar si el número ya existe en la lista de items
     const existingItemIndex = items.findIndex((item) => item.numero === numero);
@@ -395,10 +414,12 @@ export default function VentaScreen({ navigation, route }) {
         ...(item.rev ? { rev: item.rev } : {}),
       }));
 
-      setTiempo((prev) => ({
-        ...prev,
-        montoNumeros: nuevosMontoNumeros,
-      }));
+      actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+
+      // setTiempo((prev) => ({
+      //   ...prev,
+      //   montoNumeros: nuevosMontoNumeros,
+      // }));
     } else {
       // Si el número no existe, agregamos un nuevo item
       let newItem = {
@@ -426,10 +447,12 @@ export default function VentaScreen({ navigation, route }) {
         ...(item.rev ? { rev: item.rev } : {}),
       }));
 
-      setTiempo((prev) => ({
-        ...prev,
-        montoNumeros: nuevosMontoNumeros,
-      }));
+      actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+
+      // setTiempo((prev) => ({
+      //   ...prev,
+      //   montoNumeros: nuevosMontoNumeros,
+      // }));
     }
   };
 
@@ -472,8 +495,6 @@ export default function VentaScreen({ navigation, route }) {
 
   // Al cambiar el sorteo o la fecha, actualizamos los parámetros
   useEffect(() => {
-    navigation.setParams({ data: data });
-
     if (fecha) {
       setTiempo((prev) => ({
         ...prev,
@@ -492,7 +513,6 @@ export default function VentaScreen({ navigation, route }) {
           `http://147.182.248.177:3001/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
         );
         const data = await response.json();
-        // Guardamos los datos directamente en el singleton
         mSorteo.restringidos = data;
         console.log("Restricciones cargadas:", mSorteo.restringidos);
       } catch (error) {
@@ -504,15 +524,9 @@ export default function VentaScreen({ navigation, route }) {
   }, [sorteoId]);
 
   useEffect(() => {
-    console.log("montoNumeros actualizado:", tiempo.montoNumeros);
-  }, [tiempo.montoNumeros]);
-
-  useEffect(() => {
-    console.log("Tiempo actualizado:", tiempo);
     tiempoRef.current = tiempo;
   }, [tiempo]);
 
-  // Efecto para verificar si el número tiene 2 dígitos
   useEffect(() => {
     console.log("use Reventado Log:", reventar);
     if (!reventar) {
@@ -529,99 +543,10 @@ export default function VentaScreen({ navigation, route }) {
         Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
       }
     } else {
-      //setNumero(text);
       if (numero.length === 2 && useReventado) {
         reventarRef.current?.focus();
       }
     }
-
-    // console.log("use Reventado Log:", reventar);
-    // if (!reventar) {
-    //   if (numero.length === 2) {
-    //     if (monto.trim() === "" || numero.trim() === "") {
-    //       Alert.alert("Error", "Debe ingresar monto y número válidos.");
-    //       return;
-    //     }
-
-    //     const restricciones = mSorteo.restringidos || [];
-    //     console.log("reglas", restricciones);
-
-    //     if (validarMontoContraRestricciones(numero, monto, restricciones)) {
-    //       return; // Se detiene si hay una restricción
-    //     }
-    //     addNumeroToListAdapter(monto, numero, reventar, monto_reventar);
-
-    //     // // Verificar si el número ya existe en la lista de items
-    //     // const existingItemIndex = items.findIndex(
-    //     //   (item) => item.numero === numero,
-    //     // );
-    //     // let updatedItems;
-
-    //     // if (existingItemIndex !== -1) {
-    //     //   // Si el número ya existe, sumamos el monto al monto existente
-    //     //   updatedItems = [...items];
-    //     //   updatedItems[existingItemIndex].monto = (
-    //     //     parseFloat(updatedItems[existingItemIndex].monto) +
-    //     //     parseFloat(monto)
-    //     //   ).toString(); // Sumar el monto y convertirlo de nuevo a string
-
-    //     //   // Mover el item actualizado al principio de la lista
-    //     //   const itemToMove = updatedItems.splice(existingItemIndex, 1)[0]; // Sacamos el item de la lista
-    //     //   updatedItems.unshift(itemToMove); // Lo agregamos al principio
-
-    //     //   setItems(updatedItems); // Actualizar la lista con el monto sumado y el item movido al principio
-    //     //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
-    //     //   const nuevosMontoNumeros = updatedItems.map((item) => ({
-    //     //     monto: item.monto,
-    //     //     numero: item.numero,
-    //     //     ...(item.rev ? { rev: item.rev } : {}),
-    //     //   }));
-
-    //     //   setTiempo((prev) => ({
-    //     //     ...prev,
-    //     //     montoNumeros: nuevosMontoNumeros,
-    //     //   }));
-    //     // } else {
-    //     //   // Si el número no existe, agregamos un nuevo item
-    //     //   const newItem = {
-    //     //     key: Date.now().toString(), // clave única
-    //     //     monto: monto,
-    //     //     numero: numero,
-    //     //   };
-
-    //     //   setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
-
-    //     //   updatedItems = [newItem, ...items];
-
-    //     //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
-    //     //   const nuevosMontoNumeros = updatedItems.map((item) => ({
-    //     //     monto: item.monto,
-    //     //     numero: item.numero,
-    //     //     ...(item.rev ? { rev: item.rev } : {}),
-    //     //   }));
-
-    //     //   setTiempo((prev) => ({
-    //     //     ...prev,
-    //     //     montoNumeros: nuevosMontoNumeros,
-    //     //   }));
-    //     // }
-
-    //     setNumero(""); // Limpiar número
-    //     if (!isMontoLocked) {
-    //       setMonto(""); // Limpiar monto
-    //       montoRef.current?.focus(); // Volver a poner el enfoque en el monto
-    //     }
-    //   } else if (numero.length > 2) {
-    //     // Si el número tiene más de 2 dígitos, limpiamos el campo
-    //     setNumero(""); // Limpiar número si tiene más de 2 dígitos
-    //     Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
-    //   }
-    // } else {
-    //   //setNumero(text);
-    //   if (numero.length === 2 && useReventado) {
-    //     reventarRef.current?.focus();
-    //   }
-    // }
   }, [numero, monto_reventar]); // Este efecto se ejecuta solo cuando el valor de 'numero' cambia
 
   return (
@@ -705,27 +630,14 @@ export default function VentaScreen({ navigation, route }) {
                   />
 
                   {Platform.OS === "web" ? (
-                    <input
-                      type="date"
-                      value={toInputDateFormat(fecha)}
-                      onChange={(e) => {
-                        const newDate = new Date(e.target.value);
-                        if (!isNaN(newDate)) {
-                          setFecha(newDate);
-                          setTiempo((prev) => ({
-                            ...prev,
-                            fecha: newDate,
-                          }));
-                          //tiempo.fecha = newDate;
-                        }
-                      }}
-                      style={{
-                        ...styles.inputSmall,
-                        padding: 8,
-                        fontSize: 16,
-                        border: "none",
-                      }}
-                    />
+                    <>
+                      <DatePickerWeb
+                        value={fecha}
+                        onChange={(date) => {
+                          setFecha(date);
+                        }}
+                      />
+                    </>
                   ) : (
                     <>
                       <Pressable
@@ -837,7 +749,6 @@ export default function VentaScreen({ navigation, route }) {
                 </View>
                 {useReventado && reventar && (
                   <View style={styles.row}>
-
                     <View style={styles.iconButtonInvisible} />
 
                     <TextInput

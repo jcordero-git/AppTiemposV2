@@ -13,13 +13,13 @@ import * as Device from "expo-device";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen({ navigation }) {
-
   const { login } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const handleLogin = async () => {
+    console.log("Email:", username); // 🔍 Imprime el resultado en la consola
     const result = await loginUser({
       email: username,
       password,
@@ -76,6 +76,7 @@ export default function LoginScreen({ navigation }) {
 
 const loginUser = async ({ email, password, emei, apkVersion }) => {
   try {
+    console.log("Email:", email); // 🔍 Imprime el resultado en la consola
     const response = await fetch(
       "http://147.182.248.177:3001/api/user/loginV2",
       {

@@ -15,6 +15,8 @@ import {
 //import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { subMonths, addDays, format } from "date-fns";
+import DatePickerWeb from "../components/DatePickerWeb";
+
 import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "../context/AuthContext";
@@ -74,6 +76,7 @@ export default function HistorialScreen({ navigation, route }) {
     return date.toISOString().split("T")[0]; // "2025-04-29"
   };
   const handleFechaDesdeChange = (event, selectedDate) => {
+    console.log("day", selectedDate);
     setShowPickerDesde(false);
     if (selectedDate) {
       setfechaDesde(selectedDate);
@@ -204,11 +207,9 @@ export default function HistorialScreen({ navigation, route }) {
           });
         }
 
-
         history_history.sort((a, b) => {
           return new Date(a.date) - new Date(b.date);
         });
-
 
         let ventaTotalFloat = 0;
         let comisionFloat = 0;
@@ -287,24 +288,29 @@ export default function HistorialScreen({ navigation, route }) {
         <View style={[styles.formContainer, isWeb && styles.webFormContainer]}>
           <View style={styles.formRow}>
             {Platform.OS === "web" ? (
-              <input
-                type="date"
-                //value={toInputDateFormat(fecha)}
-                onChange={(e) => {
-                  const newDate = new Date(e.target.value);
-                  if (!isNaN(newDate)) {
-                    //setFecha(newDate);
-                    //tiempo.fecha = newDate;
-                  }
-                }}
-                style={{
-                  ...styles.inputSmall,
-                  padding: 8,
-                  fontSize: 16,
-                  border: "none",
-                }}
-              />
+              <>
+                <DatePickerWeb
+                  value={fechaDesde}
+                  onChange={(date) => handleFechaDesdeChange(null, date)}
+                />
+              </>
             ) : (
+              // <input
+              //   type="date"
+              //   value={toInputDateFormat(fechaDesde)}
+              //   onChange={(e) => {
+              //     const newDate = new Date(e.target.value);
+              //     if (!isNaN(newDate)) {
+              //       handleFechaDesdeChange(null, newDate);
+              //     }
+              //   }}
+              //   style={{
+              //     ...styles.inputSmall,
+              //     padding: 8,
+              //     fontSize: 16,
+              //     border: "none",
+              //   }}
+              // />
               <>
                 <Pressable
                   onPress={() => setShowPickerDesde(true)}
@@ -325,23 +331,12 @@ export default function HistorialScreen({ navigation, route }) {
             )}
 
             {Platform.OS === "web" ? (
-              <input
-                type="date"
-                value={toInputDateFormat(fecha)}
-                onChange={(e) => {
-                  const newDate = new Date(e.target.value);
-                  if (!isNaN(newDate)) {
-                    setFecha(newDate);
-                    //tiempo.fecha = newDate;
-                  }
-                }}
-                style={{
-                  ...styles.inputSmall,
-                  padding: 8,
-                  fontSize: 16,
-                  border: "none",
-                }}
-              />
+              <>
+                <DatePickerWeb
+                  value={fechaHasta}
+                  onChange={(date) => handleFechaHastaChange(null, date)}
+                />
+              </>
             ) : (
               <>
                 <Pressable
