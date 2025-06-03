@@ -37,28 +37,7 @@ export default function DrawerNavigator() {
       <Drawer.Screen
         name="Venta"
         component={VentaScreen}
-        options={({ navigation, route }) => ({
-          drawerLabel: "VENTA",
-          headerRight: () => {
-            const data = route.params?.data || {
-              sorteo: "No Sorteo",
-              fecha: "No Fecha",
-            };
-
-            return (
-              <Ionicons
-                name="alert-circle"
-                size={24}
-                color="black"
-                style={{ marginRight: 10 }}
-                onPress={() => {
-                  // Mostrar la alerta con los valores de Sorteo y Fecha
-                  alert(`Sorteo: ${data.sorteo}\nFecha: ${data.fecha}`);
-                }}
-              />
-            );
-          },
-        })}
+        options={{ drawerLabel: "VENTA" }}
       />
       <Drawer.Screen
         name="Premios"

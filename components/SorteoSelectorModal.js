@@ -11,11 +11,14 @@ import {
   StyleSheet,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
+import { mSorteo } from "../models/mSorteo";
 
 export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
   const { userData } = useAuth();
-  const [draws, setDraws] = useState([]);
+  const [sorteoItems, setSorteoItems] = useState([]);
   //console.log("User desde modal:", userData.id);
+  /** @type {mSorteo[]} */
+  let mSorteos = [];
 
   useEffect(() => {
     if (visible) {
@@ -24,7 +27,25 @@ export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
           return res.json();
         })
         .then((data) => {
-          setDraws(data);
+          // Ordenar los sorteos por limitTime (más temprano primero)
+          const sorteosOrdenados = data.sort((a, b) => {
+            const horaA = new Date(`1970-01-01T${a.limitTime}Z`);
+            const horaB = new Date(`1970-01-01T${b.limitTime}Z`);
+            return horaA - horaB;
+          });
+
+          
+
+          if (Array.isArray(sorteosOrdenados)) {
+            mSorteos = sorteosOrdenados;
+          } else {
+            console.warn(
+              "⚠️ 'data sorteos' no es un array válido:",
+              sorteosOrdenados,
+            );
+          }
+          console.log("sorteos ordenados:", mSorteos);
+          setSorteoItems(mSorteos);
         })
         .catch((error) => console.error("Error al obtener sorteos", error));
     }
@@ -41,8 +62,8 @@ export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
         <Pressable style={styles.modal} onPress={() => {}}>
           <Text style={styles.title}>SORTEOS DISPONIBLES</Text>
           <FlatList
-            data={draws}
-            keyExtractor={(item) => item.id.toString()}
+            data={sorteoItems}
+            keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.item}
@@ -81,8 +102,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   item: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
+    paddingVertical: 13,
+    borderBottomWidth: 0,
     borderBottomColor: "#ccc",
   },
   closeButton: {

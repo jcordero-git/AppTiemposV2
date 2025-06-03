@@ -91,7 +91,7 @@ const loginUser = async ({ email, password, emei, apkVersion }) => {
 
     // Verifica si hay datos válidos
     if (response.ok && data && Object.keys(data).length > 0) {
-      console.log("Login exitoso:", data);
+      //console.log("Login exitoso:", data);
       return data;
     } else {
       console.log("Credenciales incorrectas o sin respuesta");

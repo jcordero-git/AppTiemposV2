@@ -1,26 +1,324 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { useNavigation, useRoute } from "@react-navigation/native";
 
-const VentaScreen = () => {
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  TouchableOpacity,
+  TextInput,
+  Switch,
+  FlatList,
+  useWindowDimensions,
+  Alert,
+  Platform,
+} from "react-native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { format, parse } from "date-fns";
+import { es } from "date-fns/locale"; // idioma español
+import { useAuth } from "../context/AuthContext";
+import { formatHour } from "../utils/timeUtils";
+
+export default function SorteosScreen({ navigation }) {
+  const route = useRoute();
+
+  React.useLayoutEffect(() => {
+    const data = route.params?.data || {
+      sorteo: "No Sorteo",
+      fecha: "No Fecha",
+    };
+
+    navigation.setOptions({
+      title: "SORTEOS",
+      headerStyle: { backgroundColor: "#4CAF50" },
+      headerTintColor: "#fff",
+      headerRight: () => (
+        <>
+          <MaterialIcons
+            name="search"
+            size={24}
+            color="#fff" // Blanco para contraste con fondo verde
+            style={{ marginRight: 15 }}
+            onPress={() => {
+              Alert.alert(
+                "Datos del sorteo",
+                `Sorteo: ${data.sorteo}\nFecha: ${data.fecha}`,
+              );
+            }}
+          />
+          <MaterialIcons
+            name="sync"
+            size={24}
+            color="#fff" // Blanco para contraste con fondo verde
+            style={{ marginRight: 15 }}
+            onPress={() => {
+              Alert.alert(
+                "Datos del sorteo",
+                `Sorteo: ${data.sorteo}\nFecha: ${data.fecha}`,
+              );
+            }}
+          />
+        </>
+      ),
+    });
+  }, [navigation, route.params]);
+
+  const { userData, logout } = useAuth();
+
+  const [modalVisible, setModalVisible] = useState(false);
+  const [sorteoNombre, setSorteoNombre] = useState("");
+  const [sorteoId, setSorteoId] = useState(null);
+
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  const toggleMenu = () => setMenuVisible(!menuVisible);
+  const [showPicker, setShowPicker] = useState(false);
+
+  const { width } = useWindowDimensions();
+  const isWeb = width > 768;
+
+  const [items, setItems] = useState([]);
+
+  // const formatHour = (timeStr) => {
+  //   try {
+  //     const date = parse(timeStr, "HH:mm:ss", new Date());
+  //     return format(date, "hh:mm a", { locale: es }).toUpperCase(); // 10:58 PM
+  //   } catch (e) {
+  //     return timeStr;
+  //   }
+  // };
+
+  const renderItem = ({ item }) => (
+    <TouchableOpacity
+      onPress={() =>
+        navigation.navigate("SorteoDetalle", { sorteo: item, userData })
+      }
+    >
+      <View style={styles.itemRow}>
+        <Text style={styles.itemTitle}>{item.name}</Text>
+        <View style={styles.itemDetailsRow}>
+          <Text style={styles.timeText}>{formatHour(item.limitTime)}</Text>
+          <Text style={styles.pagaText}>PAGA</Text>
+          <Text style={styles.vecesText}>{item.prizeTimes} veces</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  useEffect(() => {
+    const fetchSorteos = async () => {
+      try {
+        const response = await fetch(
+          `http://147.182.248.177:3001/api/drawCategory/user/${userData.id}`,
+        );
+        const data = await response.json();
+        // Asegúrate de mapear los datos al formato que esperas en FlatList
+        console.log("Sorteos:", data);
+        // Ordenar por limitTime (hora) - más temprano primero
+        const sorteosOrdenados = data.sort((a, b) => {
+          const horaA = new Date(`1970-01-01T${a.limitTime}Z`);
+          const horaB = new Date(`1970-01-01T${b.limitTime}Z`);
+          return horaA - horaB;
+        });
+
+        console.log("Sorteos ordenados:", sorteosOrdenados);
+
+        const sorteosFormateados = sorteosOrdenados.map((item, index) => ({
+          key: item.id.toString(), // necesario para FlatList
+          id: item.id,
+          name: item.name || "Sin nombre",
+          prizeTimes: item.userValues?.prizeTimes || 0,
+          revPrizeTimes: item.userValues?.revPrizeTimes || 0,
+          limitTime: item.limitTime || "",
+          useReventado: item.useReventado,
+        }));
+        setItems(sorteosFormateados);
+        console.log("Sorteos formateados:", sorteosFormateados);
+      } catch (error) {
+        console.error("Error al obtener sorteos", error);
+        Alert.alert("Error", "No se pudieron cargar los sorteos.");
+      }
+    };
+
+    if (userData?.id) {
+      fetchSorteos();
+    }
+  }, [userData]);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>SORTEOS</Text>
+      {/* Formulario y Lista */}
+      <View style={[styles.formAndListContainer, isWeb && styles.webLayout]}>
+        {/* Lista */}
+        <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
+          <FlatList
+            data={items}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.key}
+            style={{ marginTop: 0 }}
+          />
+        </View>
+      </View>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#fff",
+    paddingRight: 16,
+    paddingLeft: 16,
+    paddingBottom: 16,
+    justifyContent: "flex-start",
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  headerIcons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  icon: {
+    paddingHorizontal: 4,
+  },
+  title: { fontSize: 20, fontWeight: "bold" },
+  dropdown: {
+    position: "absolute",
+    right: 16,
+    top: 50,
+    backgroundColor: "#fff",
+    elevation: 5,
+    borderRadius: 4,
+  },
+  menuItem: {
+    padding: 12,
+    fontSize: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  formAndListContainer: {
+    flexDirection: "column",
+    marginTop: 20,
+    flex: 1,
+  },
+  webLayout: {
+    flexDirection: "row",
+  },
+  formContainer: {
+    marginBottom: 20,
+  },
+  webFormContainer: {
+    marginRight: 20,
+  },
+  listContainer: {
+    flex: 1,
+    maxHeight: 900, // puedes ajustar esto según el diseño deseado
+  },
+  formRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    marginBottom: 10,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  itemRow: {
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+    paddingVertical: 12,
+  },
+  itemTitle: {
+    fontWeight: "bold",
+    fontSize: 16,
+    marginBottom: 4,
+  },
+
+  itemDetailsRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 12,
+    width: "100%",
+  },
+  timeText: {
+    fontSize: 14,
+    color: "#555",
+  },
+
+  pagaText: {
+    fontSize: 14,
+    color: "#555",
+  },
+
+  vecesText: {
+    fontSize: 14,
+    color: "#555",
+  },
+  input: {
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+    padding: 8,
+    marginBottom: 10,
+  },
+  inputSmall: {
+    flex: 1,
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+    padding: 8,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    gap: 8,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#fff",
+    marginTop: 0,
+    backgroundColor: "#ccc",
+    borderRadius: 8,
   },
-  text: {
-    fontSize: 30,
+  montoContainer: {
+    flexDirection: "column",
+    justifyContent: "space-between",
+    height: 80,
+    flex: 1,
+  },
+  item: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
+  itemSubtitle: { color: "#666" },
+  totalBar: {
+    marginTop: 10,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderColor: "#ccc",
+  },
+  totalText: {
     fontWeight: "bold",
-    color: "#000",
+    fontSize: 20,
+  },
+  totalValue: {
+    fontSize: 20,
+    marginLeft: 4,
+    fontWeight: "bold",
   },
 });
-
-export default VentaScreen;

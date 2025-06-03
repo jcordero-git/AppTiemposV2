@@ -12,14 +12,93 @@ import {
   Alert,
   Platform,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Menu, Divider, Provider } from "react-native-paper";
+//import { Ionicons } from "@expo/vector-icons";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+
 import { format } from "date-fns";
 import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
+import mSorteo from "../models/mSorteoSingleton.js";
+import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 
-export default function VentaScreen({ navigation }) {
+export default function VentaScreen({ navigation, route }) {
+  const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
+  const menuAnchorRef = useRef(null);
+
+  const openMenu = () => setMenuVisibleHeader(true);
+  const closeMenu = () => setMenuVisibleHeader(false);
+
+  // El botón que actuará como anchor para el menú
+  const MenuAnchor = (
+    <TouchableOpacity onPress={openMenu} style={{ marginRight: 10 }}>
+      <MaterialIcons name="more-vert" size={24} color="#fff" />
+    </TouchableOpacity>
+  );
+
+  React.useLayoutEffect(() => {
+    const data = route.params?.data || {
+      sorteo: "No Sorteo",
+      fecha: "No Fecha",
+    };
+
+    navigation.setOptions({
+      title: "VENTA",
+      headerStyle: { backgroundColor: "#4CAF50" },
+      headerTintColor: "#fff",
+      headerRight: () => (
+        <>
+          <MaterialIcons
+            name="print"
+            size={24}
+            color="#fff" // Blanco para contraste con fondo verde
+            style={{ marginRight: 20 }}
+            onPress={() => {
+              Alert.alert(
+                "Datos del sorteo",
+                `Sorteo: ${data.sorteo}\nFecha: ${data.fecha}`,
+              );
+            }}
+          />
+          <MaterialIcons
+            name="image"
+            size={24}
+            color="#fff" // Blanco para contraste con fondo verde
+            style={{ marginRight: 15 }}
+            onPress={handleImagePress}
+          />
+          {/* Menú anclado al botón visible */}
+          <Menu
+            visible={menuVisibleHeader}
+            onDismiss={closeMenu}
+            anchor={MenuAnchor}
+            contentStyle={{ backgroundColor: "white", marginRight: 15 }} // Fondo blanco
+          >
+            <Menu.Item
+              onPress={() => {
+                closeMenu();
+                console.log("Pre Cargar");
+              }}
+              title="Pre Cargar"
+              titleStyle={{ color: "#000" }} // Texto negro opcional
+            />
+            <Divider />
+            <Menu.Item
+              onPress={() => {
+                closeMenu();
+                console.log("Categorías Predeterminadas");
+              }}
+              title="Categorías Predeterminadas"
+              titleStyle={{ color: "#000" }} // Texto negro opcional
+            />
+          </Menu>
+        </>
+      ),
+    });
+  }, [navigation, route.params, menuVisibleHeader, tiempo]);
+
   const { userData, logout } = useAuth();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -35,6 +114,7 @@ export default function VentaScreen({ navigation }) {
   const [monto, setMonto] = useState("");
   const [numero, setNumero] = useState("");
   const [monto_reventar, setMonto_reventar] = useState("");
+  const [useReventado, setUseReventado] = useState(false);
 
   const toggleMenu = () => setMenuVisible(!menuVisible);
   const [showPicker, setShowPicker] = useState(false);
@@ -52,24 +132,107 @@ export default function VentaScreen({ navigation }) {
 
   const [items, setItems] = useState([]);
 
+  //const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
+  //const openMenu = () => setMenuVisibleHeader(true);
+  //const closeMenu = () => setMenuVisibleHeader(false);
+
   const renderItem = ({ item }) => (
-    <View style={styles.itemRow}>
-      <Text style={styles.itemLeft}>₡{item.monto}</Text>
-      <Text style={styles.itemRight}>{item.numero}</Text>
+    <View>
+      <View style={styles.itemRow}>
+        <Text style={styles.itemLeft}>₡{item.monto}</Text>
+        <Text style={styles.itemRight}>{item.numero}</Text>
+      </View>
+      {item.rev && (
+        <View style={styles.itemRowRev}>
+          <Text style={styles.itemLeft}>₡{item.rev}</Text>
+          <Text style={styles.itemRight}>REVENTADO</Text>
+        </View>
+      )}
     </View>
   );
 
-  const formattedDate = format(fecha, "EE dd/MM/yyyy", { locale: es });
-  
+  const [tiempo, setTiempo] = useState({
+    sorteoId: null,
+    fecha: null,
+    nombreCliente: "",
+    montoNumeros: [],
+  });
+
+  const tiempoRef = useRef(tiempo);
+
   const toInputDateFormat = (date) => {
+    setTiempo((prev) => ({
+      ...prev,
+      fecha: date,
+    }));
     return date.toISOString().split("T")[0]; // "2025-04-29"
+  };
+
+  const formatDate = (fecha) => {
+    if (!fecha) return "";
+    // setTiempo((prev) => ({
+    //   ...prev,
+    //   fecha: fecha,
+    // }));
+    return format(new Date(fecha), "EE dd/MM/yyyy", { locale: es });
+  };
+
+  const formattedDate = formatDate(fecha);
+
+  const handleImagePress = () => {
+    const mensaje = JSON.stringify(tiempoRef.current, null, 2);
+    console.log("tiempo al hacer click en imagen: ", tiempoRef.current);
+    if (Platform.OS === "web") {
+      window.alert(`Contenido de "tiempo":\n${mensaje}`);
+    } else {
+      Alert.alert("Contenido de 'tiempo'", mensaje);
+    }
   };
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
     if (selectedDate) {
       setFecha(selectedDate);
+      // setTiempo((prev) => ({
+      //   ...prev,
+      //   fecha: selectedDate,
+      // }));
     }
+  };
+
+  const handleReventarChange = (event) => {
+    setReventar(!reventar);
+    if (reventar === false) {
+      setMonto_reventar("");
+    }
+  };
+
+  const handleSubmitReventar = () => {
+    txtNumeroDone(monto, numero);
+    // const montoInt = parseInt(monto, 10);
+    // const reventarInt = parseInt(monto_reventar, 10);
+
+    // if (
+    //   !isNaN(montoInt) &&
+    //   !isNaN(reventarInt) &&
+    //   reventarInt <= montoInt &&
+    //   numero.length === 2
+    // ) {
+    //   const nuevoItem = {
+    //     key: Date.now().toString(), // clave única
+    //     numero,
+    //     monto: montoInt.toString(),
+    //     rev: reventarInt.toString(),
+    //   };
+
+    //   setItems((prevItems) => [nuevoItem, ...prevItems]);
+
+    //   setNumero("");
+    //   setMonto_reventar("");
+    //   numeroRef.current?.focus(); // vuelve al campo número
+    // } else {
+    //   Alert.alert("Error", "Revisar monto, reventar o número.");
+    // }
   };
 
   const [isMontoLocked, setIsMontoLocked] = useState(false);
@@ -82,324 +245,651 @@ export default function VentaScreen({ navigation }) {
 
   // Calcular total
   const total = items.reduce(
-    (sum, item) => sum + parseFloat(item.monto || 0),
+    (sum, item) =>
+      sum + parseFloat(item.monto || 0) + parseFloat(item.rev || 0),
     0,
   );
+
+  const asignarItemsAMontoNumeros = () => {
+    setTiempo((prev) => {
+      const nuevoTiempo = {
+        ...prev,
+        montoNumeros: items.map((item) => ({
+          monto: item.monto,
+          numero: item.numero,
+          ...(item.rev ? { rev: item.rev } : {}),
+        })),
+      };
+
+      return nuevoTiempo;
+    });
+  };
+
+  const reventarRef = useRef(null);
+
+  const txtNumeroDone = (monto, numero) => {
+    // console.log("use Reventado Log:", reventar);
+    // if (!reventar) {
+    //   if (numero.length === 2) {
+    //     if (monto.trim() === "" || numero.trim() === "") {
+    //       Alert.alert("Error", "Debe ingresar monto y número válidos.");
+    //       return;
+    //     }
+
+    const restricciones = mSorteo.restringidos || [];
+    console.log("reglas", restricciones);
+
+    if (validarMontoContraRestricciones(numero, monto, restricciones)) {
+      return; // Se detiene si hay una restricción
+    }
+    addNumeroToListAdapter(monto, numero, reventar, monto_reventar);
+
+    // // Verificar si el número ya existe en la lista de items
+    // const existingItemIndex = items.findIndex(
+    //   (item) => item.numero === numero,
+    // );
+    // let updatedItems;
+
+    // if (existingItemIndex !== -1) {
+    //   // Si el número ya existe, sumamos el monto al monto existente
+    //   updatedItems = [...items];
+    //   updatedItems[existingItemIndex].monto = (
+    //     parseFloat(updatedItems[existingItemIndex].monto) +
+    //     parseFloat(monto)
+    //   ).toString(); // Sumar el monto y convertirlo de nuevo a string
+
+    //   // Mover el item actualizado al principio de la lista
+    //   const itemToMove = updatedItems.splice(existingItemIndex, 1)[0]; // Sacamos el item de la lista
+    //   updatedItems.unshift(itemToMove); // Lo agregamos al principio
+
+    //   setItems(updatedItems); // Actualizar la lista con el monto sumado y el item movido al principio
+    //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
+    //   const nuevosMontoNumeros = updatedItems.map((item) => ({
+    //     monto: item.monto,
+    //     numero: item.numero,
+    //     ...(item.rev ? { rev: item.rev } : {}),
+    //   }));
+
+    //   setTiempo((prev) => ({
+    //     ...prev,
+    //     montoNumeros: nuevosMontoNumeros,
+    //   }));
+    // } else {
+    //   // Si el número no existe, agregamos un nuevo item
+    //   const newItem = {
+    //     key: Date.now().toString(), // clave única
+    //     monto: monto,
+    //     numero: numero,
+    //   };
+
+    //   setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
+
+    //   updatedItems = [newItem, ...items];
+
+    //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
+    //   const nuevosMontoNumeros = updatedItems.map((item) => ({
+    //     monto: item.monto,
+    //     numero: item.numero,
+    //     ...(item.rev ? { rev: item.rev } : {}),
+    //   }));
+
+    //   setTiempo((prev) => ({
+    //     ...prev,
+    //     montoNumeros: nuevosMontoNumeros,
+    //   }));
+    // }
+
+    setNumero(""); // Limpiar número
+    if (!isMontoLocked) {
+      setMonto(""); // Limpiar monto
+      montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+    } else {
+      numeroRef.current?.focus();
+    }
+    setMonto_reventar("");
+    //   } else if (numero.length > 2) {
+    //     // Si el número tiene más de 2 dígitos, limpiamos el campo
+    //     setNumero(""); // Limpiar número si tiene más de 2 dígitos
+    //     Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
+    //   }
+    // } else {
+    //   //setNumero(text);
+    //   if (numero.length === 2 && useReventado) {
+    //     reventarRef.current?.focus();
+    //   }
+    //}
+  };
+
+  const addNumeroToListAdapter = (monto, numero, reventado, montoRevetado) => {
+    // Verificar si el número ya existe en la lista de items
+    const existingItemIndex = items.findIndex((item) => item.numero === numero);
+    let updatedItems;
+
+    if (existingItemIndex !== -1) {
+      // Si el número ya existe, sumamos el monto al monto existente
+      updatedItems = [...items];
+      updatedItems[existingItemIndex].monto = (
+        parseFloat(updatedItems[existingItemIndex].monto) + parseFloat(monto)
+      ).toString(); // Sumar el monto y convertirlo de nuevo a string
+      if (reventado) {
+        if (updatedItems[existingItemIndex]?.rev) {
+          updatedItems[existingItemIndex].rev = (
+            parseFloat(updatedItems[existingItemIndex].rev) +
+            parseFloat(montoRevetado)
+          ).toString(); // Sumar el monto reventado y convertirlo de nuevo a string
+        } else {
+          updatedItems[existingItemIndex].rev =
+            parseFloat(montoRevetado).toString(); // Sumar el monto reventado y convertirlo de nuevo a string
+        }
+      }
+
+      // Mover el item actualizado al principio de la lista
+      const itemToMove = updatedItems.splice(existingItemIndex, 1)[0]; // Sacamos el item de la lista
+      updatedItems.unshift(itemToMove); // Lo agregamos al principio
+
+      setItems(updatedItems); // Actualizar la lista con el monto sumado y el item movido al principio
+      // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
+      const nuevosMontoNumeros = updatedItems.map((item) => ({
+        monto: item.monto,
+        numero: item.numero,
+        ...(item.rev ? { rev: item.rev } : {}),
+      }));
+
+      setTiempo((prev) => ({
+        ...prev,
+        montoNumeros: nuevosMontoNumeros,
+      }));
+    } else {
+      // Si el número no existe, agregamos un nuevo item
+      let newItem = {
+        key: Date.now().toString(), // clave única
+        monto: monto,
+        numero: numero,
+      };
+      if (reventado) {
+        newItem = {
+          key: Date.now().toString(), // clave única
+          monto: monto,
+          numero: numero,
+          rev: monto_reventar,
+        };
+      }
+
+      setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
+
+      updatedItems = [newItem, ...items];
+
+      // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
+      const nuevosMontoNumeros = updatedItems.map((item) => ({
+        monto: item.monto,
+        numero: item.numero,
+        ...(item.rev ? { rev: item.rev } : {}),
+      }));
+
+      setTiempo((prev) => ({
+        ...prev,
+        montoNumeros: nuevosMontoNumeros,
+      }));
+    }
+  };
+
+  const validarMontoContraRestricciones = (numero, monto, restricciones) => {
+    const montoNumerico = parseFloat(monto);
+
+    const restriccionViolada = restricciones.find((regla) => {
+      // Si es una regla de tipo fecha
+      if (regla.restricted === "{DATE}") {
+        const hoy = new Date();
+        const dia = hoy.toLocaleDateString("es-ES", {
+          day: "2-digit",
+          timeZone: "America/Costa_Rica", // Asegúrate de usar el timezone correcto si es necesario
+        });
+        const aplicaAlNumero = numero === dia;
+        return (
+          aplicaAlNumero && montoNumerico > parseFloat(regla.restrictedAmount)
+        );
+      }
+
+      const valoresRestringidos = regla.restricted
+        ?.split(",")
+        .map((val) => val.trim());
+
+      const aplicaAlNumero = valoresRestringidos?.includes(numero);
+      return (
+        aplicaAlNumero && montoNumerico > parseFloat(regla.restrictedAmount)
+      );
+    });
+
+    if (restriccionViolada) {
+      Alert.alert(
+        "Restricción activa",
+        `El monto para el número ${numero} debe ser mínimo ₡${restriccionViolada.restrictedAmount}.`,
+      );
+      return true; // Hubo una violación
+    }
+    return false; // Todo bien
+  };
 
   // Al cambiar el sorteo o la fecha, actualizamos los parámetros
   useEffect(() => {
     navigation.setParams({ data: data });
+
+    if (fecha) {
+      setTiempo((prev) => ({
+        ...prev,
+        fecha: format(fecha, "yyyy-MM-dd", { locale: es }),
+      }));
+    }
   }, [sorteoId, fecha]);
+
+  useEffect(() => {
+    console.log("sorteo seleccionado:", mSorteo.name);
+    if (!sorteoId || !userData?.id) return;
+
+    const fetchRestringidos = async () => {
+      try {
+        const response = await fetch(
+          `http://147.182.248.177:3001/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+        );
+        const data = await response.json();
+        // Guardamos los datos directamente en el singleton
+        mSorteo.restringidos = data;
+        console.log("Restricciones cargadas:", mSorteo.restringidos);
+      } catch (error) {
+        console.error("Error cargando restricciones:", error);
+      }
+    };
+
+    fetchRestringidos();
+  }, [sorteoId]);
+
+  useEffect(() => {
+    console.log("montoNumeros actualizado:", tiempo.montoNumeros);
+  }, [tiempo.montoNumeros]);
+
+  useEffect(() => {
+    console.log("Tiempo actualizado:", tiempo);
+    tiempoRef.current = tiempo;
+  }, [tiempo]);
 
   // Efecto para verificar si el número tiene 2 dígitos
   useEffect(() => {
-    if (numero.length === 2) {
-      if (monto.trim() === "" || numero.trim() === "") {
-        Alert.alert("Error", "Debe ingresar monto y número válidos.");
-        return;
+    console.log("use Reventado Log:", reventar);
+    if (!reventar) {
+      if (numero.length === 2) {
+        if (monto.trim() === "" || numero.trim() === "") {
+          Alert.alert("Error", "Debe ingresar monto y número válidos.");
+          return;
+        }
+
+        txtNumeroDone(monto, numero);
+      } else if (numero.length > 2) {
+        // Si el número tiene más de 2 dígitos, limpiamos el campo
+        setNumero(""); // Limpiar número si tiene más de 2 dígitos
+        Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
       }
-
-      // Verificar si el número ya existe en la lista de items
-      const existingItemIndex = items.findIndex(
-        (item) => item.numero === numero,
-      );
-
-      if (existingItemIndex !== -1) {
-        // Si el número ya existe, sumamos el monto al monto existente
-        const updatedItems = [...items];
-        updatedItems[existingItemIndex].monto = (
-          parseFloat(updatedItems[existingItemIndex].monto) + parseFloat(monto)
-        ).toString(); // Sumar el monto y convertirlo de nuevo a string
-
-        // Mover el item actualizado al principio de la lista
-        const itemToMove = updatedItems.splice(existingItemIndex, 1)[0]; // Sacamos el item de la lista
-        updatedItems.unshift(itemToMove); // Lo agregamos al principio
-
-        setItems(updatedItems); // Actualizar la lista con el monto sumado y el item movido al principio
-      } else {
-        // Si el número no existe, agregamos un nuevo item
-        const newItem = {
-          key: Date.now().toString(), // clave única
-          monto: monto,
-          numero: numero,
-        };
-
-        setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
+    } else {
+      //setNumero(text);
+      if (numero.length === 2 && useReventado) {
+        reventarRef.current?.focus();
       }
-
-      setNumero(""); // Limpiar número
-      if (!isMontoLocked) {
-        setMonto(""); // Limpiar monto
-        montoRef.current?.focus(); // Volver a poner el enfoque en el monto
-      }
-    } else if (numero.length > 2) {
-      // Si el número tiene más de 2 dígitos, limpiamos el campo
-      setNumero(""); // Limpiar número si tiene más de 2 dígitos
-      Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
     }
-  }, [numero]); // Este efecto se ejecuta solo cuando el valor de 'numero' cambia
+
+    // console.log("use Reventado Log:", reventar);
+    // if (!reventar) {
+    //   if (numero.length === 2) {
+    //     if (monto.trim() === "" || numero.trim() === "") {
+    //       Alert.alert("Error", "Debe ingresar monto y número válidos.");
+    //       return;
+    //     }
+
+    //     const restricciones = mSorteo.restringidos || [];
+    //     console.log("reglas", restricciones);
+
+    //     if (validarMontoContraRestricciones(numero, monto, restricciones)) {
+    //       return; // Se detiene si hay una restricción
+    //     }
+    //     addNumeroToListAdapter(monto, numero, reventar, monto_reventar);
+
+    //     // // Verificar si el número ya existe en la lista de items
+    //     // const existingItemIndex = items.findIndex(
+    //     //   (item) => item.numero === numero,
+    //     // );
+    //     // let updatedItems;
+
+    //     // if (existingItemIndex !== -1) {
+    //     //   // Si el número ya existe, sumamos el monto al monto existente
+    //     //   updatedItems = [...items];
+    //     //   updatedItems[existingItemIndex].monto = (
+    //     //     parseFloat(updatedItems[existingItemIndex].monto) +
+    //     //     parseFloat(monto)
+    //     //   ).toString(); // Sumar el monto y convertirlo de nuevo a string
+
+    //     //   // Mover el item actualizado al principio de la lista
+    //     //   const itemToMove = updatedItems.splice(existingItemIndex, 1)[0]; // Sacamos el item de la lista
+    //     //   updatedItems.unshift(itemToMove); // Lo agregamos al principio
+
+    //     //   setItems(updatedItems); // Actualizar la lista con el monto sumado y el item movido al principio
+    //     //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
+    //     //   const nuevosMontoNumeros = updatedItems.map((item) => ({
+    //     //     monto: item.monto,
+    //     //     numero: item.numero,
+    //     //     ...(item.rev ? { rev: item.rev } : {}),
+    //     //   }));
+
+    //     //   setTiempo((prev) => ({
+    //     //     ...prev,
+    //     //     montoNumeros: nuevosMontoNumeros,
+    //     //   }));
+    //     // } else {
+    //     //   // Si el número no existe, agregamos un nuevo item
+    //     //   const newItem = {
+    //     //     key: Date.now().toString(), // clave única
+    //     //     monto: monto,
+    //     //     numero: numero,
+    //     //   };
+
+    //     //   setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
+
+    //     //   updatedItems = [newItem, ...items];
+
+    //     //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
+    //     //   const nuevosMontoNumeros = updatedItems.map((item) => ({
+    //     //     monto: item.monto,
+    //     //     numero: item.numero,
+    //     //     ...(item.rev ? { rev: item.rev } : {}),
+    //     //   }));
+
+    //     //   setTiempo((prev) => ({
+    //     //     ...prev,
+    //     //     montoNumeros: nuevosMontoNumeros,
+    //     //   }));
+    //     // }
+
+    //     setNumero(""); // Limpiar número
+    //     if (!isMontoLocked) {
+    //       setMonto(""); // Limpiar monto
+    //       montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+    //     }
+    //   } else if (numero.length > 2) {
+    //     // Si el número tiene más de 2 dígitos, limpiamos el campo
+    //     setNumero(""); // Limpiar número si tiene más de 2 dígitos
+    //     Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
+    //   }
+    // } else {
+    //   //setNumero(text);
+    //   if (numero.length === 2 && useReventado) {
+    //     reventarRef.current?.focus();
+    //   }
+    // }
+  }, [numero, monto_reventar]); // Este efecto se ejecuta solo cuando el valor de 'numero' cambia
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      {/* <View style={styles.header}>
-        <Text style={styles.title}>VENTA</Text>
+    <Provider>
+      <View style={{ flex: 1 }}>
+        {/* Botón invisible que será el anchor del menú
+        <TouchableOpacity
+          ref={menuAnchorRef}
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: 1,
+            height: 1,
+          }}
+        />
 
-        <View style={styles.headerIcons}>
-          <TouchableOpacity onPress={() => console.log("Imprimir")}>
-            <Ionicons
-              name="print"
-              size={24}
-              color="black"
-              style={styles.icon}
-            />
-          </TouchableOpacity>
+        <Menu
+          visible={menuVisibleHeader}
+          onDismiss={closeMenu}
+          anchor={
+            // Importante: el anchor debe ser un elemento visible,
+            // pero aquí usamos el botón invisible para que el menú aparezca en el header
+            <View />
+          }
+          // Alternativa: usar anchor={anchorRef.current} si quieres anclar al botón invisible
+        >
+          <Menu.Item
+            onPress={() => {
+              closeMenu();
+              console.log("Pre Cargar");
+            }}
+            title="Pre Cargar"
+          />
+          <Divider />
+          <Menu.Item
+            onPress={() => {
+              closeMenu();
+              console.log("Categorías Predeterminadas");
+            }}
+            title="Categorías Predeterminadas"
+          />
+        </Menu> */}
 
-          <TouchableOpacity onPress={() => console.log("Seleccionar imagen")}>
-            <Ionicons
-              name="image"
-              size={24}
-              color="black"
-              style={styles.icon}
-            />
-          </TouchableOpacity>
-
-          <Pressable onPress={toggleMenu}>
-            <Ionicons
-              name="ellipsis-vertical"
-              size={24}
-              color="black"
-              style={styles.icon}
-            />
-          </Pressable>
-        </View>
-
-        {menuVisible && (
-          <View style={styles.dropdown}>
-            <TouchableOpacity onPress={() => console.log("Opción 1")}>
-              <Text style={styles.menuItem}>Opción 1</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => console.log("Opción 2")}>
-              <Text style={styles.menuItem}>Opción 2</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View> */}
-
-      {/* Formulario y Lista */}
-      <View style={[styles.formAndListContainer, isWeb && styles.webLayout]}>
-        {/* Formulario */}
-        <View style={[styles.formContainer, isWeb && styles.webFormContainer]}>
-          <View style={styles.formRow}>
-            <Pressable
-              style={styles.inputSmall}
-              onPress={() => setModalVisible(true)}
+        {/* Tu contenido de pantalla */}
+        <>
+          <View style={styles.container}>
+            {/* Formulario y Lista */}
+            <View
+              style={[styles.formAndListContainer, isWeb && styles.webLayout]}
             >
-              <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
-                {sorteoNombre || "Seleccione sorteo"}
-              </Text>
-            </Pressable>
-            <SorteoSelectorModal
-              visible={modalVisible}
-              onClose={() => setModalVisible(false)}
-              onSelect={(sorteo) => {
-                setSorteoId(sorteo.id);
-                setSorteoNombre(sorteo.name);
-              }}
-            />
+              {/* Formulario */}
+              <View
+                style={[styles.formContainer, isWeb && styles.webFormContainer]}
+              >
+                <View style={styles.formRow}>
+                  <Pressable
+                    style={styles.inputSmall}
+                    onPress={() => setModalVisible(true)}
+                  >
+                    <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
+                      {sorteoNombre || "Sorteo"}
+                    </Text>
+                  </Pressable>
+                  <SorteoSelectorModal
+                    visible={modalVisible}
+                    onClose={() => setModalVisible(false)}
+                    onSelect={(sorteo) => {
+                      Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
 
-            {Platform.OS === "web" ? (
-              <input
-                type="date"
-                value={toInputDateFormat(fecha)}
-                onChange={(e) => {
-                  const newDate = new Date(e.target.value);
-                  if (!isNaN(newDate)) setFecha(newDate);
-                }}
-                style={{
-                  ...styles.inputSmall,
-                  padding: 8,
-                  fontSize: 16,
-                  border: "none",
-                }}
-              />
-            ) : (
-              <>
-                <Pressable
-                  onPress={() => setShowPicker(true)}
-                  style={styles.inputSmall}
-                >
-                  <Text>{formattedDate || "Selecciona fecha"}</Text>
-                </Pressable>
-
-                {showPicker && (
-                  <DateTimePicker
-                    value={fecha}
-                    mode="date"
-                    display={Platform.OS === "android" ? "calendar" : "default"}
-                    onChange={handleDateChange}
+                      setSorteoId(mSorteo.id);
+                      setSorteoNombre(mSorteo.name);
+                      setUseReventado(mSorteo.useReventado);
+                      setReventar(false);
+                      setMonto_reventar("");
+                      setTiempo((prev) => ({
+                        ...prev,
+                        sorteoId: sorteo.id,
+                      }));
+                    }}
                   />
+
+                  {Platform.OS === "web" ? (
+                    <input
+                      type="date"
+                      value={toInputDateFormat(fecha)}
+                      onChange={(e) => {
+                        const newDate = new Date(e.target.value);
+                        if (!isNaN(newDate)) {
+                          setFecha(newDate);
+                          setTiempo((prev) => ({
+                            ...prev,
+                            fecha: newDate,
+                          }));
+                          //tiempo.fecha = newDate;
+                        }
+                      }}
+                      style={{
+                        ...styles.inputSmall,
+                        padding: 8,
+                        fontSize: 16,
+                        border: "none",
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <Pressable
+                        onPress={() => setShowPicker(true)}
+                        style={styles.inputSmall}
+                      >
+                        <Text>{formattedDate || "Selecciona fecha"}</Text>
+                      </Pressable>
+
+                      {showPicker && (
+                        <DateTimePicker
+                          value={fecha}
+                          mode="date"
+                          display={
+                            Platform.OS === "android" ? "calendar" : "default"
+                          }
+                          onChange={handleDateChange}
+                        />
+                      )}
+                    </>
+                  )}
+                </View>
+
+                <TextInput
+                  placeholder="Nombre Cliente"
+                  style={styles.input}
+                  //value={nombreCliente}
+                  value={nombreCliente}
+                  onChangeText={setNombreCliente}
+                />
+                {/* Switches */}
+                <View style={styles.switchRow}>
+                  <Text>Limpiar al imprimir</Text>
+                  <Switch value={limpiar} onValueChange={setLimpiar} />
+
+                  {useReventado && (
+                    <>
+                      <Text>Reventar</Text>
+                      <Switch
+                        value={reventar}
+                        onValueChange={handleReventarChange}
+                      />
+                    </>
+                  )}
+                </View>
+
+                {/* Botón, Monto y Número en una fila */}
+                <View style={styles.row}>
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {
+                      if (isMontoLocked) {
+                        // Desbloquear si ya estaba bloqueado
+                        setIsMontoLocked(false);
+                        montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+                        setMonto("");
+                      } else {
+                        const montoNum = parseInt(monto, 10);
+                        if (!isNaN(montoNum) && montoNum % 50 === 0) {
+                          setIsMontoLocked(true); // Bloquear el campo
+                          numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+                        } else {
+                          Alert.alert(
+                            "Monto inválido",
+                            "Debe ser un múltiplo de 50.",
+                          );
+                        }
+                      }
+                    }}
+                  >
+                    <MaterialIcons
+                      name={isMontoLocked ? "lock" : "lock-open"}
+                      size={20}
+                      color="gray"
+                    />
+                  </TouchableOpacity>
+
+                  <TextInput
+                    ref={montoRef}
+                    placeholder="Monto"
+                    style={[styles.inputSmall, { marginLeft: 8 }]}
+                    value={monto}
+                    onChangeText={setMonto}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                    editable={!isMontoLocked}
+                    onSubmitEditing={() => {
+                      const montoNum = parseInt(monto, 10);
+                      if (!isNaN(montoNum) && montoNum % 50 === 0) {
+                        numeroRef.current?.focus();
+                      } else {
+                        Alert.alert(
+                          "Monto inválido",
+                          "Debe ser un múltiplo de 50.",
+                        );
+                      }
+                    }}
+                  />
+
+                  <TextInput
+                    ref={numeroRef}
+                    placeholder="Número"
+                    style={[styles.inputSmall, { marginLeft: 8 }]}
+                    value={numero}
+                    onChangeText={setNumero}
+                    keyboardType="numeric"
+                    returnKeyType="done"
+                  />
+                </View>
+                {useReventado && reventar && (
+                  <View style={styles.row}>
+
+                    <View style={styles.iconButtonInvisible} />
+
+                    <TextInput
+                      ref={reventarRef}
+                      placeholder="Reventar"
+                      style={[styles.inputSmall, { marginLeft: 8 }]}
+                      value={monto_reventar}
+                      onChangeText={setMonto_reventar}
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                      onSubmitEditing={() => {
+                        const montoNumReventar = parseInt(monto_reventar, 10);
+                        if (
+                          !isNaN(montoNumReventar) &&
+                          montoNumReventar % 50 === 0
+                        ) {
+                          handleSubmitReventar();
+                        } else {
+                          Alert.alert(
+                            "Monto inválido",
+                            "Debe ser un múltiplo de 50.",
+                          );
+                        }
+                      }}
+                    />
+                    <View
+                      style={[styles.inputSmallInvisible, { marginLeft: 8 }]}
+                    />
+                  </View>
                 )}
-              </>
-            )}
-          </View>
+              </View>
 
-          <TextInput
-            placeholder="Nombre Cliente"
-            style={styles.input}
-            //value={nombreCliente}
-            value={userData?.name}
-            onChangeText={setNombreCliente}
-          />
-
-          {/* Switches */}
-          <View style={styles.switchRow}>
-            <Text>Limpiar al imprimir</Text>
-            <Switch value={limpiar} onValueChange={setLimpiar} />
-            <Text style={{ marginLeft: 20 }}>Reventar</Text>
-            <Switch value={reventar} onValueChange={setReventar} />
-          </View>
-
-          {/* Botón, Monto y Número en una fila */}
-          <View style={styles.row}>
-            <TouchableOpacity
-              style={styles.iconButton}
-              onPress={() => {
-                if (isMontoLocked) {
-                  // Desbloquear si ya estaba bloqueado
-                  setIsMontoLocked(false);
-                  montoRef.current?.focus(); // Volver a poner el enfoque en el monto
-                  setMonto("");
-                } else {
-                  const montoNum = parseInt(monto, 10);
-                  if (!isNaN(montoNum) && montoNum % 50 === 0) {
-                    setIsMontoLocked(true); // Bloquear el campo
-                    numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
-                  } else {
-                    Alert.alert(
-                      "Monto inválido",
-                      "Debe ser un múltiplo de 50.",
-                    );
-                  }
-                }
-              }}
-            >
-              <Ionicons
-                name={isMontoLocked ? "lock-closed" : "lock-open"}
-                size={20}
-                color="gray"
-              />
-            </TouchableOpacity>
-
-            <TextInput
-              ref={montoRef}
-              placeholder="Monto"
-              style={[styles.inputSmall, { marginLeft: 8 }]}
-              value={monto}
-              onChangeText={setMonto}
-              keyboardType="numeric"
-              returnKeyType="done"
-              editable={!isMontoLocked}
-              onSubmitEditing={() => {
-                const montoNum = parseInt(monto, 10);
-                if (!isNaN(montoNum) && montoNum % 50 === 0) {
-                  numeroRef.current?.focus();
-                } else {
-                  Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
-                }
-              }}
-            />
-
-            <TextInput
-              ref={numeroRef}
-              placeholder="Numero"
-              style={[styles.inputSmall, { marginLeft: 8 }]}
-              value={numero}
-              onChangeText={setNumero}
-              keyboardType="numeric"
-              returnKeyType="done"
-              // onChangeText={(text) => {
-              //   setNumero(text);
-              //   if (numero.length === 2) {
-              //     if (monto.trim() === "" || numero.trim() === "") {
-              //       Alert.alert(
-              //         "Error",
-              //         "Debe ingresar monto y número válidos.",
-              //       );
-              //       return;
-              //     }
-
-              //     // Comprobamos si el número ya existe en los items
-              //     const existingItemIndex = items.findIndex(
-              //       (item) => item.numero === numero,
-              //     );
-
-              //     if (existingItemIndex !== -1) {
-              //       // Si el número ya existe, sumamos el monto al monto existente
-              //       const updatedItems = [...items];
-              //       updatedItems[existingItemIndex].monto = (
-              //         parseFloat(updatedItems[existingItemIndex].monto) +
-              //         parseFloat(monto)
-              //       ).toString(); // Sumar el monto y convertirlo de nuevo a string
-
-              //       // Mover el item actualizado al final de la lista
-              //       const itemToMove = updatedItems.splice(
-              //         existingItemIndex,
-              //         1,
-              //       )[0]; // Sacamos el item de la lista
-              //       updatedItems.unshift(itemToMove); // Lo agregamos al final
-
-              //       setItems(updatedItems); // Actualizar la lista con el monto sumado
-              //     } else {
-              //       // Si el número no existe, agregamos un nuevo item
-              //       const newItem = {
-              //         key: Date.now().toString(), // clave única
-              //         monto: monto,
-              //         numero: numero,
-              //       };
-
-              //       setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
-              //     }
-
-              //     //setItems((prevItems) => [newItem, ...prevItems]); // lo agrega arriba en la lista
-              //     setMonto(""); // limpia monto
-              //     setNumero(""); // limpia numero
-              //     montoRef.current?.focus();
-              //   } else {
-              //   }
-              // }}
-            />
-          </View>
-          {reventar && (
-            <View style={styles.row}>
-              <TextInput
-                placeholder="Reventar"
-                style={styles.inputSmall}
-                value={monto_reventar}
-                onChangeText={setMonto_reventar}
-                keyboardType="numeric"
-              />
+              {/* Lista */}
+              <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
+                <FlatList
+                  data={items}
+                  renderItem={renderItem}
+                  keyExtractor={(item) => item.key}
+                  style={{ marginTop: 0 }}
+                />
+              </View>
             </View>
-          )}
-        </View>
 
-        {/* Lista */}
-        <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
-          <FlatList
-            data={items}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.key}
-            style={{ marginTop: 0 }}
-          />
-        </View>
+            {/* Total */}
+            <View style={styles.totalBar}>
+              <Text style={styles.totalText}>TOTAL: </Text>
+              <Text style={styles.totalValue}>₡{total.toFixed(2)}</Text>
+            </View>
+          </View>
+        </>
       </View>
-
-      {/* Total */}
-      <View style={styles.totalBar}>
-        <Text style={styles.totalText}>TOTAL: </Text>
-        <Text style={styles.totalValue}>₡{total.toFixed(2)}</Text>
-      </View>
-    </View>
+    </Provider>
   );
 }
 
@@ -407,7 +897,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
-    padding: 16,
+    paddingRight: 16,
+    paddingLeft: 16,
+    paddingBottom: 16,
     justifyContent: "flex-start",
   },
   header: {
@@ -475,6 +967,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
+    borderTopWidth: 1,
+    borderColor: "#eee",
+  },
+  itemRowRev: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderColor: "#eee",
   },
@@ -500,9 +1000,21 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 8,
   },
+  inputSmallInvisible: {
+    flex: 1,
+    padding: 8,
+  },
+  iconButtonInvisible: {
+    width: 40,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 0,
+  },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 10,
     gap: 8,
   },
