@@ -12,7 +12,14 @@ import {
   Alert,
   Platform,
 } from "react-native";
-import { Menu, Divider, Provider } from "react-native-paper";
+import {
+  Menu,
+  Divider,
+  Provider,
+  Portal,
+  Dialog,
+  Button,
+} from "react-native-paper";
 //import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
@@ -24,28 +31,83 @@ import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
+import { useTiempo } from "../models/mTiempoContext";
+import { convertNumero, validateMonto } from "../utils/numeroUtils";
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
+  const [dialogVisible, setDialogVisible] = useState(false);
+  const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
+
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
+  const [categoriasMonto, setCategoriasMonto] = useState("");
+  const [categoriasTerminaEn, setCategoriasTerminaEn] = useState("");
+
   const menuAnchorRef = useRef(null);
 
-  const openMenu = () => setMenuVisibleHeader(true);
-  const closeMenu = () => setMenuVisibleHeader(false);
+  const openMenuHeader = () => setMenuVisibleHeader(true);
+  const closeMenuHeader = () => setMenuVisibleHeader(false);
+
+  // 🔹 MÉTODOS DEL DIÁLOGO
+  const openDialogCategorias = () => {
+    console.log("Abriendo diálogo");
+    closeMenuHeader();
+    setDialogVisible(true);
+  };
+
+  const closeDialogCategorias = () => {
+    setDialogVisible(false);
+    setCategoriaSeleccionada(null);
+    setCategoriasMonto("");
+    setCategoriasTerminaEn("");
+  };
+  const OKDialogCategorias = () => {
+    const montoTemp = parseInt(categoriasMonto); // si textFieldPreSellCategoryMonto es un string del estado
+    const v = validateMonto(montoTemp);
+    console.log("Monto válido", v);
+    if (validateMonto(montoTemp)) {
+      if (categoriaSeleccionada === "Parejitas") {
+        for (let i = 0; i <= 9; i++) {
+          const number = parseInt(`${i}${i}`);
+
+          const numero = convertNumero(number);
+          txtNumeroDone(montoTemp, numero);
+        }
+      }
+      setDialogVisible(false);
+      setCategoriaSeleccionada(null);
+      setCategoriasMonto("");
+      setCategoriasTerminaEn("");
+    } else {
+      Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
+    }
+  };
+
+  // 🔹 MÉTODOS DEL DROPDOWN
+  const openCategoriaSelector = () => {
+    console.log("Abriendo selector de categorías");
+    setCategoriaDialogVisible(true);
+  };
+  const closeCategoriaSelector = () => setCategoriaDialogVisible(false);
+
+  const seleccionarCategoria = (categoria) => {
+    setCategoriaSeleccionada(categoria);
+    closeCategoriaSelector();
+  };
+
+  useEffect(() => {
+    console.log("categoriaDialogVisible cambió a:", categoriaDialogVisible);
+  }, [categoriaDialogVisible]);
+
+  const { tiempo, setTiempo, resetTiempo, setNombreCliente } = useTiempo();
 
   // El botón que actuará como anchor para el menú
   const MenuAnchor = (
-    <TouchableOpacity onPress={openMenu} style={{ marginRight: 10 }}>
+    <TouchableOpacity onPress={openMenuHeader} style={{ marginRight: 10 }}>
       <MaterialIcons name="more-vert" size={24} color="#fff" />
     </TouchableOpacity>
   );
-
-  const [tiempo, setTiempo] = useState({
-    sorteoId: null,
-    fecha: null,
-    nombreCliente: "",
-    montoNumeros: [],
-  });
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -76,26 +138,23 @@ export default function VentaScreen({ navigation, route }) {
           {/* Menú anclado al botón visible */}
           <Menu
             visible={menuVisibleHeader}
-            onDismiss={closeMenu}
+            onDismiss={closeMenuHeader}
             anchor={MenuAnchor}
             contentStyle={{ backgroundColor: "white", marginRight: 15 }} // Fondo blanco
           >
             <Menu.Item
               onPress={() => {
-                closeMenu();
+                closeMenuHeader();
                 console.log("Pre Cargar");
               }}
               title="Pre Cargar"
               titleStyle={{ color: "#000" }} // Texto negro opcional
             />
-            <Divider />
+
             <Menu.Item
-              onPress={() => {
-                closeMenu();
-                console.log("Categorías Predeterminadas");
-              }}
+              onPress={openDialogCategorias}
               title="Categorías Predeterminadas"
-              titleStyle={{ color: "#000" }} // Texto negro opcional
+              titleStyle={{ color: "#000" }}
             />
           </Menu>
         </>
@@ -114,7 +173,6 @@ export default function VentaScreen({ navigation, route }) {
   const [reventar, setReventar] = useState(false);
   const [sorteo, setSorteo] = useState("");
   const [fecha, setFecha] = useState(new Date()); // Siempre inicializa con un Date válido
-  const [nombreCliente, setNombreCliente] = useState("");
   const [monto, setMonto] = useState("");
   const [numero, setNumero] = useState("");
   const [monto_reventar, setMonto_reventar] = useState("");
@@ -127,7 +185,7 @@ export default function VentaScreen({ navigation, route }) {
   const montoRef = useRef(null);
 
   const { width } = useWindowDimensions();
-  const isWeb = width > 768;
+  const isWeb = width > 710;
 
   const onChange = (event, selectedDate) => {
     setShowPicker(false);
@@ -195,6 +253,10 @@ export default function VentaScreen({ navigation, route }) {
     setShowPicker(false);
     if (selectedDate) {
       setFecha(selectedDate);
+      // setTiempo((prev) => ({
+      //   ...prev,
+      //   fecha: selectedDate,
+      // }));
       setTiempo((prev) => ({
         ...prev,
         fecha: selectedDate,
@@ -252,20 +314,20 @@ export default function VentaScreen({ navigation, route }) {
     0,
   );
 
-  const asignarItemsAMontoNumeros = () => {
-    setTiempo((prev) => {
-      const nuevoTiempo = {
-        ...prev,
-        montoNumeros: items.map((item) => ({
-          monto: item.monto,
-          numero: item.numero,
-          ...(item.rev ? { rev: item.rev } : {}),
-        })),
-      };
+  // const asignarItemsAMontoNumeros = () => {
+  //   setTiempo((prev) => {
+  //     const nuevoTiempo = {
+  //       ...prev,
+  //       montoNumeros: items.map((item) => ({
+  //         monto: item.monto,
+  //         numero: item.numero,
+  //         ...(item.rev ? { rev: item.rev } : {}),
+  //       })),
+  //     };
 
-      return nuevoTiempo;
-    });
-  };
+  //     return nuevoTiempo;
+  //   });
+  // };
 
   const reventarRef = useRef(null);
 
@@ -423,13 +485,13 @@ export default function VentaScreen({ navigation, route }) {
     } else {
       // Si el número no existe, agregamos un nuevo item
       let newItem = {
-        key: Date.now().toString(), // clave única
+        key: generateKey(),
         monto: monto,
         numero: numero,
       };
       if (reventado) {
         newItem = {
-          key: Date.now().toString(), // clave única
+          key: generateKey(), // clave única
           monto: monto,
           numero: numero,
           rev: monto_reventar,
@@ -455,6 +517,10 @@ export default function VentaScreen({ navigation, route }) {
       // }));
     }
   };
+
+  function generateKey() {
+    return `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  }
 
   const validarMontoContraRestricciones = (numero, monto, restricciones) => {
     const montoNumerico = parseFloat(monto);
@@ -664,8 +730,7 @@ export default function VentaScreen({ navigation, route }) {
                 <TextInput
                   placeholder="Nombre Cliente"
                   style={styles.input}
-                  //value={nombreCliente}
-                  value={nombreCliente}
+                  value={tiempo.nombreCliente}
                   onChangeText={setNombreCliente}
                 />
                 {/* Switches */}
@@ -696,7 +761,7 @@ export default function VentaScreen({ navigation, route }) {
                         setMonto("");
                       } else {
                         const montoNum = parseInt(monto, 10);
-                        if (!isNaN(montoNum) && montoNum % 50 === 0) {
+                        if (!isNaN(montoNum) && validateMonto(montoNum) === 0) {
                           setIsMontoLocked(true); // Bloquear el campo
                           numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
                         } else {
@@ -726,7 +791,7 @@ export default function VentaScreen({ navigation, route }) {
                     editable={!isMontoLocked}
                     onSubmitEditing={() => {
                       const montoNum = parseInt(monto, 10);
-                      if (!isNaN(montoNum) && montoNum % 50 === 0) {
+                      if (!isNaN(montoNum) && validateMonto(montoNum) === 0) {
                         numeroRef.current?.focus();
                       } else {
                         Alert.alert(
@@ -763,7 +828,7 @@ export default function VentaScreen({ navigation, route }) {
                         const montoNumReventar = parseInt(monto_reventar, 10);
                         if (
                           !isNaN(montoNumReventar) &&
-                          montoNumReventar % 50 === 0
+                          validateMonto(montoNumReventar) === 0
                         ) {
                           handleSubmitReventar();
                         } else {
@@ -800,6 +865,274 @@ export default function VentaScreen({ navigation, route }) {
           </View>
         </>
       </View>
+
+      <Portal>
+        {/* Diálogo principal */}
+        <Dialog
+          visible={dialogVisible}
+          onDismiss={closeDialogCategorias}
+          style={[
+            {
+              backgroundColor: "white", // Fondo blanco
+              borderRadius: 10, // Bordes redondeados
+              marginHorizontal: 20, // Margen lateral
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4, // sombra en Android
+              shadowColor: "#000", // sombra en iOS
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          {/* <Dialog.Title style={{ flexDirection: "row", alignItems: "center" }}>
+            <View style={styles.row}>
+              <MaterialIcons name="qr-code" size={35} color="#000" />
+              <Text
+                style={{ marginLeft: 8, fontWeight: "bold", color: "#000" }}
+              >
+                CATEGORÍAS PREDETERMINADAS
+              </Text>
+            </View>
+          </Dialog.Title> */}
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons name="qr-code" size={35} color="#000" />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                CATEGORÍAS PREDETERMINADAS
+              </Text>
+            </View>
+
+            {/* Campo categoría (abre otro diálogo) */}
+            <Pressable
+              style={styles.inputSmall}
+              onPress={openCategoriaSelector}
+            >
+              <Text style={{ color: categoriaSeleccionada ? "#000" : "#aaa" }}>
+                {categoriaSeleccionada || "Selecciona categoría"}
+              </Text>
+            </Pressable>
+            {categoriaSeleccionada !== "Extraer de Texto" && (
+              <TextInput
+                placeholder="Monto"
+                style={styles.input}
+                value={categoriasMonto}
+                onChangeText={setCategoriasMonto}
+                keyboardType="numeric"
+              />
+            )}
+            {categoriaSeleccionada === "Terminan en..." && (
+              <TextInput
+                placeholder="Números que terminan en"
+                value={categoriasTerminaEn}
+                onChangeText={setCategoriasTerminaEn}
+                keyboardType="numeric"
+                style={[styles.input, { marginTop: 15, textAlign: "center" }]}
+              />
+            )}
+            {categoriaSeleccionada === "Inician con..." && (
+              <TextInput
+                placeholder="Números que inician con"
+                value={categoriasTerminaEn}
+                onChangeText={setCategoriasTerminaEn}
+                keyboardType="numeric"
+                style={[styles.input, { marginTop: 15, textAlign: "center" }]}
+              />
+            )}
+            {categoriaSeleccionada === "Desde / Hasta" && (
+              <>
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <TextInput
+                    placeholder="Desde"
+                    value={categoriasTerminaEn}
+                    onChangeText={setCategoriasTerminaEn}
+                    keyboardType="numeric"
+                    style={[
+                      styles.input,
+                      { marginTop: 15, textAlign: "center", width: 140 },
+                    ]}
+                  />
+                  <TextInput
+                    placeholder="Hasta"
+                    value={categoriasTerminaEn}
+                    onChangeText={setCategoriasTerminaEn}
+                    keyboardType="numeric"
+                    style={[
+                      styles.input,
+                      { marginTop: 15, textAlign: "center", width: 140 },
+                    ]}
+                  />
+                </View>
+              </>
+            )}
+            {categoriaSeleccionada === "Extraer de Texto" && (
+              <TextInput
+                placeholder="Pega aqui el mensage"
+                value={categoriasTerminaEn}
+                onChangeText={setCategoriasTerminaEn}
+                multiline={true} // <-- habilita multilinea
+                numberOfLines={4}
+                style={[
+                  styles.input,
+                  {
+                    marginTop: 15,
+                    textAlign: "center",
+                    height: 100, // altura inicial en píxeles
+                    maxHeight: 150, // altura máxima que puede crecer
+                    textAlignVertical: "top", // para que el texto inicie en la parte superior (Android)
+                  },
+                ]}
+              />
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={closeDialogCategorias}
+            >
+              CANCELAR
+            </Button>
+            <Button
+              textColor="#4CAF50"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={OKDialogCategorias}
+            >
+              OK
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Diálogo para elegir categoría */}
+        <Dialog
+          visible={categoriaDialogVisible}
+          onDismiss={closeCategoriaSelector}
+          style={[
+            {
+              backgroundColor: "white", // Fondo blanco
+              borderRadius: 10, // Bordes redondeados
+              marginHorizontal: 20, // Margen lateral
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4, // sombra en Android
+              shadowColor: "#000", // sombra en iOS
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          {/* <Dialog.Title>
+            <Text style={{ marginLeft: 8, fontWeight: "bold", color: "#000" }}>
+              CATEGORÍAS
+            </Text>
+          </Dialog.Title> */}
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons name="category" size={35} color="#000" />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                CATEGORÍAS
+              </Text>
+            </View>
+            <Button
+              onPress={() => seleccionarCategoria("Parejitas")}
+              textColor="#000"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                width: "100%",
+                borderRadius: 3,
+              }}
+              contentStyle={{ justifyContent: "flex-start" }} // Texto a la izquierda
+            >
+              Parejitas
+            </Button>
+            <Button
+              onPress={() => seleccionarCategoria("Terminan en...")}
+              textColor="#000"
+              style={{ marginBottom: 10, width: "100%", borderRadius: 3 }}
+              contentStyle={{ justifyContent: "flex-start" }} // Texto a la izquierda
+            >
+              Terminan en...
+            </Button>
+            <Button
+              onPress={() => seleccionarCategoria("Inician con...")}
+              textColor="#000"
+              style={{ marginBottom: 10, width: "100%", borderRadius: 3 }}
+              contentStyle={{ justifyContent: "flex-start" }} // Texto a la izquierda
+            >
+              Inician con...
+            </Button>
+            <Button
+              onPress={() => seleccionarCategoria("Desde / Hasta")}
+              textColor="#000"
+              style={{ marginBottom: 10, width: "100%", borderRadius: 3 }}
+              contentStyle={{ justifyContent: "flex-start" }} // Texto a la izquierda
+            >
+              Desde / Hasta
+            </Button>
+            <Button
+              onPress={() => seleccionarCategoria("Extraer de Texto")}
+              textColor="#000"
+              style={{ marginBottom: 10, width: "100%", borderRadius: 3 }}
+              contentStyle={{ justifyContent: "flex-start" }} // Texto a la izquierda
+            >
+              Extraer de Texto
+            </Button>
+          </Dialog.Content>
+        </Dialog>
+      </Portal>
     </Provider>
   );
 }
@@ -910,6 +1243,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#ccc",
     padding: 8,
+    minHeight: 40, // importante para móviles
   },
   inputSmallInvisible: {
     flex: 1,
@@ -967,5 +1301,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginLeft: 4,
     fontWeight: "bold",
+  },
+  dialogWebContainer: {
+    position: "fixed", // fijo en pantalla
+    top: 0,
+    right: 0,
+    height: "100vh", // toda la altura visible
+    width: 400, // ancho fijo para el diálogo
+    backgroundColor: "white",
+    padding: 20,
+    boxShadow: "0 0 10px rgba(0,0,0,0.3)",
+    zIndex: 1000, // asegurarse que quede encima de todo
+    overflowY: "auto",
   },
 });
