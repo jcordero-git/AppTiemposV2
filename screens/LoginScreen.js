@@ -155,6 +155,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
+    width: "100%",
+    maxWidth: 400,
   },
   buttonPressed: {
     backgroundColor: "#005BBB",

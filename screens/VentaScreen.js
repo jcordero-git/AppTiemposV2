@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,9 @@ import {
   useWindowDimensions,
   Alert,
   Platform,
+  ScrollView,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
 } from "react-native";
 import {
   Menu,
@@ -21,10 +24,13 @@ import {
   Button,
 } from "react-native-paper";
 //import { Ionicons } from "@expo/vector-icons";
+
+import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
+
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 import { format } from "date-fns";
-import { es } from "date-fns/locale"; // idioma español
+import { da, de, es, tr } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
@@ -33,60 +39,230 @@ import mSorteo from "../models/mSorteoSingleton.js";
 import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
+import { parseMessage } from "../utils/UtilParseMessageAI";
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
+  const [dialogTicketsVisible, setDialogTicketsVisible] = useState(false);
+  const [dialogRestringidoVisible, setDialogRestringidoVisible] =
+    useState(false);
+  const [ultimoTicket, setUltimoTicket] = useState(null);
 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [categoriasMonto, setCategoriasMonto] = useState("");
   const [categoriasTerminaEn, setCategoriasTerminaEn] = useState("");
+  const [categoriasInicianCon, setCategoriasInicianCon] = useState("");
+  const [categoriasDesde, setCategoriasDesde] = useState("");
+  const [categoriasHasta, setCategoriasHasta] = useState("");
+  const [categoriasExtraerTexto, setCategoriasExtraerTexto] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const [categoriasMontoTemporal, setCategoriasMontoTemporal] =
+    useState(categoriasMonto);
 
   const menuAnchorRef = useRef(null);
+
+  useEffect(() => {
+    if (dialogVisible) setCategoriasMontoTemporal(categoriasMonto);
+  }, [dialogVisible]);
 
   const openMenuHeader = () => setMenuVisibleHeader(true);
   const closeMenuHeader = () => setMenuVisibleHeader(false);
 
+  //PROMESAS
+  const resolverDialogRef = useRef(null);
+  const [dialogNumeroRestringido, setDialogNumeroRestringido] = useState("");
+  const [
+    dialogMontoRestringidoDisponible,
+    setDialogMontoRestringidoDisponible,
+  ] = useState("");
+  function esperarConfirmacionDialog(numero, montoDisponible) {
+    console.log("entra a esperar confirmacion 1");
+    return new Promise((resolve) => {
+      setDialogNumeroRestringido(numero);
+      setDialogMontoRestringidoDisponible(montoDisponible);
+      setDialogRestringidoVisible(true); // mostrar el Dialog
+      // Guardamos el resolver para llamarlo después
+      console.log("entra a esperar confirmacion 2");
+
+      resolverDialogRef.current = resolve;
+    });
+  }
+
   // 🔹 MÉTODOS DEL DIÁLOGO
-  const openDialogCategorias = () => {
-    console.log("Abriendo diálogo");
+  const openDialogRestringido = () => {
+    setDialogRestringidoVisible(true);
+  };
+
+  const closeDialogRestringido = () => {
+    setNumero("");
+    numeroRef.current?.focus();
+
+    setDialogRestringidoVisible(false);
+  };
+  const openDialogTickets = () => {
+    setDialogTicketsVisible(true);
+  };
+
+  const closeDialogTickets = () => {
+    setDialogTicketsVisible(false);
+  };
+  // const openDialogCategorias = () => {
+  //   closeMenuHeader();
+  //   setDialogVisible(true);
+  // };
+  const openDialogCategorias = useCallback(() => {
     closeMenuHeader();
     setDialogVisible(true);
-  };
+  }, []);
 
   const closeDialogCategorias = () => {
     setDialogVisible(false);
     setCategoriaSeleccionada(null);
     setCategoriasMonto("");
     setCategoriasTerminaEn("");
+    setCategoriasInicianCon("");
+    setCategoriasDesde("");
+    setCategoriasHasta("");
+    setCategoriasExtraerTexto("");
   };
-  const OKDialogCategorias = () => {
-    const montoTemp = parseInt(categoriasMonto); // si textFieldPreSellCategoryMonto es un string del estado
-    const v = validateMonto(montoTemp);
-    console.log("Monto válido", v);
-    if (validateMonto(montoTemp)) {
-      if (categoriaSeleccionada === "Parejitas") {
-        for (let i = 0; i <= 9; i++) {
-          const number = parseInt(`${i}${i}`);
 
-          const numero = convertNumero(number);
-          txtNumeroDone(montoTemp, numero);
-        }
+  const SelectTicket = () => {
+    console.log("select ticket");
+    closeDialogTickets();
+  };
+
+  const OKDialogCategorias = async () => {
+    let montoTemp;
+    if (categoriaSeleccionada !== "Extraer de Texto") {
+      montoTemp = parseInt(categoriasMonto);
+      if (!validateMonto(montoTemp)) {
+        Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
+        return;
       }
-      setDialogVisible(false);
-      setCategoriaSeleccionada(null);
-      setCategoriasMonto("");
-      setCategoriasTerminaEn("");
-    } else {
-      Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
     }
+    setDialogVisible(false);
+    let currentItems = [...items]; // arranco con la lista actual
+
+    if (categoriaSeleccionada === "Parejitas") {
+      for (let i = 0; i <= 9; i++) {
+        const number = parseInt(`${i}${i}`);
+        const numero = convertNumero(number);
+        [currentItems] = await verificaRestringidosYAgregaNumero(
+          montoTemp,
+          numero,
+          currentItems,
+          tiemposAnteriores,
+        );
+        console.log("CURRENT ITEM DESDE PAREJITAS: ", currentItems);
+      }
+    }
+    if (categoriaSeleccionada === "Terminan en...") {
+      for (let i = 0; i <= 9; i++) {
+        const number = parseInt(`${i}${categoriasTerminaEn}`);
+        const numero = convertNumero(number);
+        [currentItems] = await verificaRestringidosYAgregaNumero(
+          montoTemp,
+          numero,
+          currentItems,
+          tiemposAnteriores,
+        );
+        console.log("CURRENT ITEM DESDE TERMINAN EN: ", currentItems);
+      }
+    }
+    if (categoriaSeleccionada === "Inician con...") {
+      for (let i = 0; i <= 9; i++) {
+        const number = parseInt(`${categoriasInicianCon}${i}`);
+        const numero = convertNumero(number);
+        [currentItems] = await verificaRestringidosYAgregaNumero(
+          montoTemp,
+          numero,
+          currentItems,
+          tiemposAnteriores,
+        );
+        console.log("CURRENT ITEM DESDE INICIAN CON: ", currentItems);
+      }
+    }
+    if (categoriaSeleccionada === "Desde / Hasta") {
+      const desde = parseInt(categoriasDesde);
+      const hasta = parseInt(categoriasHasta);
+
+      for (let i = desde; i <= hasta; i++) {
+        const number = parseInt(`${i}`);
+        const numero = convertNumero(number);
+        [currentItems] = await verificaRestringidosYAgregaNumero(
+          montoTemp,
+          numero,
+          currentItems,
+          tiemposAnteriores,
+        );
+        console.log("CURRENT ITEM DESDE / HASTA: ", currentItems);
+      }
+    }
+    console.log("categoriaSeleccionada", categoriaSeleccionada);
+    if (categoriaSeleccionada === "Extraer de Texto") {
+      setLoading(true); // Mostrar loader
+
+      try {
+        const runGeminiExample = async () => {
+          const setting = userData.settings.find(
+            (s) => s.promt_extrae !== undefined,
+          );
+          const prompt = setting ? setting.promt_extrae : "";
+          const day = new Date().getDate();
+          const extraPrompt = prompt;
+          const text = categoriasExtraerTexto;
+          console.log("EXTRAER DE TEXTO - ", extraPrompt + " " + text);
+          const result = await parseMessage(text, day, extraPrompt);
+          console.log("Resultado parseado:", result);
+          return result;
+        };
+
+        const result = await runGeminiExample();
+        console.log("Resultado parseado despues de llamado:", result);
+
+        for (const item of result) {
+          const numero = convertNumero(parseInt(`${item.numero}`));
+          const monto = parseInt(`${item.monto}`);
+
+          [currentItems] = await verificaRestringidosYAgregaNumero(
+            monto,
+            numero,
+            currentItems,
+            tiemposAnteriores,
+          );
+
+          console.log("CURRENT ITEM DESDE / HASTA: ", currentItems);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    setItems(currentItems);
+
+    const nuevosMontoNumeros = currentItems?.map((item) => ({
+      monto: item.monto,
+      numero: item.numero,
+      reventado: item.reventado,
+      montoReventado: item.montoReventado,
+      //...(item.montoReventado ? { rev: item.montoReventado } : {}),
+    }));
+    actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+    setCategoriaSeleccionada(null);
+    setCategoriasMonto("");
+    setCategoriasTerminaEn("");
+    setCategoriasInicianCon("");
+    setCategoriasDesde("");
+    setCategoriasHasta("");
+    setCategoriasExtraerTexto("");
   };
 
   // 🔹 MÉTODOS DEL DROPDOWN
   const openCategoriaSelector = () => {
-    console.log("Abriendo selector de categorías");
     setCategoriaDialogVisible(true);
   };
   const closeCategoriaSelector = () => setCategoriaDialogVisible(false);
@@ -96,11 +272,9 @@ export default function VentaScreen({ navigation, route }) {
     closeCategoriaSelector();
   };
 
-  useEffect(() => {
-    console.log("categoriaDialogVisible cambió a:", categoriaDialogVisible);
-  }, [categoriaDialogVisible]);
+  useEffect(() => {}, [categoriaDialogVisible]);
 
-  const { tiempo, setTiempo, resetTiempo, setNombreCliente } = useTiempo();
+  const { tiempo, setTiempo, resetTiempo, setClientName } = useTiempo();
 
   // El botón que actuará como anchor para el menú
   const MenuAnchor = (
@@ -116,17 +290,17 @@ export default function VentaScreen({ navigation, route }) {
       headerTintColor: "#fff",
       headerRight: () => (
         <>
+          <Pressable style={{ marginRight: 20 }} onPress={openDialogTickets}>
+            <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>
+              {ultimoTicket + 1}
+            </Text>
+          </Pressable>
           <MaterialIcons
             name="print"
             size={24}
             color="#fff" // Blanco para contraste con fondo verde
             style={{ marginRight: 20 }}
-            onPress={() => {
-              Alert.alert(
-                "Datos del sorteo",
-                `Sorteo: ${data.sorteo}\nFecha: ${data.fecha}`,
-              );
-            }}
+            onPress={handlePrint}
           />
           <MaterialIcons
             name="image"
@@ -145,7 +319,6 @@ export default function VentaScreen({ navigation, route }) {
             <Menu.Item
               onPress={() => {
                 closeMenuHeader();
-                console.log("Pre Cargar");
               }}
               title="Pre Cargar"
               titleStyle={{ color: "#000" }} // Texto negro opcional
@@ -160,9 +333,11 @@ export default function VentaScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, menuVisibleHeader]);
+  }, [navigation, menuVisibleHeader, ultimoTicket]);
 
   const { userData, logout } = useAuth();
+
+  const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [sorteoNombre, setSorteoNombre] = useState("");
@@ -175,8 +350,10 @@ export default function VentaScreen({ navigation, route }) {
   const [fecha, setFecha] = useState(new Date()); // Siempre inicializa con un Date válido
   const [monto, setMonto] = useState("");
   const [numero, setNumero] = useState("");
-  const [monto_reventar, setMonto_reventar] = useState("");
+  const [montoDisponible, setMontoDisponible] = useState("");
+  const [montoReventado, setMontoReventado] = useState("");
   const [useReventado, setUseReventado] = useState(false);
+  const [abiertoPorReventado, setAbiertoPorReventado] = useState(false);
 
   const toggleMenu = () => setMenuVisible(!menuVisible);
   const [showPicker, setShowPicker] = useState(false);
@@ -184,7 +361,7 @@ export default function VentaScreen({ navigation, route }) {
   const numeroRef = useRef(null);
   const montoRef = useRef(null);
 
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
 
   const onChange = (event, selectedDate) => {
@@ -204,9 +381,9 @@ export default function VentaScreen({ navigation, route }) {
         <Text style={styles.itemLeft}>₡{item.monto}</Text>
         <Text style={styles.itemRight}>{item.numero}</Text>
       </View>
-      {item.rev && (
+      {item.reventado && (
         <View style={styles.itemRowRev}>
-          <Text style={styles.itemLeft}>₡{item.rev}</Text>
+          <Text style={styles.itemLeft}>₡{item.montoReventado}</Text>
           <Text style={styles.itemRight}>REVENTADO</Text>
         </View>
       )}
@@ -214,6 +391,7 @@ export default function VentaScreen({ navigation, route }) {
   );
 
   const tiempoRef = useRef(tiempo);
+  const limpiarRef = useRef(limpiar);
 
   const toInputDateFormat = (date) => {
     // setTiempo((prev) => ({
@@ -241,7 +419,6 @@ export default function VentaScreen({ navigation, route }) {
 
   const handleImagePress = () => {
     const mensaje = JSON.stringify(tiempoRef.current, null, 2);
-    console.log("tiempo al hacer click en imagen: ", tiempoRef.current);
     if (Platform.OS === "web") {
       window.alert(`Contenido de "tiempo":\n${mensaje}`);
     } else {
@@ -253,13 +430,9 @@ export default function VentaScreen({ navigation, route }) {
     setShowPicker(false);
     if (selectedDate) {
       setFecha(selectedDate);
-      // setTiempo((prev) => ({
-      //   ...prev,
-      //   fecha: selectedDate,
-      // }));
       setTiempo((prev) => ({
         ...prev,
-        fecha: selectedDate,
+        drawDate: selectedDate,
       }));
     }
   };
@@ -267,36 +440,96 @@ export default function VentaScreen({ navigation, route }) {
   const handleReventarChange = (event) => {
     setReventar(!reventar);
     if (reventar === false) {
-      setMonto_reventar("");
+      setMontoReventado("");
     }
   };
 
-  const handleSubmitReventar = () => {
-    txtNumeroDone(monto, numero);
-    // const montoInt = parseInt(monto, 10);
-    // const reventarInt = parseInt(monto_reventar, 10);
+  const handleSubmitReventar = (event) => {
+    const submitReventar = async () => {
+      const [currentItems, resultIsAllowedFromMethod] =
+        await verificaRestringidosYAgregaNumero(
+          monto,
+          numero,
+          items,
+          tiemposAnteriores,
+        );
 
-    // if (
-    //   !isNaN(montoInt) &&
-    //   !isNaN(reventarInt) &&
-    //   reventarInt <= montoInt &&
-    //   numero.length === 2
-    // ) {
-    //   const nuevoItem = {
-    //     key: Date.now().toString(), // clave única
-    //     numero,
-    //     monto: montoInt.toString(),
-    //     rev: reventarInt.toString(),
-    //   };
+      // Paso 6: Actualizar estado final
+      setItems(currentItems);
+      const nuevosMontoNumeros = currentItems.map((item) => ({
+        monto: item.monto,
+        numero: item.numero,
+        reventado: item.reventado,
+        montoReventado: item.montoReventado,
+      }));
+      actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+    };
+    submitReventar();
+  };
 
-    //   setItems((prevItems) => [nuevoItem, ...prevItems]);
+  const handlePrint = async () => {
+    if (!fecha || !sorteoId || !userData?.id) return;
 
-    //   setNumero("");
-    //   setMonto_reventar("");
-    //   numeroRef.current?.focus(); // vuelve al campo número
-    // } else {
-    //   Alert.alert("Error", "Revisar monto, reventar o número.");
-    // }
+    const resultado = await inicializarYProcesar();
+
+    console.log("TODOS PERMITIDOS DESPUES DE MANDAR A IMPRIMIR?: ", resultado);
+
+    if (!resultado) {
+      console.log("❌ Validación fallida. Cancelando envío.");
+      return; // ⛔ No continúa si hay errores
+    }
+
+    const tiempoParaImprimir = resultado;
+    console.log("🖨️ Tiempo final:", tiempoParaImprimir);
+
+    const url = `http://147.182.248.177:3001/api/ticket/`;
+
+    console.log("tiempo ref:", tiempoParaImprimir);
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(tiempoParaImprimir),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error en el envío: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("Ticket enviado con éxito:", result);
+
+      fetchTiemposAnteriores(
+        tiempoParaImprimir.drawCategoryId,
+        tiempoParaImprimir.drawDate,
+      );
+
+      // Aquí podrías imprimir o navegar a otra pantalla si hace falta
+      Alert.alert("Éxito", "El ticket fue enviado correctamente.");
+      printTicketWeb(result);
+      console.log("Limpiar?: ", limpiarRef.current);
+      if (limpiarRef.current) {
+        console.log("Limpiar 2?: ", limpiarRef.current);
+        limpiarDespuesDeImprimir();
+      }
+    } catch (error) {
+      console.error("Error al enviar el ticket:", error);
+      Alert.alert("Error", "No se pudo enviar el ticket.");
+    }
+  };
+
+  const limpiarDespuesDeImprimir = () => {
+    const tiempoLimpio = {
+      ...tiempo,
+      numbers: [],
+      clientName: "",
+    };
+    setTiempo(tiempoLimpio);
+    setItems([]);
+    tiempoRef.current = tiempoLimpio;
   };
 
   const [isMontoLocked, setIsMontoLocked] = useState(false);
@@ -307,12 +540,105 @@ export default function VentaScreen({ navigation, route }) {
     fecha: format(fecha, "EEEE dd/MM/yyyy", { locale: es }),
   };
 
+  function getMontoPorNumero(items, numero) {
+    return items?.reduce((sum, item) => {
+      const mismoNumero = item.numero === numero;
+      const monto = parseFloat(item.monto);
+      const montoValido = mismoNumero && !isNaN(monto) ? monto : 0;
+      return sum + montoValido;
+    }, 0);
+  }
+
+  function getMontoPorNumeroEnTiemposVendidos(tiemposAnteriores, numero) {
+    return tiemposAnteriores
+      .filter((ticket) => ticket.status !== true) // solo los no confirmados
+      .reduce((total, ticket) => {
+        const sumaMontosTicket = ticket.numbers.reduce((sum, num) => {
+          const esNumeroBuscado = num.numero === numero;
+          const monto = parseFloat(num.monto);
+          return sum + (esNumeroBuscado && !isNaN(monto) ? monto : 0);
+        }, 0);
+        return total + sumaMontosTicket;
+      }, 0);
+  }
+
+  function getMontoReventadoPorNumero(items, numero) {
+    return items?.reduce((sum, item) => {
+      const mismoNumero = item.numero === numero;
+      const monto = parseFloat(item.montoReventado);
+      const montoValido = mismoNumero && !isNaN(monto) ? monto : 0;
+      return sum + montoValido;
+    }, 0);
+  }
+
+  function getMontoPorNumeroReventadoEnTiemposVendidos(
+    tiemposAnteriores,
+    numero,
+  ) {
+    return tiemposAnteriores
+      .filter((ticket) => ticket.status !== true) // solo los no confirmados
+      .reduce((total, ticket) => {
+        const sumaMontosTicket = ticket.numbers.reduce((sum, num) => {
+          const esNumeroBuscado = num.numero === numero;
+          const monto = parseFloat(num.montoReventado);
+          return sum + (esNumeroBuscado && !isNaN(monto) ? monto : 0);
+        }, 0);
+        return total + sumaMontosTicket;
+      }, 0);
+  }
+
   // Calcular total
-  const total = items.reduce(
-    (sum, item) =>
-      sum + parseFloat(item.monto || 0) + parseFloat(item.rev || 0),
-    0,
-  );
+  const total = items?.reduce((sum, item) => {
+    const monto = parseFloat(item.monto);
+    const montoReventado = parseFloat(item.montoReventado);
+
+    const montoValido = !isNaN(monto) ? monto : 0;
+    const montoReventadoValido = !isNaN(montoReventado) ? montoReventado : 0;
+
+    return sum + montoValido + montoReventadoValido;
+  }, 0);
+
+  // Calcular total sin reventados
+  function totalSinReventados(tiemposActualNumbers = []) {
+    return tiemposActualNumbers.reduce((sum, item) => {
+      const monto = parseFloat(item.monto);
+      const montoValido = !isNaN(monto) ? monto : 0;
+      return sum + montoValido;
+    }, 0);
+  }
+
+  // Calcular total solo reventados
+  function totalNormalYReventados(tiemposActualNumbers = []) {
+    return tiemposActualNumbers.reduce((sum, item) => {
+      const monto = parseFloat(item.monto) + parseFloat(item.montoReventado);
+      const montoValido = !isNaN(monto) ? monto : 0;
+      return sum + montoValido;
+    }, 0);
+  }
+
+  function sumaTotalSinReventadosVendidos(tiemposVendidos = []) {
+    return tiemposVendidos
+      .filter((ticket) => ticket.status !== true)
+      .reduce((total, ticket) => {
+        const sumaMontosTicket = ticket.numbers.reduce((sum, num) => {
+          const monto = parseFloat(num.monto);
+          return sum + (!isNaN(monto) ? monto : 0);
+        }, 0);
+        return total + sumaMontosTicket;
+      }, 0);
+  }
+
+  function sumaTotalNormalYReventadosVendidos(tiemposVendidos = []) {
+    return tiemposVendidos
+      .filter((ticket) => ticket.status !== true) // filtrar los que no tengan status true
+      .reduce((total, ticket) => {
+        const sumaMontosTicket = ticket.numbers.reduce((sum, num) => {
+          const monto = parseFloat(num.monto) + parseFloat(num.montoReventado);
+          return sum + (!isNaN(monto) ? monto : 0);
+        }, 0);
+        return total + sumaMontosTicket;
+      }, 0);
+  }
 
   // const asignarItemsAMontoNumeros = () => {
   //   setTiempo((prev) => {
@@ -321,7 +647,7 @@ export default function VentaScreen({ navigation, route }) {
   //       montoNumeros: items.map((item) => ({
   //         monto: item.monto,
   //         numero: item.numero,
-  //         ...(item.rev ? { rev: item.rev } : {}),
+  //         ...(item.montoReventado ? { rev: item.montoReventado } : {}),
   //       })),
   //     };
 
@@ -331,77 +657,45 @@ export default function VentaScreen({ navigation, route }) {
 
   const reventarRef = useRef(null);
 
-  const txtNumeroDone = (monto, numero) => {
-    // console.log("use Reventado Log:", reventar);
-    // if (!reventar) {
-    //   if (numero.length === 2) {
-    //     if (monto.trim() === "" || numero.trim() === "") {
-    //       Alert.alert("Error", "Debe ingresar monto y número válidos.");
-    //       return;
-    //     }
-
-    const restricciones = mSorteo.restringidos || [];
-    console.log("reglas", restricciones);
-
-    if (validarMontoContraRestricciones(numero, monto, restricciones)) {
-      return; // Se detiene si hay una restricción
+  const txtNumeroDone = (
+    currentItems,
+    monto,
+    numero,
+    reventar,
+    montoReventado,
+  ) => {
+    setNumero(""); // Limpiar número
+    if (!isMontoLocked) {
+      setMonto(""); // Limpiar monto
+      montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+    } else {
+      numeroRef.current?.focus();
     }
-    addNumeroToListAdapter(monto, numero, reventar, monto_reventar);
+    setMontoReventado("");
 
-    // // Verificar si el número ya existe en la lista de items
-    // const existingItemIndex = items.findIndex(
-    //   (item) => item.numero === numero,
-    // );
-    // let updatedItems;
+    return addNumeroToListAdapter(
+      currentItems,
+      monto,
+      numero,
+      reventar,
+      montoReventado,
+    );
+  };
 
-    // if (existingItemIndex !== -1) {
-    //   // Si el número ya existe, sumamos el monto al monto existente
-    //   updatedItems = [...items];
-    //   updatedItems[existingItemIndex].monto = (
-    //     parseFloat(updatedItems[existingItemIndex].monto) +
-    //     parseFloat(monto)
-    //   ).toString(); // Sumar el monto y convertirlo de nuevo a string
+  const txtNumeroDonev2 = (currentItems, monto, numero) => {
+    //const restricciones = mSorteo.restringidos || [];
 
-    //   // Mover el item actualizado al principio de la lista
-    //   const itemToMove = updatedItems.splice(existingItemIndex, 1)[0]; // Sacamos el item de la lista
-    //   updatedItems.unshift(itemToMove); // Lo agregamos al principio
-
-    //   setItems(updatedItems); // Actualizar la lista con el monto sumado y el item movido al principio
-    //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
-    //   const nuevosMontoNumeros = updatedItems.map((item) => ({
-    //     monto: item.monto,
-    //     numero: item.numero,
-    //     ...(item.rev ? { rev: item.rev } : {}),
-    //   }));
-
-    //   setTiempo((prev) => ({
-    //     ...prev,
-    //     montoNumeros: nuevosMontoNumeros,
-    //   }));
-    // } else {
-    //   // Si el número no existe, agregamos un nuevo item
-    //   const newItem = {
-    //     key: Date.now().toString(), // clave única
-    //     monto: monto,
-    //     numero: numero,
-    //   };
-
-    //   setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
-
-    //   updatedItems = [newItem, ...items];
-
-    //   // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
-    //   const nuevosMontoNumeros = updatedItems.map((item) => ({
-    //     monto: item.monto,
-    //     numero: item.numero,
-    //     ...(item.rev ? { rev: item.rev } : {}),
-    //   }));
-
-    //   setTiempo((prev) => ({
-    //     ...prev,
-    //     montoNumeros: nuevosMontoNumeros,
-    //   }));
-    // }
+    //if (validarMontoContraRestricciones(numero, monto, restricciones)) {
+    //return currentItems; // Se detiene si hay una restricción
+    //}
+    //addNumeroToListAdapter(monto, numero, reventar, monto_reventar);
+    const updatedItems = addNumeroToListAdapter(
+      currentItems,
+      monto,
+      numero,
+      reventar,
+      montoReventado,
+    );
 
     setNumero(""); // Limpiar número
     if (!isMontoLocked) {
@@ -410,112 +704,58 @@ export default function VentaScreen({ navigation, route }) {
     } else {
       numeroRef.current?.focus();
     }
-    setMonto_reventar("");
-    //   } else if (numero.length > 2) {
-    //     // Si el número tiene más de 2 dígitos, limpiamos el campo
-    //     setNumero(""); // Limpiar número si tiene más de 2 dígitos
-    //     Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
-    //   }
-    // } else {
-    //   //setNumero(text);
-    //   if (numero.length === 2 && useReventado) {
-    //     reventarRef.current?.focus();
-    //   }
-    //}
+    setMontoReventado("");
+    console.log("current items en txt done: ", updatedItems);
+    return updatedItems;
   };
 
   const actualizarMontoNumerosEnTiempo = (montoNumeros) => {
-    setTiempo((prev) => {
-      const nuevo = {
-        ...prev,
-        montoNumeros: montoNumeros,
-      };
-
-      if (
-        JSON.stringify(prev.montoNumeros) === JSON.stringify(nuevo.montoNumeros)
-      ) {
-        return prev; // Evita el re-render
-      }
-
-      return nuevo;
-    });
+    setTiempo((prev) => ({
+      ...prev,
+      numbers: montoNumeros,
+    }));
   };
 
-  const addNumeroToListAdapter = (monto, numero, reventado, montoRevetado) => {
-    // Verificar si el número ya existe en la lista de items
-    const existingItemIndex = items.findIndex((item) => item.numero === numero);
-    let updatedItems;
+  const addNumeroToListAdapter = (
+    currentItems,
+    monto,
+    numero,
+    reventado,
+    montoReventado,
+  ) => {
+    const existingItemIndex = currentItems.findIndex(
+      (item) => item.numero === numero,
+    );
+    let updatedItems = [...currentItems];
 
     if (existingItemIndex !== -1) {
-      // Si el número ya existe, sumamos el monto al monto existente
-      updatedItems = [...items];
       updatedItems[existingItemIndex].monto = (
-        parseFloat(updatedItems[existingItemIndex].monto) + parseFloat(monto)
-      ).toString(); // Sumar el monto y convertirlo de nuevo a string
+        parseInt(updatedItems[existingItemIndex].monto) + parseInt(monto)
+      ).toString();
+
       if (reventado) {
-        if (updatedItems[existingItemIndex]?.rev) {
-          updatedItems[existingItemIndex].rev = (
-            parseFloat(updatedItems[existingItemIndex].rev) +
-            parseFloat(montoRevetado)
-          ).toString(); // Sumar el monto reventado y convertirlo de nuevo a string
-        } else {
-          updatedItems[existingItemIndex].rev =
-            parseFloat(montoRevetado).toString(); // Sumar el monto reventado y convertirlo de nuevo a string
-        }
+        updatedItems[existingItemIndex].montoReventado = (
+          parseInt(updatedItems[existingItemIndex].montoReventado) +
+          parseInt(montoReventado)
+        ).toString();
+        updatedItems[existingItemIndex].reventado = reventado;
       }
 
-      // Mover el item actualizado al principio de la lista
-      const itemToMove = updatedItems.splice(existingItemIndex, 1)[0]; // Sacamos el item de la lista
-      updatedItems.unshift(itemToMove); // Lo agregamos al principio
-
-      setItems(updatedItems); // Actualizar la lista con el monto sumado y el item movido al principio
-      // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
-      const nuevosMontoNumeros = updatedItems.map((item) => ({
-        monto: item.monto,
-        numero: item.numero,
-        ...(item.rev ? { rev: item.rev } : {}),
-      }));
-
-      actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
-
-      // setTiempo((prev) => ({
-      //   ...prev,
-      //   montoNumeros: nuevosMontoNumeros,
-      // }));
+      // Mover al principio
+      const itemToMove = updatedItems.splice(existingItemIndex, 1)[0];
+      updatedItems.unshift(itemToMove);
     } else {
-      // Si el número no existe, agregamos un nuevo item
-      let newItem = {
+      const newItem = {
         key: generateKey(),
-        monto: monto,
-        numero: numero,
+        monto: parseInt(monto, 10),
+        numero: numero.toString(),
+        reventado: reventado,
+        montoReventado: reventado ? parseInt(montoReventado, 10) : 0,
       };
-      if (reventado) {
-        newItem = {
-          key: generateKey(), // clave única
-          monto: monto,
-          numero: numero,
-          rev: monto_reventar,
-        };
-      }
-
-      setItems((prevItems) => [newItem, ...prevItems]); // Lo agrega arriba en la lista
-
-      updatedItems = [newItem, ...items];
-
-      // 🔄 Actualiza tiempo.montoNumeros con los nuevos items
-      const nuevosMontoNumeros = updatedItems.map((item) => ({
-        monto: item.monto,
-        numero: item.numero,
-        ...(item.rev ? { rev: item.rev } : {}),
-      }));
-
-      actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
-
-      // setTiempo((prev) => ({
-      //   ...prev,
-      //   montoNumeros: nuevosMontoNumeros,
-      // }));
+      updatedItems = [newItem, ...updatedItems];
     }
+
+    return updatedItems;
   };
 
   function generateKey() {
@@ -550,6 +790,10 @@ export default function VentaScreen({ navigation, route }) {
     });
 
     if (restriccionViolada) {
+      console.log(
+        "Restricción activa",
+        `El monto para el número ${numero} debe ser mínimo ₡${restriccionViolada.restrictedAmount}.`,
+      );
       Alert.alert(
         "Restricción activa",
         `El monto para el número ${numero} debe ser mínimo ₡${restriccionViolada.restrictedAmount}.`,
@@ -559,65 +803,650 @@ export default function VentaScreen({ navigation, route }) {
     return false; // Todo bien
   };
 
-  // Al cambiar el sorteo o la fecha, actualizamos los parámetros
-  useEffect(() => {
-    if (fecha) {
-      setTiempo((prev) => ({
-        ...prev,
-        fecha: format(fecha, "yyyy-MM-dd", { locale: es }),
-      }));
+  const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
+    try {
+      console.log(
+        "obteniendo tiempos vendidos: drawCategoryID: ",
+        drawCategoryId,
+        drawDate,
+      );
+      const response = await fetch(
+        `http://147.182.248.177:3001/api/ticket/${drawCategoryId}/${drawDate}`,
+      );
+      const data = await response.json();
+      console.log("tiempos obtenidos: ", data);
+
+      console.log("Tiempos anteriores:", data);
+      setTiemposAnteriores(data); // Guardar en el estado
+
+      const ticketNumbers = data
+        .map((item) => item.ticketNumber)
+        .filter((n) => typeof n === "number" && n > 0);
+
+      const lastTicketNumber =
+        ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
+
+      setUltimoTicket(lastTicketNumber);
+      console.log("ultimo ticket: ", lastTicketNumber);
+      // setTiempo((prev) => ({
+      //   ...prev,
+      //   ticketNumber: lastTicketNumber + 1, // O mantener 1 si querés forzarlo
+      // }));
+      return {
+        tiemposVendidos: data,
+        lastTicketNumber,
+      };
+    } catch (error) {
+      console.error("Error al cargar tiempos anteriores:", error);
+      return [[], 0]; // ✅ fallback seguro
     }
-  }, [sorteoId, fecha]);
+  };
+
+  function allowRestringidoFunction(
+    numero,
+    monto,
+    items,
+    tiemposVendidosExternos,
+  ) {
+    const montoInt = Number(monto || 0);
+    let montoDisponible = 0;
+
+    console.log("NUMERO: ", numero);
+
+    const sumMonto_restrictedNum = sumaTotalSinReventadosVendidos(
+      tiemposVendidosExternos,
+    );
+    console.log("TOTAL TICKETs VENDIDOS SIN REV: ", sumMonto_restrictedNum);
+
+    const montoAlreadyInserted = totalSinReventados(items);
+    console.log("TOTAL TICKET SIN REV: ", montoAlreadyInserted);
+
+    const motoVentaTotal = montoAlreadyInserted + sumMonto_restrictedNum;
+
+    const totalPorNumero_AlreadyInserted = getMontoPorNumero(items, numero);
+    console.log(
+      "TOTAL MONTO POR NUMERO INSERTADO EN CURRENT TICKET: ",
+      totalPorNumero_AlreadyInserted,
+    );
+
+    const totalPorNumero_TiemposVendidos = Number(
+      getMontoPorNumeroEnTiemposVendidos(tiemposVendidosExternos, numero) || 0,
+    );
+    console.log(
+      "TOTAL MONTO POR NUMERO TIEMPOS VENDIDOS: ",
+      totalPorNumero_TiemposVendidos,
+    );
+
+    console.log("TOTAL TICKET ACTUAL Y VENDIDOS: ", motoVentaTotal);
+    let montoAllowed = 0;
+    if (getMontoRestringido(numero, motoVentaTotal) !== null) {
+      montoAllowed = Number(getMontoRestringido(numero, motoVentaTotal) || 0);
+    } else {
+      return [true, montoAllowed];
+    }
+
+    console.log("MONTO MINIMO PERMITIDO: ", montoAllowed);
+
+    console.log("Debug:", {
+      totalPorNumero_TiemposVendidos,
+      totalPorNumero_AlreadyInserted,
+      montoInt,
+      montoAllowed,
+      total:
+        totalPorNumero_TiemposVendidos +
+        totalPorNumero_AlreadyInserted +
+        montoInt,
+    });
+
+    if (montoAllowed === null) {
+      return [true, montoAllowed];
+    } else {
+      if (
+        totalPorNumero_TiemposVendidos +
+          montoInt +
+          totalPorNumero_AlreadyInserted >
+        montoAllowed
+      ) {
+        console.log("entro en el false");
+        montoDisponible =
+          montoAllowed -
+          totalPorNumero_TiemposVendidos +
+          totalPorNumero_AlreadyInserted;
+
+        return [false, montoDisponible];
+      } else {
+        console.log("entro en el true");
+        return [true, montoAllowed];
+      }
+    }
+  }
+
+  function allowRestringidoReventadoFunction(
+    numero,
+    monto,
+    porcentajeReventado,
+    items,
+    tiemposVendidosExternos,
+  ) {
+    const montoInt = Number(monto || 0);
+    let montoDisponible = 0;
+
+    console.log("NUMERO: ", numero);
+
+    const sumMonto_restrictedNum = sumaTotalNormalYReventadosVendidos(
+      tiemposVendidosExternos,
+    );
+    console.log(
+      "TOTAL TICKETs VENDIDOS NORMAL Y REV: ",
+      sumMonto_restrictedNum,
+    );
+
+    const montoAlreadyInserted = totalNormalYReventados(items);
+    console.log("TOTAL TICKET ACTUAL NORMAL Y REV: ", montoAlreadyInserted);
+
+    const motoVentaTotal = montoAlreadyInserted + sumMonto_restrictedNum;
+
+    const totalPorNumero_AlreadyInserted = getMontoReventadoPorNumero(
+      items,
+      numero,
+    );
+    console.log(
+      "TOTAL MONTO POR NUMERO INSERTADO EN CURRENT TICKET - REVENTADO: ",
+      totalPorNumero_AlreadyInserted,
+    );
+
+    const totalPorNumero_TiemposVendidos = Number(
+      getMontoPorNumeroReventadoEnTiemposVendidos(
+        tiemposVendidosExternos,
+        numero,
+      ) || 0,
+    );
+    //const totalPorNumero_TiemposVendidos = Number(getMontoPorNumeroEnTiemposVendidos(tiemposVendidosExternos, numero) || 0,);
+    console.log(
+      "TOTAL MONTO POR NUMERO TIEMPOS VENDIDOS - REVENTADO: ",
+      totalPorNumero_TiemposVendidos,
+    );
+
+    console.log("TOTAL TICKET ACTUAL Y VENDIDOS - REVENTADO: ", motoVentaTotal);
+    let montoAllowed = 0;
+    if (getMontoRestringido(numero, motoVentaTotal) !== null) {
+      montoAllowed = Number(
+        getMontoRestringido(numero, motoVentaTotal) *
+          (porcentajeReventado / 100) || 0,
+      );
+    } else {
+      return [true, montoAllowed];
+    }
+
+    console.log("MONTO MINIMO PERMITIDO REVENTADO: ", montoAllowed);
+
+    console.log("Debug:", {
+      totalPorNumero_TiemposVendidos,
+      totalPorNumero_AlreadyInserted,
+      montoInt,
+      montoAllowed,
+      total:
+        totalPorNumero_TiemposVendidos +
+        totalPorNumero_AlreadyInserted +
+        montoInt,
+    });
+
+    if (montoAllowed === null) {
+      return [true, montoAllowed];
+    } else {
+      if (
+        totalPorNumero_TiemposVendidos +
+          montoInt +
+          totalPorNumero_AlreadyInserted >
+        montoAllowed
+      ) {
+        console.log("entro en el false - REVENTADO");
+        montoDisponible =
+          montoAllowed -
+          totalPorNumero_TiemposVendidos +
+          totalPorNumero_AlreadyInserted;
+        return [false, montoDisponible];
+      } else {
+        console.log("entro en el true - REVENTADO");
+        return [true, montoAllowed];
+      }
+    }
+  }
+
+  function getMontoRestringido(numero, totalVenta) {
+    const montosPermitidos = [];
+
+    const restricciones = mSorteo.restringidos || [];
+    console.log("RESTRICCIONES: ", restricciones);
+
+    restricciones.forEach((regla) => {
+      const valoresRestringidos = regla.restricted.split(",");
+
+      if (valoresRestringidos.includes(numero.toString())) {
+        console.log(
+          "regla restringifa por porcentaje afuera: ",
+          regla.isRestrictedByPercent,
+        );
+
+        if (regla.isRestrictedByPercent) {
+          console.log(
+            "regla restringifa por porcentaje adentro: ",
+            regla.isRestrictedByPercent,
+          );
+          const porcentaje = regla.sellerRestrictedPercent / 100;
+          console.log(
+            "regla restringifa por porcentaje - porcentaje: ",
+            porcentaje,
+          );
+          let montoPermitido = totalVenta * porcentaje;
+          console.log(
+            "regla restringifa por porcentaje - venta total: ",
+            totalVenta,
+          );
+          console.log(
+            "regla restringifa por porcentaje - monto permitido: ",
+            montoPermitido,
+          );
+
+          if (montoPermitido < regla.restrictedAmount) {
+            montosPermitidos.push(regla.restrictedAmount);
+          } else {
+            montosPermitidos.push(montoPermitido);
+          }
+        } else {
+          // Si no es por porcentaje, asumimos que el restrictedAmount es un límite fijo
+          console.log(
+            "regla restringifa por monto fijo: ",
+            regla.restrictedAmount,
+          );
+          montosPermitidos.push(regla.restrictedAmount);
+        }
+      }
+    });
+
+    if (montosPermitidos.length > 0) {
+      console.log(
+        "regla restringifa por porcentaje - monto minimo: ",
+        Math.min(...montosPermitidos),
+      );
+      return Math.min(...montosPermitidos);
+    } else {
+      return null;
+    }
+  }
+
+  // Al cambiar el sorteo o la fecha, actualizamos los parámetros
+  // useEffect(() => {
+  //   if (!fecha || !sorteoId || !userData?.id) return;
+  //   setLoading(true); // Mostrar loader
+  //   const actualizarYProcesarTiempo = async () => {
+  //     // 1. Obtener copia de los números ANTES de limpiar tiempo
+  //     const numbersOriginales = [...(tiempo.numbers || [])]; // ✅ importante: extraer antes
+
+  //     // 2. Limpiar tiempo para que no tenga numbers
+  //     const tiempoBase = {
+  //       ...tiempo,
+  //       ticketNumber: 1,
+  //       userId: userData.id,
+  //       drawCategoryId: sorteoId,
+  //       drawDate: format(fecha, "yyyy-MM-dd", { locale: es }),
+  //       numbers: [], // ✅ asegura limpieza
+  //     };
+
+  //     setTiempo(tiempoBase); // limpiar números
+  //     setItems([]); // antes del bucle que re-agrega
+  //     console.log("NUMBERS VACIOS EN TIEMPO", tiempoBase);
+  //     console.log("ITEMS VACIOS EN TIEMPO", items);
+
+  //     // 3. Fetch de tiempos anteriores
+  //     await fetchTiemposAnteriores(sorteoId, tiempoBase.drawDate);
+  //     let currentItems = [];
+
+  //     // 4. Reinsertar los números uno por uno
+  //     for (const item of numbersOriginales) {
+  //       const monto = parseInt(item.monto, 10);
+  //       const numero = item.numero;
+
+  //       currentItems = await verificaRestringidosYAgregaNumero(
+  //         monto,
+  //         numero,
+  //         currentItems,
+  //       );
+  //     }
+
+  //     setItems(currentItems);
+
+  //     const nuevosMontoNumeros = currentItems?.map((item) => ({
+  //       monto: item.monto,
+  //       numero: item.numero,
+  //       reventado: item.reventado,
+  //       montoReventado: item.montoReventado,
+  //       //...(item.montoReventado ? { rev: item.montoReventado } : {}),
+  //     }));
+  //     actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+  //   };
+
+  //   actualizarYProcesarTiempo();
+  //   setLoading(false); // Mostrar loader
+  // }, [sorteoId, fecha]);
+
+  // useEffect(() => {
+  //   if (!sorteoId || !userData?.id) return;
+
+  //   const fetchRestringidos = async () => {
+  //     try {
+  //       const response = await fetch(
+  //         `http://147.182.248.177:3001/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+  //       );
+  //       const data = await response.json();
+
+  //       // Obtener el día del mes (dos dígitos)
+  //       const diaDelMes = new Date().getDate().toString().padStart(2, "0");
+
+  //       // Reemplazar "{DATE}" por el día actual en los datos recibidos
+  //       const reglasProcesadas = data.map((item) => {
+  //         if (item.restricted === "{DATE}") {
+  //           return {
+  //             ...item,
+  //             restricted: diaDelMes,
+  //           };
+  //         }
+  //         return item;
+  //       });
+
+  //       mSorteo.restringidos = reglasProcesadas;
+  //       console.log("REGLAS: ", reglasProcesadas);
+  //     } catch (error) {
+  //       console.error("Error cargando restricciones:", error);
+  //     }
+  //   };
+
+  //   fetchRestringidos();
+  // }, [sorteoId]);
+
+  const inicializarYProcesar = async () => {
+    try {
+      setLoading(true); // Mostrar loader
+
+      let isAllowed = true;
+      let resultIsAllowedFromMethod = true;
+
+      // Paso 1: Obtener restricciones
+      const response = await fetch(
+        `http://147.182.248.177:3001/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+      );
+      const data = await response.json();
+
+      const diaDelMes = new Date().getDate().toString().padStart(2, "0");
+      const reglasProcesadas = data.map((item) => {
+        if (item.restricted === "{DATE}") {
+          return { ...item, restricted: diaDelMes };
+        }
+        return item;
+      });
+
+      mSorteo.restringidos = reglasProcesadas;
+      console.log("REGLAS:", reglasProcesadas);
+
+      // Paso 2: Guardar copia de números anteriores
+      const numbersOriginales = [...(tiempoRef.current.numbers || [])];
+
+      // Paso 3: Limpiar tiempo y items
+      const tiempoBase = {
+        ...tiempo,
+        ticketNumber: 1,
+        userId: userData.id,
+        drawCategoryId: sorteoId,
+        drawDate: format(fecha, "yyyy-MM-dd", { locale: es }),
+        numbers: [],
+      };
+      setTiempo(tiempoBase);
+      setItems([]);
+
+      // Paso 4: Fetch de tiempos anteriores
+      const { tiemposVendidos, lastTicketNumber } =
+        await fetchTiemposAnteriores(sorteoId, tiempoBase.drawDate);
+
+      // const tiempoBaseActualizaTicketNummber = {
+      //   ...tiempoBase,
+      //   ticketNumber: lastTicketNumber + 1,
+      // };
+      // setTiempo(tiempoBaseActualizaTicketNummber);
+
+      // Paso 5: Reinsertar números uno por uno
+      let currentItems = [];
+      console.log(" currentItems", currentItems);
+      console.log(" numbersOriginales", numbersOriginales);
+      for (const item of numbersOriginales) {
+        const monto = parseInt(item.monto, 10);
+        const numero = item.numero;
+        [currentItems, resultIsAllowedFromMethod] =
+          await verificaRestringidosYAgregaNumero(
+            monto,
+            numero,
+            currentItems,
+            tiemposVendidos,
+          );
+        console.log(
+          "VERIFICANDO EL IS ALLOWED EN EL FOR: ",
+          resultIsAllowedFromMethod,
+        );
+        // Si la validación falló y no lo agregó
+        if (resultIsAllowedFromMethod === false) {
+          console.log(
+            "Número restringido",
+            `El número ${numero} no se puede jugar.`,
+          );
+          isAllowed = false;
+        }
+      }
+
+      // Paso 6: Actualizar estado final
+      setItems(currentItems);
+      const nuevosMontoNumeros = currentItems.map((item) => ({
+        monto: item.monto,
+        numero: item.numero,
+        reventado: item.reventado,
+        montoReventado: item.montoReventado,
+      }));
+
+      actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+
+      const tiempoFinal = {
+        ...tiempoBase,
+        ticketNumber: lastTicketNumber + 1,
+        numbers: nuevosMontoNumeros,
+      };
+
+      setTiempo(tiempoFinal);
+      tiempoRef.current = tiempoFinal;
+
+      return isAllowed ? tiempoFinal : false;
+      //return isAllowed; // ✅ validaciones pasaron
+    } catch (error) {
+      console.error("Error en inicialización de sorteo/fecha:", error);
+      return false;
+    } finally {
+      setLoading(false); // Ocultar loader
+    }
+  };
 
   useEffect(() => {
-    console.log("sorteo seleccionado:", mSorteo.name);
-    if (!sorteoId || !userData?.id) return;
-
-    const fetchRestringidos = async () => {
-      try {
-        const response = await fetch(
-          `http://147.182.248.177:3001/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
-        );
-        const data = await response.json();
-        mSorteo.restringidos = data;
-        console.log("Restricciones cargadas:", mSorteo.restringidos);
-      } catch (error) {
-        console.error("Error cargando restricciones:", error);
-      }
-    };
-
-    fetchRestringidos();
-  }, [sorteoId]);
+    if (!fecha || !sorteoId || !userData?.id) return;
+    async function execute() {
+      const isAllowed = await inicializarYProcesar();
+      console.log(
+        "TODOS PERMITIDOS DESPUES DE CAMBIAR EL SORTEO?: ",
+        isAllowed,
+      );
+    }
+    execute();
+  }, [sorteoId, fecha]);
 
   useEffect(() => {
     tiempoRef.current = tiempo;
   }, [tiempo]);
-
   useEffect(() => {
-    console.log("use Reventado Log:", reventar);
-    if (!reventar) {
-      if (numero.length === 2) {
-        if (monto.trim() === "" || numero.trim() === "") {
-          Alert.alert("Error", "Debe ingresar monto y número válidos.");
-          return;
-        }
+    limpiarRef.current = limpiar;
+  }, [limpiar]);
 
-        txtNumeroDone(monto, numero);
-      } else if (numero.length > 2) {
-        // Si el número tiene más de 2 dígitos, limpiamos el campo
-        setNumero(""); // Limpiar número si tiene más de 2 dígitos
-        Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
+  async function verificaRestringidosYAgregaNumero(
+    monto,
+    numero,
+    currentItems,
+    tiemposVendidosExternos,
+  ) {
+    const tiemposVendidos = tiemposVendidosExternos ?? tiemposAnteriores; // fallback al estado
+    const setting = userData.settings.find(
+      (s) => s.porcentaje_reventado_restringido !== undefined,
+    );
+    const porcentaje_reventado_restringido = setting
+      ? parseFloat(setting.porcentaje_reventado_restringido)
+      : 100; // valor por defecto si no se encuentra
+
+    let [allowRestringido, montoDisponible] = allowRestringidoFunction(
+      numero,
+      monto,
+      currentItems,
+      tiemposVendidos,
+    );
+
+    if (montoDisponible < 0) montoDisponible = 0;
+
+    console.log("PERMITIDO: ", allowRestringido);
+    console.log("MONTO DISPONIBLE: ", montoDisponible);
+    //let updatedItems = [...items];
+    let updatedItems = currentItems ? [...currentItems] : [...items];
+    if (allowRestringido) {
+      console.log("updated items PP: ", updatedItems);
+      if (reventar) {
+        let [allowRestringidoReventado, montoDisponibleReventado] =
+          allowRestringidoReventadoFunction(
+            numero,
+            monto,
+            porcentaje_reventado_restringido,
+            currentItems,
+            tiemposVendidos,
+          );
+
+        if (montoDisponibleReventado < 0) montoDisponibleReventado = 0;
+
+        console.log("PERMITIDO: ", allowRestringidoReventado);
+        console.log("MONTO DISPONIBLE: ", montoDisponibleReventado);
+        if (allowRestringidoReventado) {
+          updatedItems = txtNumeroDone(
+            updatedItems,
+            monto,
+            numero,
+            reventar,
+            montoReventado,
+          );
+        } else {
+          console.log(
+            "numero restringido reventado: ",
+            montoDisponibleReventado,
+          );
+          //setMontoDisponible(montoDisponibleReventado * -1);
+          //setDialogMontoRestringidoDisponible(montoDisponibleReventado * -1);
+          //setDialogNumeroRestringido(numero);
+          setAbiertoPorReventado(true);
+          await esperarConfirmacionDialog(numero, montoDisponibleReventado);
+          return [currentItems ?? items, false];
+          //return currentItems ?? items;
+        }
+      } else {
+        updatedItems = txtNumeroDone(
+          updatedItems,
+          monto,
+          numero,
+          reventar,
+          montoReventado,
+        );
       }
     } else {
-      if (numero.length === 2 && useReventado) {
-        reventarRef.current?.focus();
-      }
+      console.log("numero restringido: ", montoDisponible);
+      //setMontoDisponible(montoDisponibleReventado * -1);
+      //setDialogMontoRestringidoDisponible(montoDisponible * -1);
+      //setDialogNumeroRestringido(numero);
+      setAbiertoPorReventado(false);
+      await esperarConfirmacionDialog(numero, montoDisponible);
+      return [currentItems ?? items, false];
+      //return currentItems ?? items;
     }
-  }, [numero, monto_reventar]); // Este efecto se ejecuta solo cuando el valor de 'numero' cambia
+    // if (!currentItems) {
+    //   setItems(updatedItems);
+    //   const nuevosMontoNumeros = updatedItems.map((item) => ({
+    //     monto: item.monto,
+    //     numero: item.numero,
+    //     reventado: item.reventado,
+    //     montoReventado: item.montoReventado,
+    //   }));
+    //   actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+    // }
+
+    return [updatedItems ?? items, true];
+    //return updatedItems;
+  }
+
+  useEffect(() => {
+    const submitNumero = async () => {
+      if (!reventar) {
+        if (numero.length === 2) {
+          if (monto.trim() === "" || numero.trim() === "") {
+            Alert.alert("Error", "Debe ingresar monto y número válidos.");
+            return;
+          }
+          const [currentItems] = await verificaRestringidosYAgregaNumero(
+            monto,
+            numero,
+            items,
+            tiemposAnteriores,
+          );
+
+          setItems(currentItems);
+          const nuevosMontoNumeros = currentItems.map((item) => ({
+            monto: item.monto,
+            numero: item.numero,
+            reventado: item.reventado,
+            montoReventado: item.montoReventado,
+          }));
+          actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+        } else if (numero.length > 2) {
+          // Si el número tiene más de 2 dígitos, limpiamos el campo
+          setNumero(""); // Limpiar número si tiene más de 2 dígitos
+          Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
+        }
+      } else {
+        if (numero.length === 2 && useReventado) {
+          reventarRef.current?.focus();
+        }
+      }
+    };
+    submitNumero();
+  }, [numero, montoReventado]);
 
   return (
     <Provider>
       <View style={{ flex: 1 }}>
+        {loading && (
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.4)",
+                justifyContent: "center",
+                alignItems: "center",
+                zIndex: 9999, // asegurarse de que esté encima de todo
+              }}
+            >
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          </TouchableWithoutFeedback>
+        )}
         {/* Botón invisible que será el anchor del menú
         <TouchableOpacity
           ref={menuAnchorRef}
@@ -687,7 +1516,7 @@ export default function VentaScreen({ navigation, route }) {
                       setSorteoNombre(mSorteo.name);
                       setUseReventado(mSorteo.useReventado);
                       setReventar(false);
-                      setMonto_reventar("");
+                      setMontoReventado("");
                       setTiempo((prev) => ({
                         ...prev,
                         sorteoId: sorteo.id,
@@ -730,8 +1559,8 @@ export default function VentaScreen({ navigation, route }) {
                 <TextInput
                   placeholder="Nombre Cliente"
                   style={styles.input}
-                  value={tiempo.nombreCliente}
-                  onChangeText={setNombreCliente}
+                  value={tiempo.clientName}
+                  onChangeText={setClientName}
                 />
                 {/* Switches */}
                 <View style={styles.switchRow}>
@@ -761,7 +1590,7 @@ export default function VentaScreen({ navigation, route }) {
                         setMonto("");
                       } else {
                         const montoNum = parseInt(monto, 10);
-                        if (!isNaN(montoNum) && validateMonto(montoNum) === 0) {
+                        if (!isNaN(montoNum) && validateMonto(montoNum)) {
                           setIsMontoLocked(true); // Bloquear el campo
                           numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
                         } else {
@@ -791,7 +1620,7 @@ export default function VentaScreen({ navigation, route }) {
                     editable={!isMontoLocked}
                     onSubmitEditing={() => {
                       const montoNum = parseInt(monto, 10);
-                      if (!isNaN(montoNum) && validateMonto(montoNum) === 0) {
+                      if (!isNaN(montoNum) && validateMonto(montoNum)) {
                         numeroRef.current?.focus();
                       } else {
                         Alert.alert(
@@ -820,15 +1649,15 @@ export default function VentaScreen({ navigation, route }) {
                       ref={reventarRef}
                       placeholder="Reventar"
                       style={[styles.inputSmall, { marginLeft: 8 }]}
-                      value={monto_reventar}
-                      onChangeText={setMonto_reventar}
+                      value={montoReventado}
+                      onChangeText={setMontoReventado}
                       keyboardType="numeric"
                       returnKeyType="done"
                       onSubmitEditing={() => {
-                        const montoNumReventar = parseInt(monto_reventar, 10);
+                        const montoNumReventar = parseInt(montoReventado, 10);
                         if (
                           !isNaN(montoNumReventar) &&
-                          validateMonto(montoNumReventar) === 0
+                          validateMonto(montoNumReventar)
                         ) {
                           handleSubmitReventar();
                         } else {
@@ -860,13 +1689,193 @@ export default function VentaScreen({ navigation, route }) {
             {/* Total */}
             <View style={styles.totalBar}>
               <Text style={styles.totalText}>TOTAL: </Text>
-              <Text style={styles.totalValue}>₡{total.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>₡{total?.toFixed(2)}</Text>
             </View>
           </View>
         </>
       </View>
 
       <Portal>
+        {/* Diálogo Restringido */}
+        <Dialog
+          visible={dialogRestringidoVisible}
+          onDismiss={closeDialogRestringido}
+          style={[
+            {
+              backgroundColor: "white",
+              borderRadius: 10,
+              marginHorizontal: 20,
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          {/* Diálogo Restringido */}
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons name="warning" size={35} color="#f09359" />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                RESTRINGIDO
+              </Text>
+            </View>
+            <View style={{ maxHeight: height * 0.6 }}>
+              <Text>
+                El número {abiertoPorReventado && <Text>reventado </Text>}
+                <Text style={{ fontWeight: "bold" }}>
+                  ({dialogNumeroRestringido}){" "}
+                </Text>
+                es restringido y con la venta actual sobrepasaría el límite.
+                {"\n"}
+                El monto disponible es de:{" "}
+                <Text style={{ fontWeight: "bold" }}>
+                  {dialogMontoRestringidoDisponible}
+                </Text>
+              </Text>
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="black"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={closeDialogRestringido}
+            >
+              SYNC RESTRINGIDOS
+            </Button>
+
+            <Button
+              textColor="green"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                setDialogRestringidoVisible(false);
+                //closeDialogRestringido;
+                resolverDialogRef.current?.(); // Resuelve la promesa
+              }}
+            >
+              OK
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Diálogo Tiempos Vendidos */}
+        <Dialog
+          visible={dialogTicketsVisible}
+          onDismiss={closeDialogTickets}
+          style={[
+            {
+              backgroundColor: "white",
+              borderRadius: 10,
+              marginHorizontal: 20,
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons
+                name="format-list-numbered"
+                size={35}
+                color="#000"
+              />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                TIEMPOS VENDIDOS
+              </Text>
+            </View>
+            <View style={{ maxHeight: height * 0.6 }}>
+              <ScrollView contentContainerStyle={{ paddingHorizontal: 10 }}>
+                {tiemposAnteriores.map((item, index) => (
+                  <Pressable
+                    key={item.id || index}
+                    onPress={() => console.log("Seleccionado", item)}
+                    style={{
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: "#eee",
+                    }}
+                  >
+                    <Text style={{ fontWeight: "bold" }}>
+                      Tiquete: # {item.ticketNumber || ""}
+                    </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Cliente: {item.clientName || "Sin nombre"}
+                    </Text>
+                    <Text style={{ color: "#555" }}>
+                      Fecha: {new Date(item.updatedAt).toLocaleString()}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="black"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={closeDialogTickets}
+            >
+              CERRAR
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
         {/* Diálogo principal */}
         <Dialog
           visible={dialogVisible}
@@ -891,16 +1900,6 @@ export default function VentaScreen({ navigation, route }) {
             },
           ]}
         >
-          {/* <Dialog.Title style={{ flexDirection: "row", alignItems: "center" }}>
-            <View style={styles.row}>
-              <MaterialIcons name="qr-code" size={35} color="#000" />
-              <Text
-                style={{ marginLeft: 8, fontWeight: "bold", color: "#000" }}
-              >
-                CATEGORÍAS PREDETERMINADAS
-              </Text>
-            </View>
-          </Dialog.Title> */}
           <Dialog.Content>
             <View
               style={{
@@ -921,8 +1920,6 @@ export default function VentaScreen({ navigation, route }) {
                 CATEGORÍAS PREDETERMINADAS
               </Text>
             </View>
-
-            {/* Campo categoría (abre otro diálogo) */}
             <Pressable
               style={styles.inputSmall}
               onPress={openCategoriaSelector}
@@ -935,7 +1932,7 @@ export default function VentaScreen({ navigation, route }) {
               <TextInput
                 placeholder="Monto"
                 style={styles.input}
-                value={categoriasMonto}
+                defaultValue={categoriasMonto}
                 onChangeText={setCategoriasMonto}
                 keyboardType="numeric"
               />
@@ -943,7 +1940,7 @@ export default function VentaScreen({ navigation, route }) {
             {categoriaSeleccionada === "Terminan en..." && (
               <TextInput
                 placeholder="Números que terminan en"
-                value={categoriasTerminaEn}
+                defaultValue={categoriasTerminaEn}
                 onChangeText={setCategoriasTerminaEn}
                 keyboardType="numeric"
                 style={[styles.input, { marginTop: 15, textAlign: "center" }]}
@@ -952,8 +1949,8 @@ export default function VentaScreen({ navigation, route }) {
             {categoriaSeleccionada === "Inician con..." && (
               <TextInput
                 placeholder="Números que inician con"
-                value={categoriasTerminaEn}
-                onChangeText={setCategoriasTerminaEn}
+                defaultValue={categoriasInicianCon}
+                onChangeText={setCategoriasInicianCon}
                 keyboardType="numeric"
                 style={[styles.input, { marginTop: 15, textAlign: "center" }]}
               />
@@ -969,8 +1966,8 @@ export default function VentaScreen({ navigation, route }) {
                 >
                   <TextInput
                     placeholder="Desde"
-                    value={categoriasTerminaEn}
-                    onChangeText={setCategoriasTerminaEn}
+                    defaultValue={categoriasDesde}
+                    onChangeText={setCategoriasDesde}
                     keyboardType="numeric"
                     style={[
                       styles.input,
@@ -979,8 +1976,8 @@ export default function VentaScreen({ navigation, route }) {
                   />
                   <TextInput
                     placeholder="Hasta"
-                    value={categoriasTerminaEn}
-                    onChangeText={setCategoriasTerminaEn}
+                    defaultValue={categoriasHasta}
+                    onChangeText={setCategoriasHasta}
                     keyboardType="numeric"
                     style={[
                       styles.input,
@@ -993,8 +1990,8 @@ export default function VentaScreen({ navigation, route }) {
             {categoriaSeleccionada === "Extraer de Texto" && (
               <TextInput
                 placeholder="Pega aqui el mensage"
-                value={categoriasTerminaEn}
-                onChangeText={setCategoriasTerminaEn}
+                defaultValue={categoriasExtraerTexto}
+                onChangeText={setCategoriasExtraerTexto}
                 multiline={true} // <-- habilita multilinea
                 numberOfLines={4}
                 style={[
@@ -1060,11 +2057,6 @@ export default function VentaScreen({ navigation, route }) {
             },
           ]}
         >
-          {/* <Dialog.Title>
-            <Text style={{ marginLeft: 8, fontWeight: "bold", color: "#000" }}>
-              CATEGORÍAS
-            </Text>
-          </Dialog.Title> */}
           <Dialog.Content>
             <View
               style={{
@@ -1133,6 +2125,29 @@ export default function VentaScreen({ navigation, route }) {
           </Dialog.Content>
         </Dialog>
       </Portal>
+
+      {/* <>
+        <DialogoCategorias
+          visible={dialogVisible}
+          items={items}
+          setItems={setItems}
+          actualizarMontoNumerosEnTiempo={actualizarMontoNumerosEnTiempo}
+          verificaRestringidosYAgregaNumero={verificaRestringidosYAgregaNumero}
+          convertNumero={convertNumero}
+          userData={userData}
+          parseMessage={parseMessage}
+          setLoading={setLoading}
+        />
+
+        <DialogoSelectorCategoria
+          visible={categoriaDialogVisible}
+          onDismiss={() => setCategoriaDialogVisible(false)}
+          onSeleccionar={(categoria) => {
+            setCategoriaSeleccionada(categoria);
+            setCategoriaDialogVisible(false);
+          }}
+        />
+      </> */}
     </Provider>
   );
 }

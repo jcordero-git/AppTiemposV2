@@ -5,28 +5,40 @@ const mTiempoContext = createContext();
 
 export const TiempoProvider = ({ children }) => {
   const [tiempo, setTiempo] = useState({
-    sorteoId: null,
-    fecha: null,
-    nombreCliente: "",
-    montoNumeros: [],
+    ticketNumber: 0,
+    userId: 0,
+    drawCategoryId: 0,
+    drawDate: null,
+    printDate: null,
+    clientName: "",
+    numbers: [],
+    isPaid: null,
+    status: null,
+    queueStatus: "",
   });
 
-  const setNombreCliente = (nombre) => {
-    setTiempo((prev) => ({ ...prev, nombreCliente: nombre }));
+  const setClientName = (clientName) => {
+    setTiempo((prev) => ({ ...prev, clientName: clientName }));
   };
 
   const resetTiempo = () => {
     setTiempo({
-      sorteoId: null,
-      fecha: null,
-      nombreCliente: "",
-      montoNumeros: [],
+      ticketNumber: 0,
+      userId: 0,
+      drawCategoryId: 0,
+      drawDate: null,
+      printDate: null,
+      clientName: "",
+      numbers: [],
+      isPaid: null,
+      status: null,
+      queueStatus: "",
     });
   };
 
   return (
     <mTiempoContext.Provider
-      value={{ tiempo, setTiempo, resetTiempo, setNombreCliente }}
+      value={{ tiempo, setTiempo, resetTiempo, setClientName }}
     >
       {children}
     </mTiempoContext.Provider>

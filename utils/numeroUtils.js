@@ -5,3 +5,8 @@ export function convertNumero(num) {
 export function validateMonto(monto) {
   return monto % 50 === 0;
 }
+
+export function toFloat(input) {
+  const num = parseFloat(input);
+  return isNaN(num) ? 0 : num;
+}
