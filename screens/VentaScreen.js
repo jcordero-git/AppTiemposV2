@@ -22,12 +22,14 @@ import {
   Portal,
   Dialog,
   Button,
+  Snackbar,
 } from "react-native-paper";
 //import { Ionicons } from "@expo/vector-icons";
 
 import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 import { format } from "date-fns";
 import { da, de, es, tr } from "date-fns/locale"; // idioma español
@@ -40,9 +42,11 @@ import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
+import mSorteoSingleton from "../models/mSorteoSingleton.js";
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
+  const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
@@ -154,6 +158,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
+          false,
+          0,
           currentItems,
           tiemposAnteriores,
         );
@@ -167,6 +173,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
+          false,
+          0,
           currentItems,
           tiemposAnteriores,
         );
@@ -180,6 +188,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
+          false,
+          0,
           currentItems,
           tiemposAnteriores,
         );
@@ -196,6 +206,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
+          false,
+          0,
           currentItems,
           tiemposAnteriores,
         );
@@ -231,6 +243,8 @@ export default function VentaScreen({ navigation, route }) {
           [currentItems] = await verificaRestringidosYAgregaNumero(
             monto,
             numero,
+            false,
+            0,
             currentItems,
             tiemposAnteriores,
           );
@@ -282,6 +296,7 @@ export default function VentaScreen({ navigation, route }) {
       <MaterialIcons name="more-vert" size={24} color="#fff" />
     </TouchableOpacity>
   );
+  const [refreshHeader, setRefreshHeader] = useState(0);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -292,23 +307,31 @@ export default function VentaScreen({ navigation, route }) {
         <>
           <Pressable style={{ marginRight: 20 }} onPress={openDialogTickets}>
             <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>
-              {ultimoTicket + 1}
+              {ultimoTicket}
             </Text>
           </Pressable>
-          <MaterialIcons
-            name="print"
-            size={24}
-            color="#fff" // Blanco para contraste con fondo verde
-            style={{ marginRight: 20 }}
-            onPress={handlePrint}
-          />
-          <MaterialIcons
-            name="image"
-            size={24}
-            color="#fff" // Blanco para contraste con fondo verde
-            style={{ marginRight: 15 }}
-            onPress={handleImagePress}
-          />
+          {tiempoRef.current &&
+            tiempoRef.current.drawCategoryId > 0 &&
+            !!tiempoRef.current.drawDate &&
+            Array.isArray(tiempoRef.current.numbers) &&
+            tiempoRef.current.numbers.length > 0 && (
+              <>
+                <MaterialIcons
+                  name="print"
+                  size={24}
+                  color="#fff"
+                  style={{ marginRight: 20 }}
+                  onPress={handlePrint}
+                />
+                <MaterialIcons
+                  name="image"
+                  size={24}
+                  color="#fff"
+                  style={{ marginRight: 15 }}
+                  onPress={handleImagePress}
+                />
+              </>
+            )}
           {/* Menú anclado al botón visible */}
           <Menu
             visible={menuVisibleHeader}
@@ -323,17 +346,61 @@ export default function VentaScreen({ navigation, route }) {
               title="Pre Cargar"
               titleStyle={{ color: "#000" }} // Texto negro opcional
             />
-
             <Menu.Item
               onPress={openDialogCategorias}
               title="Categorías Predeterminadas"
               titleStyle={{ color: "#000" }}
             />
+            {tiempoSeleccionadoRef.current &&
+              tiempoSeleccionadoRef.current.id > 0 && (
+                <Menu.Item
+                  onPress={() => {
+                    closeMenuHeader();
+                    handleBorrarTiempo(tiempoSeleccionadoRef.current.id);
+                  }}
+                  title="Borrar Tiempo"
+                  titleStyle={{ color: "red" }}
+                />
+              )}
           </Menu>
         </>
       ),
     });
-  }, [navigation, menuVisibleHeader, ultimoTicket]);
+  }, [navigation, menuVisibleHeader, ultimoTicket, , refreshHeader]);
+
+  const handleBorrarTiempo = async (id) => {
+    const url = `http://147.182.248.177:3001/api/ticket/${id}`;
+    console.log("tiempo id a elimminar:", id);
+    try {
+      const response = await fetch(url, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        // body: JSON.stringify(tiempoParaImprimir),
+      });
+      if (!response.ok) {
+        showSnackbar("Error al eliminar el ticket.", 3);
+        throw new Error(`Error en el envío: ${response.status}`);
+      }
+      const result = await response.json();
+      if (result.message === "Success") {
+        console.log("TIEMPO ELIMINADO", result);
+        showSnackbar("Ticket eliminado correctamente.", 1);
+      }
+      //setTiempo(null);
+      setItems([]);
+      //setUltimoTicket(0);
+      tiempoSeleccionadoRef.current = null; // limpiar ref
+      setTiempo([]);
+      const isAllowed = await inicializarYProcesar();
+      setMostrarCampos(true);
+    } catch (error) {
+      console.error("Error al enviar el ticket:", error);
+      Alert.alert("Error", "No se pudo eliminar el ticket.");
+      showSnackbar("Error al eliminar el ticket.", 3);
+    }
+  };
 
   const { userData, logout } = useAuth();
 
@@ -357,6 +424,7 @@ export default function VentaScreen({ navigation, route }) {
 
   const toggleMenu = () => setMenuVisible(!menuVisible);
   const [showPicker, setShowPicker] = useState(false);
+  const [mostrarCampos, setMostrarCampos] = useState(true);
 
   const numeroRef = useRef(null);
   const montoRef = useRef(null);
@@ -377,20 +445,23 @@ export default function VentaScreen({ navigation, route }) {
 
   const renderItem = ({ item }) => (
     <View>
-      <View style={styles.itemRow}>
-        <Text style={styles.itemLeft}>₡{item.monto}</Text>
-        <Text style={styles.itemRight}>{item.numero}</Text>
-      </View>
-      {item.reventado && (
-        <View style={styles.itemRowRev}>
-          <Text style={styles.itemLeft}>₡{item.montoReventado}</Text>
-          <Text style={styles.itemRight}>REVENTADO</Text>
+      <View style={styles.itemRowGeneral}>
+        <View style={styles.itemRow}>
+          <Text style={styles.itemLeft}>₡{item.monto}</Text>
+          <Text style={styles.itemRight}>{item.numero}</Text>
         </View>
-      )}
+        {item.reventado && (
+          <View style={styles.itemRowRev}>
+            <Text style={styles.itemLeft}>₡{item.montoReventado}</Text>
+            <Text style={styles.itemRight}>REVENTADO</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 
   const tiempoRef = useRef(tiempo);
+  const tiempoSeleccionadoRef = useRef(tiempo);
   const limpiarRef = useRef(limpiar);
 
   const toInputDateFormat = (date) => {
@@ -446,10 +517,13 @@ export default function VentaScreen({ navigation, route }) {
 
   const handleSubmitReventar = (event) => {
     const submitReventar = async () => {
+      //let montoReventado = parseInt(montoReventado, 10);
       const [currentItems, resultIsAllowedFromMethod] =
         await verificaRestringidosYAgregaNumero(
           monto,
           numero,
+          reventar,
+          montoReventado,
           items,
           tiemposAnteriores,
         );
@@ -470,7 +544,16 @@ export default function VentaScreen({ navigation, route }) {
   const handlePrint = async () => {
     if (!fecha || !sorteoId || !userData?.id) return;
 
+    console.log(
+      "CLIENT NAME INICIA PRINT - antes de inicializar y procesar: ",
+      tiempoRef.current.clientName,
+    );
     const resultado = await inicializarYProcesar();
+
+    console.log(
+      "CLIENT NAME INICIA PRINT - despues de inicializar y procesar: ",
+      resultado.clientName,
+    );
 
     console.log("TODOS PERMITIDOS DESPUES DE MANDAR A IMPRIMIR?: ", resultado);
 
@@ -496,29 +579,54 @@ export default function VentaScreen({ navigation, route }) {
       });
 
       if (!response.ok) {
+        showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
         throw new Error(`Error en el envío: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log("Ticket enviado con éxito:", result);
 
-      fetchTiemposAnteriores(
-        tiempoParaImprimir.drawCategoryId,
-        tiempoParaImprimir.drawDate,
-      );
+      const { tiemposVendidos, lastTicketNumber } =
+        await fetchTiemposAnteriores(
+          tiempoParaImprimir.drawCategoryId,
+          tiempoParaImprimir.drawDate,
+        );
+      setUltimoTicket(lastTicketNumber + 1);
 
       // Aquí podrías imprimir o navegar a otra pantalla si hace falta
-      Alert.alert("Éxito", "El ticket fue enviado correctamente.");
-      printTicketWeb(result);
-      console.log("Limpiar?: ", limpiarRef.current);
+      //Alert.alert("Éxito", "El ticket fue enviado correctamente.");
+      showSnackbar("El ticket fue registrado correctamente.", 1);
+
+      if (Platform.OS === "web") {
+        const printWindow = printTicketWeb(result, mSorteo, userData); // ← referencia válida
+      }
+
       if (limpiarRef.current) {
-        console.log("Limpiar 2?: ", limpiarRef.current);
         limpiarDespuesDeImprimir();
       }
     } catch (error) {
       console.error("Error al enviar el ticket:", error);
       Alert.alert("Error", "No se pudo enviar el ticket.");
+      showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
     }
+  };
+
+  const cargarTiempoSeleccionado = (tiempoCargado) => {
+    setUltimoTicket(tiempoCargado.ticketNumber);
+    setClientName(tiempoCargado.clientName || "");
+    const numbersConKey = (tiempoCargado.numbers || []).map((item) => ({
+      ...item,
+      key: generateKey(), // Asignas un key único aquí
+    }));
+    setItems(numbersConKey || []);
+    setTiempo(tiempoCargado);
+    tiempoRef.current = tiempoCargado;
+    tiempoSeleccionadoRef.current = tiempoCargado;
+    // Ocultar campos
+    setMostrarCampos(false);
+    // Cambiar visibilidad de switches/inputs
+    setLimpiar(true);
+    setReventar(false);
+    setIsMontoLocked(false);
   };
 
   const limpiarDespuesDeImprimir = () => {
@@ -530,6 +638,11 @@ export default function VentaScreen({ navigation, route }) {
     setTiempo(tiempoLimpio);
     setItems([]);
     tiempoRef.current = tiempoLimpio;
+
+    setMonto("");
+    setNumero("");
+
+    montoRef.current?.focus();
   };
 
   const [isMontoLocked, setIsMontoLocked] = useState(false);
@@ -714,6 +827,7 @@ export default function VentaScreen({ navigation, route }) {
       ...prev,
       numbers: montoNumeros,
     }));
+    setRefreshHeader((prev) => prev + 1);
   };
 
   const addNumeroToListAdapter = (
@@ -826,8 +940,8 @@ export default function VentaScreen({ navigation, route }) {
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
 
-      setUltimoTicket(lastTicketNumber);
-      console.log("ultimo ticket: ", lastTicketNumber);
+      //setUltimoTicket(lastTicketNumber);
+      //console.log("ultimo ticket: ", lastTicketNumber);
       // setTiempo((prev) => ({
       //   ...prev,
       //   ticketNumber: lastTicketNumber + 1, // O mantener 1 si querés forzarlo
@@ -1192,6 +1306,8 @@ export default function VentaScreen({ navigation, route }) {
       const numbersOriginales = [...(tiempoRef.current.numbers || [])];
 
       // Paso 3: Limpiar tiempo y items
+      const tiempoBackup = { ...tiempoRef.current };
+
       const tiempoBase = {
         ...tiempo,
         ticketNumber: 1,
@@ -1200,7 +1316,7 @@ export default function VentaScreen({ navigation, route }) {
         drawDate: format(fecha, "yyyy-MM-dd", { locale: es }),
         numbers: [],
       };
-      setTiempo(tiempoBase);
+      //setTiempo(tiempoBase);
       setItems([]);
 
       // Paso 4: Fetch de tiempos anteriores
@@ -1217,13 +1333,19 @@ export default function VentaScreen({ navigation, route }) {
       let currentItems = [];
       console.log(" currentItems", currentItems);
       console.log(" numbersOriginales", numbersOriginales);
+
       for (const item of numbersOriginales) {
         const monto = parseInt(item.monto, 10);
         const numero = item.numero;
+        const reventar = item.reventado;
+        const montoReventado = parseInt(item.montoReventado, 10);
+
         [currentItems, resultIsAllowedFromMethod] =
           await verificaRestringidosYAgregaNumero(
             monto,
             numero,
+            reventar,
+            montoReventado,
             currentItems,
             tiemposVendidos,
           );
@@ -1253,14 +1375,18 @@ export default function VentaScreen({ navigation, route }) {
       actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
 
       const tiempoFinal = {
-        ...tiempoBase,
+        ...tiempoBackup, // <-- esto asegura que se mantenga clientName y demás
+        drawDate: tiempoBase.drawDate,
+        userId: tiempoBase.userId,
+        drawCategoryId: tiempoBase.drawCategoryId,
         ticketNumber: lastTicketNumber + 1,
         numbers: nuevosMontoNumeros,
       };
-
+      setUltimoTicket(lastTicketNumber + 1);
       setTiempo(tiempoFinal);
-      tiempoRef.current = tiempoFinal;
 
+      tiempoRef.current = tiempoFinal;
+      setLoading(false); // Ocultar loader
       return isAllowed ? tiempoFinal : false;
       //return isAllowed; // ✅ validaciones pasaron
     } catch (error) {
@@ -1293,6 +1419,8 @@ export default function VentaScreen({ navigation, route }) {
   async function verificaRestringidosYAgregaNumero(
     monto,
     numero,
+    reventar,
+    montoReventado,
     currentItems,
     tiemposVendidosExternos,
   ) {
@@ -1323,7 +1451,7 @@ export default function VentaScreen({ navigation, route }) {
         let [allowRestringidoReventado, montoDisponibleReventado] =
           allowRestringidoReventadoFunction(
             numero,
-            monto,
+            montoReventado,
             porcentaje_reventado_restringido,
             currentItems,
             tiemposVendidos,
@@ -1399,6 +1527,8 @@ export default function VentaScreen({ navigation, route }) {
           const [currentItems] = await verificaRestringidosYAgregaNumero(
             monto,
             numero,
+            false,
+            0,
             items,
             tiemposAnteriores,
           );
@@ -1499,7 +1629,7 @@ export default function VentaScreen({ navigation, route }) {
               >
                 <View style={styles.formRow}>
                   <Pressable
-                    style={styles.inputSmall}
+                    style={styles.inputSmallSorteo}
                     onPress={() => setModalVisible(true)}
                   >
                     <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
@@ -1562,119 +1692,253 @@ export default function VentaScreen({ navigation, route }) {
                   value={tiempo.clientName}
                   onChangeText={setClientName}
                 />
-                {/* Switches */}
-                <View style={styles.switchRow}>
-                  <Text>Limpiar al imprimir</Text>
-                  <Switch value={limpiar} onValueChange={setLimpiar} />
 
-                  {useReventado && (
-                    <>
-                      <Text>Reventar</Text>
+                {mostrarCampos && (
+                  <>
+                    {/* Switches */}
+                    <View style={styles.switchRowContainer}>
+                      <Pressable
+                        style={styles.switchRow}
+                        onPress={() => setLimpiar(!limpiar)}
+                      >
+                        <Text>Limpiar al imprimir</Text>
+                        <Switch value={limpiar} onValueChange={setLimpiar} />
+                      </Pressable>
+
+                      {/* <Text>Limpiar al imprimir</Text>
+                  <Switch value={limpiar} onValueChange={setLimpiar} /> */}
+
+                      {useReventado && (
+                        <>
+                          <Pressable
+                            style={styles.switchRow}
+                            onPress={() => handleReventarChange(!reventar)}
+                          >
+                            <Text>Reventar</Text>
+                            <Switch
+                              value={reventar}
+                              onValueChange={handleReventarChange}
+                            />
+                          </Pressable>
+
+                          {/* <Text>Reventar</Text>
                       <Switch
                         value={reventar}
                         onValueChange={handleReventarChange}
+                      /> */}
+                        </>
+                      )}
+                    </View>
+
+                    {/* Botón, Monto y Número en una fila */}
+                    <View style={styles.row}>
+                      <TouchableOpacity
+                        style={styles.iconButton}
+                        onPress={() => {
+                          if (isMontoLocked) {
+                            // Desbloquear si ya estaba bloqueado
+                            setIsMontoLocked(false);
+                            montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+                            setMonto("");
+                          } else {
+                            const montoNum = parseInt(monto, 10);
+                            if (!isNaN(montoNum) && validateMonto(montoNum)) {
+                              setIsMontoLocked(true); // Bloquear el campo
+                              numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+                            } else {
+                              Alert.alert(
+                                "Monto inválido",
+                                "Debe ser un múltiplo de 50.",
+                              );
+                              showSnackbar("Debe ingresar un monto válido.", 3);
+                            }
+                          }
+                        }}
+                      >
+                        <MaterialIcons
+                          name={isMontoLocked ? "lock" : "lock-open"}
+                          size={20}
+                          color="gray"
+                        />
+                      </TouchableOpacity>
+
+                      <TextInput
+                        ref={montoRef}
+                        placeholder="Monto"
+                        style={[styles.inputSmall, { marginLeft: 8 }]}
+                        value={monto}
+                        onChangeText={(text) => {
+                          // Permitir solo un "-" al inicio y dígitos
+                          const sanitized = text.replace(/[^0-9-]/g, "");
+                          const cleaned = sanitized.startsWith("-")
+                            ? "-" + sanitized.slice(1).replace(/-/g, "")
+                            : sanitized.replace(/-/g, "");
+                          setMonto(cleaned);
+                        }}
+                        keyboardType="numeric"
+                        returnKeyType="done"
+                        editable={!isMontoLocked}
+                        onSubmitEditing={() => {
+                          const montoNum = parseInt(monto, 10);
+                          if (!isNaN(montoNum) && validateMonto(montoNum)) {
+                            numeroRef.current?.focus();
+                          } else {
+                            Alert.alert(
+                              "Monto inválido",
+                              "Debe ser un múltiplo de 50.",
+                            );
+                            console.log(
+                              "Monto inválido: debe ser múltiplo de 50.",
+                            );
+                            showSnackbar("Debe ingresar un monto válido.", 3);
+                            montoRef.current?.blur();
+                            window.setTimeout(() => {
+                              montoRef.current?.focus();
+                            }, 100);
+                          }
+                        }}
                       />
-                    </>
-                  )}
-                </View>
 
-                {/* Botón, Monto y Número en una fila */}
-                <View style={styles.row}>
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => {
-                      if (isMontoLocked) {
-                        // Desbloquear si ya estaba bloqueado
-                        setIsMontoLocked(false);
-                        montoRef.current?.focus(); // Volver a poner el enfoque en el monto
-                        setMonto("");
-                      } else {
-                        const montoNum = parseInt(monto, 10);
-                        if (!isNaN(montoNum) && validateMonto(montoNum)) {
-                          setIsMontoLocked(true); // Bloquear el campo
-                          numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
-                        } else {
-                          Alert.alert(
-                            "Monto inválido",
-                            "Debe ser un múltiplo de 50.",
-                          );
-                        }
-                      }
-                    }}
-                  >
-                    <MaterialIcons
-                      name={isMontoLocked ? "lock" : "lock-open"}
-                      size={20}
-                      color="gray"
-                    />
-                  </TouchableOpacity>
+                      <TextInput
+                        ref={numeroRef}
+                        placeholder="Número"
+                        style={[styles.inputSmall, { marginLeft: 8 }]}
+                        value={numero}
+                        onChangeText={(text) => {
+                          // Eliminar cualquier carácter que no sea número y limitar a 2 dígitos
+                          const cleaned = text
+                            .replace(/[^0-9]/g, "")
+                            .slice(0, 2);
+                          setNumero(cleaned);
+                        }}
+                        keyboardType="numeric"
+                        returnKeyType="done"
+                        onFocus={() => {
+                          const montoNum = parseInt(monto, 10);
+                          if (
+                            !monto ||
+                            monto.trim() === "" ||
+                            isNaN(montoNum) ||
+                            !validateMonto(montoNum)
+                          ) {
+                            montoRef.current?.focus();
+                            showSnackbar("Debe ingresar un monto válido.", 3);
+                          }
+                        }}
+                        onSubmitEditing={() => {
+                          if (numero.length !== 2) {
+                            // Mantener foco en el input número
+                            numeroRef.current?.blur();
+                            window.setTimeout(() => {
+                              numeroRef.current?.focus();
+                              showSnackbar(
+                                "Debe ingresar un número de 2 dígitos.",
+                                3,
+                              );
+                            }, 100);
+                          } else {
+                            // Aquí puedes poner la lógica a seguir cuando es válido
+                          }
+                        }}
+                      />
+                    </View>
+                    {useReventado && reventar && (
+                      <View style={styles.row}>
+                        <View style={styles.iconButtonInvisible} />
 
-                  <TextInput
-                    ref={montoRef}
-                    placeholder="Monto"
-                    style={[styles.inputSmall, { marginLeft: 8 }]}
-                    value={monto}
-                    onChangeText={setMonto}
-                    keyboardType="numeric"
-                    returnKeyType="done"
-                    editable={!isMontoLocked}
-                    onSubmitEditing={() => {
-                      const montoNum = parseInt(monto, 10);
-                      if (!isNaN(montoNum) && validateMonto(montoNum)) {
-                        numeroRef.current?.focus();
-                      } else {
-                        Alert.alert(
-                          "Monto inválido",
-                          "Debe ser un múltiplo de 50.",
-                        );
-                      }
-                    }}
-                  />
+                        <TextInput
+                          ref={reventarRef}
+                          placeholder="Reventar"
+                          style={[styles.inputSmall, { marginLeft: 8 }]}
+                          value={montoReventado}
+                          onChangeText={(text) => {
+                            // Permitir solo un "-" al inicio y dígitos
+                            const sanitized = text.replace(/[^0-9-]/g, "");
+                            const cleaned = sanitized.startsWith("-")
+                              ? "-" + sanitized.slice(1).replace(/-/g, "")
+                              : sanitized.replace(/-/g, "");
+                            setMontoReventado(cleaned);
+                          }}
+                          keyboardType="numeric"
+                          returnKeyType="done"
+                          onSubmitEditing={() => {
+                            const montoNum = parseInt(monto, 10);
+                            const montoReventadoNum = parseInt(
+                              montoReventado,
+                              10,
+                            );
 
-                  <TextInput
-                    ref={numeroRef}
-                    placeholder="Número"
-                    style={[styles.inputSmall, { marginLeft: 8 }]}
-                    value={numero}
-                    onChangeText={setNumero}
-                    keyboardType="numeric"
-                    returnKeyType="done"
-                  />
-                </View>
-                {useReventado && reventar && (
-                  <View style={styles.row}>
-                    <View style={styles.iconButtonInvisible} />
+                            if (
+                              isNaN(montoReventadoNum) ||
+                              !validateMonto(montoReventadoNum)
+                            ) {
+                              Alert.alert(
+                                "Monto inválido",
+                                "Debe ser un múltiplo de 50.",
+                              );
+                              console.log(
+                                "Monto inválido: debe ser múltiplo de 50.",
+                              );
+                              showSnackbar("Debe ingresar un monto válido.", 3);
+                              reventarRef.current?.blur();
+                              window.setTimeout(() => {
+                                reventarRef.current?.focus();
+                              }, 100);
+                              return;
+                            }
 
-                    <TextInput
-                      ref={reventarRef}
-                      placeholder="Reventar"
-                      style={[styles.inputSmall, { marginLeft: 8 }]}
-                      value={montoReventado}
-                      onChangeText={setMontoReventado}
-                      keyboardType="numeric"
-                      returnKeyType="done"
-                      onSubmitEditing={() => {
-                        const montoNumReventar = parseInt(montoReventado, 10);
-                        if (
-                          !isNaN(montoNumReventar) &&
-                          validateMonto(montoNumReventar)
-                        ) {
-                          handleSubmitReventar();
-                        } else {
-                          Alert.alert(
-                            "Monto inválido",
-                            "Debe ser un múltiplo de 50.",
-                          );
-                        }
-                      }}
-                    />
-                    <View
-                      style={[styles.inputSmallInvisible, { marginLeft: 8 }]}
-                    />
-                  </View>
+                            if (montoReventadoNum > montoNum) {
+                              console.log(
+                                "El monto reventado no puede ser mayor al monto original.",
+                              );
+                              showSnackbar(
+                                "El monto reventado no puede ser mayor al monto original.",
+                                3,
+                              );
+                              reventarRef.current?.blur();
+                              window.setTimeout(() => {
+                                reventarRef.current?.focus();
+                              }, 100);
+                              return;
+                            }
+
+                            handleSubmitReventar();
+                          }}
+                          onFocus={() => {
+                            const montoNum = parseInt(monto, 10);
+                            if (
+                              !monto ||
+                              monto.trim() === "" ||
+                              isNaN(montoNum) ||
+                              !validateMonto(montoNum)
+                            ) {
+                              montoRef.current?.focus();
+                              showSnackbar("Debe ingresar un monto válido.", 3);
+                              return;
+                            }
+
+                            if (!numero || numero.length < 2) {
+                              numeroRef.current?.focus();
+                              showSnackbar(
+                                "Debe ingresar un número de 2 dígitos.",
+                                3,
+                              );
+                              return;
+                            }
+                          }}
+                        />
+                        <View
+                          style={[
+                            styles.inputSmallInvisible,
+                            { marginLeft: 8 },
+                          ]}
+                        />
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
-
+              <Divider style={{ backgroundColor: "rgba(0,0,0,0.12)" }} />
               {/* Lista */}
               <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
                 <FlatList
@@ -1840,7 +2104,11 @@ export default function VentaScreen({ navigation, route }) {
                 {tiemposAnteriores.map((item, index) => (
                   <Pressable
                     key={item.id || index}
-                    onPress={() => console.log("Seleccionado", item)}
+                    onPress={() => {
+                      console.log("TIEMPOS SELECCIONADO: ", item);
+                      cargarTiempoSeleccionado(item);
+                      closeDialogTickets(); // cerrar el diálogo
+                    }}
                     style={{
                       paddingVertical: 10,
                       borderBottomWidth: 1,
@@ -2205,6 +2473,7 @@ const styles = StyleSheet.create({
   },
   webFormContainer: {
     marginRight: 20,
+    minWidth: 410,
   },
   listContainer: {
     flex: 1,
@@ -2221,12 +2490,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
+  itemRowGeneral: {
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+  },
+
   itemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
-    borderTopWidth: 1,
+
     borderColor: "#eee",
   },
   itemRowRev: {
@@ -2234,7 +2509,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
-    borderBottomWidth: 1,
     borderColor: "#eee",
   },
   itemLeft: {
@@ -2260,6 +2534,14 @@ const styles = StyleSheet.create({
     padding: 8,
     minHeight: 40, // importante para móviles
   },
+  inputSmallSorteo: {
+    flex: 1,
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+    padding: 8,
+    minHeight: 40, // importante para móviles
+    minWidth: 120,
+  },
   inputSmallInvisible: {
     flex: 1,
     padding: 8,
@@ -2271,12 +2553,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 0,
   },
+  switchRowContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginVertical: Platform.OS === "web" ? 10 : 0, // solo en web,
+    paddingHorizontal: 15,
+  },
   switchRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center", // ✅ fuerza alineación vertical
     marginBottom: 10,
-    gap: 8,
+    gap: 5,
   },
   iconButton: {
     width: 40,

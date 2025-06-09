@@ -28,6 +28,7 @@ import { convertNumero, validateMonto, toFloat } from "../utils/numeroUtils";
 import { getTotalDraw } from "../utils/historyUtils";
 
 export default function HistorialScreen({ navigation, route }) {
+  console.log("🎯 RENDER Historial Screen");
   const { userData } = useAuth();
   const [showPickerDesde, setShowPickerDesde] = useState(false);
   const [showPickerHasta, setShowPickerHasta] = useState(false);

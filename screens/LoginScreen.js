@@ -30,7 +30,7 @@ export default function LoginScreen({ navigation }) {
     if (result) {
       console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
       login(result); // guarda los datos globalmente
-      navigation.replace("Home", { userData: result });
+      //navigation.replace("Home", { userData: result });
     } else {
       Alert.alert("Error", "Usuario o contraseña incorrectos");
     }
