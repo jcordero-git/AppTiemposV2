@@ -346,22 +346,23 @@ export default function VentaScreen({ navigation, route }) {
               title="Pre Cargar"
               titleStyle={{ color: "#000" }} // Texto negro opcional
             />
-            <Menu.Item
-              onPress={openDialogCategorias}
-              title="Categorías Predeterminadas"
-              titleStyle={{ color: "#000" }}
-            />
-            {tiempoSeleccionadoRef.current &&
-              tiempoSeleccionadoRef.current.id > 0 && (
-                <Menu.Item
-                  onPress={() => {
-                    closeMenuHeader();
-                    handleBorrarTiempo(tiempoSeleccionadoRef.current.id);
-                  }}
-                  title="Borrar Tiempo"
-                  titleStyle={{ color: "red" }}
-                />
-              )}
+            {tiempoSeleccionado == null && (
+              <Menu.Item
+                onPress={openDialogCategorias}
+                title="Categorías Predeterminadas"
+                titleStyle={{ color: "#000" }}
+              />
+            )}
+            {tiempoSeleccionado && tiempoSeleccionado.id > 0 && (
+              <Menu.Item
+                onPress={() => {
+                  closeMenuHeader();
+                  handleBorrarTiempo(tiempoSeleccionado.id);
+                }}
+                title="Borrar Tiempo"
+                titleStyle={{ color: "red" }}
+              />
+            )}
           </Menu>
         </>
       ),
@@ -391,8 +392,10 @@ export default function VentaScreen({ navigation, route }) {
       //setTiempo(null);
       setItems([]);
       //setUltimoTicket(0);
-      tiempoSeleccionadoRef.current = null; // limpiar ref
+      //tiempoSeleccionadoRef.current = null; // limpiar ref
+      setTiempoSeleccionado(null);
       setTiempo([]);
+      setClientName("");
       const isAllowed = await inicializarYProcesar();
       setMostrarCampos(true);
     } catch (error) {
@@ -461,7 +464,8 @@ export default function VentaScreen({ navigation, route }) {
   );
 
   const tiempoRef = useRef(tiempo);
-  const tiempoSeleccionadoRef = useRef(tiempo);
+  //const tiempoSeleccionadoRef = useRef(tiempo);
+  const [tiempoSeleccionado, setTiempoSeleccionado] = useState(null);
   const limpiarRef = useRef(limpiar);
 
   const toInputDateFormat = (date) => {
@@ -620,7 +624,8 @@ export default function VentaScreen({ navigation, route }) {
     setItems(numbersConKey || []);
     setTiempo(tiempoCargado);
     tiempoRef.current = tiempoCargado;
-    tiempoSeleccionadoRef.current = tiempoCargado;
+    //tiempoSeleccionadoRef.current = tiempoCargado;
+    setTiempoSeleccionado(tiempoCargado);
     // Ocultar campos
     setMostrarCampos(false);
     // Cambiar visibilidad de switches/inputs
