@@ -22,7 +22,7 @@ export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
 
   useEffect(() => {
     if (visible) {
-      fetch(`http://147.182.248.177:3001/api/drawCategory/user/${userData.id}`)
+      fetch(`https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`)
         .then((res) => {
           return res.json();
         })

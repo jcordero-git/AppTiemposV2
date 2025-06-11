@@ -110,7 +110,7 @@ export default function SorteosScreen({ navigation }) {
     const fetchSorteos = async () => {
       try {
         const response = await fetch(
-          `http://147.182.248.177:3001/api/drawCategory/user/${userData.id}`,
+          `https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`,
         );
         const data = await response.json();
         // Asegúrate de mapear los datos al formato que esperas en FlatList

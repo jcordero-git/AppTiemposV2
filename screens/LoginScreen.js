@@ -7,6 +7,8 @@ import {
   Alert,
   Image,
   Pressable,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
 } from "react-native";
 import React, { useState } from "react";
 import * as Device from "expo-device";
@@ -17,9 +19,13 @@ export default function LoginScreen({ navigation }) {
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     console.log("Email:", username); // 🔍 Imprime el resultado en la consola
+    console.log("password:", password); // 🔍 Imprime el resultado en la consola
+    setLoading(true); // Mostrar loader
+
     const result = await loginUser({
       email: username,
       password,
@@ -30,6 +36,7 @@ export default function LoginScreen({ navigation }) {
     if (result) {
       console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
       login(result); // guarda los datos globalmente
+      setLoading(false); // Mostrar loader
       //navigation.replace("Home", { userData: result });
     } else {
       Alert.alert("Error", "Usuario o contraseña incorrectos");
@@ -38,6 +45,26 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {loading && (
+        <TouchableWithoutFeedback onPress={() => {}}>
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 9999, // asegurarse de que esté encima de todo
+            }}
+          >
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
+        </TouchableWithoutFeedback>
+      )}
+
       <View style={styles.containerLogo}>
         <Text style={styles.title}>TIEMPOS</Text>
         <Image
@@ -78,16 +105,17 @@ const loginUser = async ({ email, password, emei, apkVersion }) => {
   try {
     console.log("Email:", email); // 🔍 Imprime el resultado en la consola
     const response = await fetch(
-      "http://147.182.248.177:3001/api/user/loginV2",
+      "https://3jbe.tiempos.website/api/user/loginV2",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({ email, password, emei, apkVersion }),
       },
     );
-
+    console.log("response: ", response);
     const data = await response.json();
 
     // Verifica si hay datos válidos

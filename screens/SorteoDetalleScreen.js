@@ -32,7 +32,7 @@ export default function SorteoDetalleScreen({ navigation, route }) {
 
     if (!userData?.id || !sorteo?.id) return;
 
-    const endpoint = `http://147.182.248.177:3001/api/restrictedNumbers/byUser/${userData.id}/${sorteo.id}`;
+    const endpoint = `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${sorteo.id}`;
     console.log("Fetching restricciones from:", endpoint);
     fetch(endpoint)
       .then((res) => res.json())

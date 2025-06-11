@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AppTiemposV3",
-    "slug": "AppTiemposV3",
+    "name": "AppTiemposV2",
+    "slug": "AppTiemposV2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,13 +16,25 @@
       "supportsTablet": true
     },
     "android": {
+      "permissions": ["INTERNET"],
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.jose.cordero.brenes.AppTiemposV2"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f47a3b65-9af9-45ae-8472-67f053b6911b"
+      }
+    },
+    "owner": "jose.cordero.brenes",
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

@@ -53,7 +53,7 @@ export default function VentaScreen({ navigation, route }) {
   const [dialogTicketsVisible, setDialogTicketsVisible] = useState(false);
   const [dialogRestringidoVisible, setDialogRestringidoVisible] =
     useState(false);
-  const [ultimoTicket, setUltimoTicket] = useState(null);
+  const [idTicketSeleccionado, setIdTicketSeleccionado] = useState(0);
 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [categoriasMonto, setCategoriasMonto] = useState("");
@@ -108,6 +108,16 @@ export default function VentaScreen({ navigation, route }) {
     setDialogRestringidoVisible(false);
   };
   const openDialogTickets = () => {
+    const actualizaTiemposVendidos = async () => {
+      console.log("CURRENT CAT ID: ", tiempoRef.current.drawCategoryId);
+      console.log("DRAW DATE: ", tiempoRef.current.drawDate);
+      const { tiemposVendidos, lastTicketNumber } =
+        await fetchTiemposAnteriores(
+          tiempoRef.current?.drawCategoryId,
+          tiempoRef.current?.drawDate,
+        );
+    };
+    actualizaTiemposVendidos();
     setDialogTicketsVisible(true);
   };
 
@@ -299,39 +309,60 @@ export default function VentaScreen({ navigation, route }) {
   const [refreshHeader, setRefreshHeader] = useState(0);
 
   React.useLayoutEffect(() => {
+    console.log("TICKET SELECCIONADO: ", idTicketSeleccionado);
+
+    if (idTicketSeleccionado > 0) {
+      navigation.setOptions({
+        title: `CÓDIGO #${idTicketSeleccionado}`,
+      });
+    } else {
+      navigation.setOptions({
+        title: "VENTA",
+      });
+    }
+
     navigation.setOptions({
-      title: "VENTA",
       headerStyle: { backgroundColor: "#4CAF50" },
       headerTintColor: "#fff",
       headerRight: () => (
         <>
-          <Pressable style={{ marginRight: 20 }} onPress={openDialogTickets}>
+          {/* <Pressable style={{ marginRight: 20 }} onPress={openDialogTickets}>
             <Text style={{ color: "#fff", fontSize: 16, fontWeight: "bold" }}>
-              {ultimoTicket}
+              {idTicketSeleccionado}
             </Text>
-          </Pressable>
-          {tiempoRef.current &&
+          </Pressable> */}
+
+          <MaterialIcons
+            name="list"
+            size={24}
+            color="#fff"
+            style={{ marginRight: 20 }}
+            onPress={openDialogTickets}
+          />
+
+          {((tiempoRef.current &&
             tiempoRef.current.drawCategoryId > 0 &&
             !!tiempoRef.current.drawDate &&
             Array.isArray(tiempoRef.current.numbers) &&
-            tiempoRef.current.numbers.length > 0 && (
-              <>
-                <MaterialIcons
-                  name="print"
-                  size={24}
-                  color="#fff"
-                  style={{ marginRight: 20 }}
-                  onPress={handlePrint}
-                />
-                <MaterialIcons
-                  name="image"
-                  size={24}
-                  color="#fff"
-                  style={{ marginRight: 15 }}
-                  onPress={handleImagePress}
-                />
-              </>
-            )}
+            tiempoRef.current.numbers.length > 0) ||
+            (tiempoSeleccionado && tiempoSeleccionado.id > 0)) && (
+            <>
+              <MaterialIcons
+                name="print"
+                size={24}
+                color="#fff"
+                style={{ marginRight: 20 }}
+                onPress={handlePrint}
+              />
+              <MaterialIcons
+                name="image"
+                size={24}
+                color="#fff"
+                style={{ marginRight: 15 }}
+                onPress={handleImagePress}
+              />
+            </>
+          )}
           {/* Menú anclado al botón visible */}
           <Menu
             visible={menuVisibleHeader}
@@ -339,6 +370,16 @@ export default function VentaScreen({ navigation, route }) {
             anchor={MenuAnchor}
             contentStyle={{ backgroundColor: "white", marginRight: 15 }} // Fondo blanco
           >
+            {tiempoSeleccionado && tiempoSeleccionado.id > 0 && (
+              <Menu.Item
+                onPress={() => {
+                  closeMenuHeader();
+                  handleNuevoTiempo();
+                }}
+                title="Nuevo Tiempo"
+                titleStyle={{ color: "green" }}
+              />
+            )}
             <Menu.Item
               onPress={() => {
                 closeMenuHeader();
@@ -367,10 +408,17 @@ export default function VentaScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, menuVisibleHeader, ultimoTicket, , refreshHeader]);
+  }, [navigation, menuVisibleHeader, idTicketSeleccionado, , refreshHeader]);
+
+  const handleNuevoTiempo = async (id) => {
+    limpiarDespuesDeImprimir();
+    setMostrarCampos(true);
+    setcamposBloqueados(false);
+    setTiempoSeleccionado(null);
+  };
 
   const handleBorrarTiempo = async (id) => {
-    const url = `http://147.182.248.177:3001/api/ticket/${id}`;
+    const url = `https://3jbe.tiempos.website/api/ticket/${id}`;
     console.log("tiempo id a elimminar:", id);
     try {
       const response = await fetch(url, {
@@ -394,6 +442,8 @@ export default function VentaScreen({ navigation, route }) {
       //setUltimoTicket(0);
       //tiempoSeleccionadoRef.current = null; // limpiar ref
       setTiempoSeleccionado(null);
+      setIdTicketSeleccionado(0);
+      setcamposBloqueados(false);
       setTiempo([]);
       setClientName("");
       const isAllowed = await inicializarYProcesar();
@@ -428,6 +478,7 @@ export default function VentaScreen({ navigation, route }) {
   const toggleMenu = () => setMenuVisible(!menuVisible);
   const [showPicker, setShowPicker] = useState(false);
   const [mostrarCampos, setMostrarCampos] = useState(true);
+  const [camposBloqueados, setcamposBloqueados] = useState(false);
 
   const numeroRef = useRef(null);
   const montoRef = useRef(null);
@@ -547,64 +598,47 @@ export default function VentaScreen({ navigation, route }) {
 
   const handlePrint = async () => {
     if (!fecha || !sorteoId || !userData?.id) return;
-
-    console.log(
-      "CLIENT NAME INICIA PRINT - antes de inicializar y procesar: ",
-      tiempoRef.current.clientName,
-    );
-    const resultado = await inicializarYProcesar();
-
-    console.log(
-      "CLIENT NAME INICIA PRINT - despues de inicializar y procesar: ",
-      resultado.clientName,
-    );
-
-    console.log("TODOS PERMITIDOS DESPUES DE MANDAR A IMPRIMIR?: ", resultado);
-
-    if (!resultado) {
-      console.log("❌ Validación fallida. Cancelando envío.");
-      return; // ⛔ No continúa si hay errores
-    }
-
-    const tiempoParaImprimir = resultado;
-    console.log("🖨️ Tiempo final:", tiempoParaImprimir);
-
-    const url = `http://147.182.248.177:3001/api/ticket/`;
-
-    console.log("tiempo ref:", tiempoParaImprimir);
-
+    let result;
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(tiempoParaImprimir),
-      });
+      if (!tiempoSeleccionado) {
+        const resultado = await inicializarYProcesar();
+        if (!resultado) {
+          console.log("❌ Validación fallida. Cancelando envío.");
+          return; // ⛔ No continúa si hay errores
+        }
+        const tiempoParaImprimir = resultado;
+        const url = `https://3jbe.tiempos.website/api/ticket/`;
+       
 
-      if (!response.ok) {
-        showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
-        throw new Error(`Error en el envío: ${response.status}`);
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(tiempoParaImprimir),
+        });
+
+        if (!response.ok) {
+          showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
+          throw new Error(`Error en el envío: ${response.status}`);
+        }
+        result = await response.json();
+        const { tiemposVendidos, lastTicketNumber } =
+          await fetchTiemposAnteriores(
+            tiempoParaImprimir.drawCategoryId,
+            tiempoParaImprimir.drawDate,
+          );
+        showSnackbar("El ticket fue registrado correctamente.", 1);
+      } else {
+        console.log("manda a imprimir sin guardar");
+        result = tiempoSeleccionado;
       }
-
-      const result = await response.json();
-
-      const { tiemposVendidos, lastTicketNumber } =
-        await fetchTiemposAnteriores(
-          tiempoParaImprimir.drawCategoryId,
-          tiempoParaImprimir.drawDate,
-        );
-      setUltimoTicket(lastTicketNumber + 1);
-
-      // Aquí podrías imprimir o navegar a otra pantalla si hace falta
-      //Alert.alert("Éxito", "El ticket fue enviado correctamente.");
-      showSnackbar("El ticket fue registrado correctamente.", 1);
 
       if (Platform.OS === "web") {
         const printWindow = printTicketWeb(result, mSorteo, userData); // ← referencia válida
       }
-
-      if (limpiarRef.current) {
+      if (limpiarRef.current && !tiempoSeleccionado) {
+        console.log("limpia");
         limpiarDespuesDeImprimir();
       }
     } catch (error) {
@@ -615,23 +649,31 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const cargarTiempoSeleccionado = (tiempoCargado) => {
-    setUltimoTicket(tiempoCargado.ticketNumber);
+    console.log(
+      "fecha antes de cargar tiempo seleccionado: ",
+      tiempoRef.current.drawDate,
+    );
+
+    setIdTicketSeleccionado(tiempoCargado.id);
     setClientName(tiempoCargado.clientName || "");
     const numbersConKey = (tiempoCargado.numbers || []).map((item) => ({
       ...item,
       key: generateKey(), // Asignas un key único aquí
     }));
     setItems(numbersConKey || []);
-    setTiempo(tiempoCargado);
-    tiempoRef.current = tiempoCargado;
-    //tiempoSeleccionadoRef.current = tiempoCargado;
+    //setTiempo(tiempoCargado);
+    //tiempoRef.current = tiempoCargado;
+
     setTiempoSeleccionado(tiempoCargado);
-    // Ocultar campos
     setMostrarCampos(false);
-    // Cambiar visibilidad de switches/inputs
     setLimpiar(true);
     setReventar(false);
     setIsMontoLocked(false);
+    setcamposBloqueados(true);
+    console.log(
+      "fecha despues de cargar tiempo seleccionado: ",
+      tiempoRef.current.drawDate,
+    );
   };
 
   const limpiarDespuesDeImprimir = () => {
@@ -643,6 +685,7 @@ export default function VentaScreen({ navigation, route }) {
     setTiempo(tiempoLimpio);
     setItems([]);
     tiempoRef.current = tiempoLimpio;
+    setIdTicketSeleccionado(0);
 
     setMonto("");
     setNumero("");
@@ -924,13 +967,20 @@ export default function VentaScreen({ navigation, route }) {
 
   const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
     try {
+      if (drawCategoryId === 0 || !drawDate) {
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+
       console.log(
         "obteniendo tiempos vendidos: drawCategoryID: ",
         drawCategoryId,
-        drawDate,
       );
+      console.log("obteniendo tiempos vendidos: drawDate: ", drawDate);
       const response = await fetch(
-        `http://147.182.248.177:3001/api/ticket/${drawCategoryId}/${drawDate}`,
+        `https://3jbe.tiempos.website/api/ticket/${drawCategoryId}/${drawDate}`,
       );
       const data = await response.json();
       console.log("tiempos obtenidos: ", data);
@@ -938,19 +988,20 @@ export default function VentaScreen({ navigation, route }) {
       console.log("Tiempos anteriores:", data);
       setTiemposAnteriores(data); // Guardar en el estado
 
+      // const ticketNumbers = data
+      //   .map((item) => item.ticketNumber)
+      //   .filter((n) => typeof n === "number" && n > 0);
+
+      // const lastTicketNumber =
+      //   ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
+
       const ticketNumbers = data
-        .map((item) => item.ticketNumber)
+        .map((item) => item.id)
         .filter((n) => typeof n === "number" && n > 0);
 
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
 
-      //setUltimoTicket(lastTicketNumber);
-      //console.log("ultimo ticket: ", lastTicketNumber);
-      // setTiempo((prev) => ({
-      //   ...prev,
-      //   ticketNumber: lastTicketNumber + 1, // O mantener 1 si querés forzarlo
-      // }));
       return {
         tiemposVendidos: data,
         lastTicketNumber,
@@ -1029,9 +1080,7 @@ export default function VentaScreen({ navigation, route }) {
         console.log("entro en el false");
         montoDisponible =
           montoAllowed -
-          totalPorNumero_TiemposVendidos +
-          totalPorNumero_AlreadyInserted;
-
+          (totalPorNumero_TiemposVendidos + totalPorNumero_AlreadyInserted);
         return [false, montoDisponible];
       } else {
         console.log("entro en el true");
@@ -1292,7 +1341,7 @@ export default function VentaScreen({ navigation, route }) {
 
       // Paso 1: Obtener restricciones
       const response = await fetch(
-        `http://147.182.248.177:3001/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+        `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
       );
       const data = await response.json();
 
@@ -1387,7 +1436,8 @@ export default function VentaScreen({ navigation, route }) {
         ticketNumber: lastTicketNumber + 1,
         numbers: nuevosMontoNumeros,
       };
-      setUltimoTicket(lastTicketNumber + 1);
+      //setUltimoTicket(lastTicketNumber + 1);
+      //setUltimoTicket("Tiempos Vendidos");
       setTiempo(tiempoFinal);
 
       tiempoRef.current = tiempoFinal;
@@ -1521,44 +1571,45 @@ export default function VentaScreen({ navigation, route }) {
     //return updatedItems;
   }
 
-  useEffect(() => {
-    const submitNumero = async () => {
-      if (!reventar) {
-        if (numero.length === 2) {
-          if (monto.trim() === "" || numero.trim() === "") {
-            Alert.alert("Error", "Debe ingresar monto y número válidos.");
-            return;
-          }
-          const [currentItems] = await verificaRestringidosYAgregaNumero(
-            monto,
-            numero,
-            false,
-            0,
-            items,
-            tiemposAnteriores,
-          );
+  const submitNumero = async () => {
+    if (!reventar) {
+      if (numero.length === 2) {
+        if (monto.trim() === "" || numero.trim() === "") {
+          Alert.alert("Error", "Debe ingresar monto y número válidos.");
+          return;
+        }
+        const [currentItems] = await verificaRestringidosYAgregaNumero(
+          monto,
+          numero,
+          false,
+          0,
+          items,
+          tiemposAnteriores,
+        );
 
-          setItems(currentItems);
-          const nuevosMontoNumeros = currentItems.map((item) => ({
-            monto: item.monto,
-            numero: item.numero,
-            reventado: item.reventado,
-            montoReventado: item.montoReventado,
-          }));
-          actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
-        } else if (numero.length > 2) {
-          // Si el número tiene más de 2 dígitos, limpiamos el campo
-          setNumero(""); // Limpiar número si tiene más de 2 dígitos
-          Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
-        }
-      } else {
-        if (numero.length === 2 && useReventado) {
-          reventarRef.current?.focus();
-        }
+        setItems(currentItems);
+        const nuevosMontoNumeros = currentItems.map((item) => ({
+          monto: item.monto,
+          numero: item.numero,
+          reventado: item.reventado,
+          montoReventado: item.montoReventado,
+        }));
+        actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+      } else if (numero.length > 2) {
+        // Si el número tiene más de 2 dígitos, limpiamos el campo
+        setNumero(""); // Limpiar número si tiene más de 2 dígitos
+        Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
       }
-    };
+    } else {
+      if (numero.length === 2 && useReventado) {
+        reventarRef.current?.focus();
+      }
+    }
+  };
+
+  useEffect(() => {
     submitNumero();
-  }, [numero, montoReventado]);
+  }, [numero, reventar]);
 
   return (
     <Provider>
@@ -1636,6 +1687,8 @@ export default function VentaScreen({ navigation, route }) {
                   <Pressable
                     style={styles.inputSmallSorteo}
                     onPress={() => setModalVisible(true)}
+                    editable={!camposBloqueados}
+                    disabled={camposBloqueados}
                   >
                     <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
                       {sorteoNombre || "Sorteo"}
@@ -1660,19 +1713,23 @@ export default function VentaScreen({ navigation, route }) {
                   />
 
                   {Platform.OS === "web" ? (
-                    <>
+                    <View pointerEvents={camposBloqueados ? "none" : "auto"}>
                       <DatePickerWeb
                         value={fecha}
+                        editable={!camposBloqueados}
+                        disabled={camposBloqueados}
                         onChange={(date) => {
                           setFecha(date);
                         }}
                       />
-                    </>
+                    </View>
                   ) : (
                     <>
                       <Pressable
                         onPress={() => setShowPicker(true)}
                         style={styles.inputSmall}
+                        editable={!camposBloqueados}
+                        disabled={camposBloqueados}
                       >
                         <Text>{formattedDate || "Selecciona fecha"}</Text>
                       </Pressable>
@@ -1691,12 +1748,15 @@ export default function VentaScreen({ navigation, route }) {
                   )}
                 </View>
 
-                <TextInput
-                  placeholder="Nombre Cliente"
-                  style={styles.input}
-                  value={tiempo.clientName}
-                  onChangeText={setClientName}
-                />
+                <View pointerEvents={camposBloqueados ? "none" : "auto"}>
+                  <TextInput
+                    placeholder="Nombre Cliente"
+                    style={styles.input}
+                    value={tiempo.clientName}
+                    onChangeText={setClientName}
+                    editable={!camposBloqueados}
+                  />
+                </View>
 
                 {mostrarCampos && (
                   <>
@@ -1770,7 +1830,10 @@ export default function VentaScreen({ navigation, route }) {
                       <TextInput
                         ref={montoRef}
                         placeholder="Monto"
-                        style={[styles.inputSmall, { marginLeft: 8 }]}
+                        style={[
+                          styles.inputSmall,
+                          { marginLeft: 8, minWidth: 70 },
+                        ]}
                         value={monto}
                         onChangeText={(text) => {
                           // Permitir solo un "-" al inicio y dígitos
@@ -1807,7 +1870,10 @@ export default function VentaScreen({ navigation, route }) {
                       <TextInput
                         ref={numeroRef}
                         placeholder="Número"
-                        style={[styles.inputSmall, { marginLeft: 8 }]}
+                        style={[
+                          styles.inputSmall,
+                          { marginLeft: 8, minWidth: 70 },
+                        ]}
                         value={numero}
                         onChangeText={(text) => {
                           // Eliminar cualquier carácter que no sea número y limitar a 2 dígitos
@@ -1815,6 +1881,17 @@ export default function VentaScreen({ navigation, route }) {
                             .replace(/[^0-9]/g, "")
                             .slice(0, 2);
                           setNumero(cleaned);
+
+                          // if (cleaned.length === 2) {
+                          //   if (reventar) {
+                          //     reventarRef.current?.blur();
+                          //     window.setTimeout(() =>{
+                          //       reventarRef.current?.focus();
+                          //     });
+                          //   } else {
+                          //     submitNumero();
+                          //   }
+                          // }
                         }}
                         keyboardType="numeric"
                         returnKeyType="done"
@@ -1832,7 +1909,6 @@ export default function VentaScreen({ navigation, route }) {
                         }}
                         onSubmitEditing={() => {
                           if (numero.length !== 2) {
-                            // Mantener foco en el input número
                             numeroRef.current?.blur();
                             window.setTimeout(() => {
                               numeroRef.current?.focus();
@@ -1842,7 +1918,11 @@ export default function VentaScreen({ navigation, route }) {
                               );
                             }, 100);
                           } else {
-                            // Aquí puedes poner la lógica a seguir cuando es válido
+                            if (reventar) {
+                              reventarRef.current?.focus();
+                            } else {
+                              submitNumero();
+                            }
                           }
                         }}
                       />
@@ -2121,7 +2201,7 @@ export default function VentaScreen({ navigation, route }) {
                     }}
                   >
                     <Text style={{ fontWeight: "bold" }}>
-                      Tiquete: # {item.ticketNumber || ""}
+                      Código: # {item.id || ""}
                     </Text>
                     <Text style={{ fontWeight: "bold" }}>
                       Cliente: {item.clientName || "Sin nombre"}

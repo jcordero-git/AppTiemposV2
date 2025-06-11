@@ -1,9 +1,9 @@
 export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
-  const { ticketNumber, drawDate, createdAt, numbers = [] } = result;
+  const { id: codigo, clientName, drawDate, createdAt, numbers = [] } = result;
 
   // Filtrar números normales y reventados (montoReventado según useReventado)
-  const normalNumbers = numbers.filter(n => parseFloat(n.monto) > 0);
-  const reventados = numbers.filter(n => parseFloat(n.montoReventado) > 0);
+  const normalNumbers = numbers.filter((n) => parseFloat(n.monto) > 0);
+  const reventados = numbers.filter((n) => parseFloat(n.montoReventado) > 0);
 
   const formatDate = (dateStr, addOneDay = false) => {
     const date = new Date(dateStr);
@@ -13,7 +13,11 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
 
   const formatTime = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true,});
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
   };
 
   const formatBarcodeDate = (dateStr) => {
@@ -34,7 +38,9 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
   const renderLines = (list, useReventado = false) => {
     const grouped = {};
     list.forEach((n) => {
-      const monto = useReventado ? parseInt(n.montoReventado) : parseInt(n.monto);
+      const monto = useReventado
+        ? parseInt(n.montoReventado)
+        : parseInt(n.monto);
       if (!grouped[monto]) grouped[monto] = [];
       grouped[monto].push(n.numero);
     });
@@ -60,7 +66,7 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
   };
 
   // Código para el barcode
-  const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${ticketNumber.toString().padStart(3, "0")}`;
+  const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${codigo.toString().padStart(3, "0")}`;
 
   // Vendedor nombre y código concatenados
   const vendedorNombreCompleto = `${vendedorData.name}`.trim();
@@ -68,10 +74,20 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
 
   // Porcentajes y valores desde sorteo o vendedor, según preferencia
   // Preferencia a sorteoSeleccionado.userValues si existe
-  const prizeTimes = sorteoSeleccionado.userValues?.prizeTimes ?? vendedorData.prizeTimes ?? "";
-  const sellerPercent = sorteoSeleccionado.userValues?.sellerPercent ?? vendedorData.percentValue ?? "";
-  const revPrizeTimes = sorteoSeleccionado.userValues?.revPrizeTimes ?? vendedorData.revPrizeTimes ?? "";
-  const revSellerPercent = sorteoSeleccionado.userValues?.revSellerPercent ?? vendedorData.revPercentValue ?? "";
+  const prizeTimes =
+    sorteoSeleccionado.userValues?.prizeTimes ?? vendedorData.prizeTimes ?? "";
+  const sellerPercent =
+    sorteoSeleccionado.userValues?.sellerPercent ??
+    vendedorData.percentValue ??
+    "";
+  const revPrizeTimes =
+    sorteoSeleccionado.userValues?.revPrizeTimes ??
+    vendedorData.revPrizeTimes ??
+    "";
+  const revSellerPercent =
+    sorteoSeleccionado.userValues?.revSellerPercent ??
+    vendedorData.revPercentValue ??
+    "";
 
   const htmlContent = `
     <html>
@@ -122,7 +138,7 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
         </style>
       </head>
       <body>
-        <h3>TIEMPO # ${String(ticketNumber).padStart(2, "0")}</h3>
+        <h3>CÓDIGO # ${String(codigo).padStart(2, "0")}</h3>
         <h3>${sorteoSeleccionado.name}</h3>
 
         <table style="text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 12px; margin-top: 6px; width: 100%;">
@@ -133,6 +149,10 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
         <tr>
           <td>TEL.:</td>
           <td>${vendedorData.phone || "N/A"}</td>
+        </tr>
+         <tr>
+          <td>CLIENTE:</td>
+          <td>${clientName || "Sin Nombre"}</td>
         </tr>
         <tr>
           <td>SORTEO:</td>
@@ -187,7 +207,7 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
           Sinpe móvil 7223-9298
         </div>
 
-         <svg id="barcode" width="220" height="60" style="max-width: 100%;"></svg>
+        
 
         <script>
           let pingInterval;
@@ -240,7 +260,26 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
   const printWindow = window.open("", "_blank");
   printWindow.document.write(htmlContent);
   printWindow.document.close();
-  printWindow.focus();
 
-  return printWindow;
+  const tryPrint = () => {
+    // Esperar que el documento esté completamente cargado
+    const interval = window.setInterval(() => {
+      if (printWindow.document.readyState === "complete") {
+        window.clearInterval(interval);
+
+        // Esperamos un poco más para que el render termine completamente
+        window.setTimeout(() => {
+          try {
+            printWindow.focus(); // Necesario en algunos navegadores
+            printWindow.print();
+            printWindow.close();
+          } catch (e) {
+            console.error("Error al intentar imprimir:", e);
+          }
+        }, 500); // puedes ajustar este delay si es necesario
+      }
+    }, 100);
+  };
+
+  tryPrint();
 };

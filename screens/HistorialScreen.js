@@ -11,8 +11,11 @@ import {
   useWindowDimensions,
   Alert,
   Platform,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
 } from "react-native";
 import { Provider, Portal, Dialog, Button } from "react-native-paper";
+import { useFocusEffect } from "@react-navigation/native";
 //import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { subMonths, addDays, format } from "date-fns";
@@ -26,8 +29,10 @@ import mBanking from "../models/mBanking";
 import mHistory from "../models/mHistory";
 import { convertNumero, validateMonto, toFloat } from "../utils/numeroUtils";
 import { getTotalDraw } from "../utils/historyUtils";
+import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 export default function HistorialScreen({ navigation, route }) {
+  const { showSnackbar } = useSnackbar();
   console.log("🎯 RENDER Historial Screen");
   const { userData } = useAuth();
   const [showPickerDesde, setShowPickerDesde] = useState(false);
@@ -41,6 +46,7 @@ export default function HistorialScreen({ navigation, route }) {
   const [fechaDesde, setfechaDesde] = useState(subMonths(new Date(), 2));
   const [fechaHasta, setfechaHasta] = useState(subMonths(new Date(), 0));
   const [dialogVisible, setDialogVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const formatDate = (fecha) => {
     try {
@@ -199,7 +205,7 @@ export default function HistorialScreen({ navigation, route }) {
             color="#fff"
             style={{ marginRight: 20 }}
             onPress={() => {
-              fetchDraws();
+              actualizaDesdeHeader();
             }}
           />
           <MaterialIcons
@@ -216,10 +222,43 @@ export default function HistorialScreen({ navigation, route }) {
     });
   }, [navigation, fechaDesde, fechaHasta]);
 
+  useFocusEffect(
+    useCallback(() => {
+      actualizaDesdeHeader();
+    }, [fechaDesde, fechaHasta, userData]), // <--- agregá las dependencias acá
+  );
+
   useEffect(() => {
     if (userData?.id) {
-      fetchDraws();
+      actualizaDesdeHeader();
     }
+  }, [fechaDesde, fechaHasta, userData]);
+
+  const actualizaDesdeHeader = useCallback(() => {
+    async function execute() {
+      if (!fechaDesde || !fechaHasta || !userData?.id) return;
+      const updated = await fetchDraws();
+      console.log("Actualizada?: ", updated);
+      if (updated) {
+        console.log("Historial Actualizado Correctamente.");
+        showSnackbar("Historial Actualizado Correctamente.", 1);
+      } else {
+        console.log("Error al intentar actualizar el historial.");
+        showSnackbar("Error al intentar actualizar el historial.", 3);
+      }
+    }
+    (async () => {
+      try {
+        setLoading(true);
+        console.log("muestra loading.");
+        await execute();
+      } catch (err) {
+        console.log("Error al intentar actualizar el historial.");
+        showSnackbar("Error al intentar actualizar el historial.", 3);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [fechaDesde, fechaHasta, userData]);
 
   const fetchDraws = async () => {
@@ -231,7 +270,7 @@ export default function HistorialScreen({ navigation, route }) {
     );
     try {
       const drawsResponse = await fetch(
-        `http://147.182.248.177:3001/api/draw/consolidated/${desde}/${hasta}?userId=${userData.id}`,
+        `https://3jbe.tiempos.website/api/draw/consolidated/${desde}/${hasta}?userId=${userData.id}`,
       );
       const dataDraws = await drawsResponse.json();
       console.log("dataDraws api: ", dataDraws);
@@ -390,15 +429,37 @@ export default function HistorialScreen({ navigation, route }) {
       history_history.reverse();
 
       setItems(history_history);
+      return true;
     } catch (error) {
       console.error("Error al obtener draws", error);
       Alert.alert("Error", "No se pudieron cargar los draws.");
+      return false;
     }
   };
 
   return (
     <Provider>
       <View style={styles.container}>
+        {loading && (
+          <TouchableWithoutFeedback onPress={() => {}}>
+            <View
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.4)",
+                justifyContent: "center",
+                alignItems: "center",
+                zIndex: 9999, // asegurarse de que esté encima de todo
+              }}
+            >
+              <ActivityIndicator size="large" color="#fff" />
+            </View>
+          </TouchableWithoutFeedback>
+        )}
+
         {/* Formulario y Lista */}
         <View style={[styles.formAndListContainer, isWeb && styles.webLayout]}>
           {/* Formulario */}
