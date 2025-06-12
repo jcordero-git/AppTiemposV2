@@ -34,8 +34,6 @@ export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
             return horaA - horaB;
           });
 
-          
-
           if (Array.isArray(sorteosOrdenados)) {
             mSorteos = sorteosOrdenados;
           } else {
@@ -44,7 +42,6 @@ export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
               sorteosOrdenados,
             );
           }
-          console.log("sorteos ordenados:", mSorteos);
           setSorteoItems(mSorteos);
         })
         .catch((error) => console.error("Error al obtener sorteos", error));

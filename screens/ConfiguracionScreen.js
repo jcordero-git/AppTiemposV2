@@ -28,6 +28,7 @@ import {
 import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 import { format } from "date-fns";
 import { da, de, es, tr } from "date-fns/locale"; // idioma español
@@ -35,6 +36,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
+import PrinterSizeSelectorModal from "../components/PrinterSizeSelectorModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
@@ -43,6 +45,7 @@ import { parseMessage } from "../utils/UtilParseMessageAI";
 
 export default function ConfiguracionScreen({ navigation, route }) {
   console.log("🎯 RENDER Configuracion Screen");
+   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
@@ -59,6 +62,8 @@ export default function ConfiguracionScreen({ navigation, route }) {
   const [categoriasHasta, setCategoriasHasta] = useState("");
   const [categoriasExtraerTexto, setCategoriasExtraerTexto] = useState("");
   const [loading, setLoading] = useState(false);
+  const [modalPrintPaperSizeVisible, setModalPrintPaperSizeVisible] =
+    useState(false);
 
   const [categoriasMontoTemporal, setCategoriasMontoTemporal] =
     useState(categoriasMonto);
@@ -130,161 +135,10 @@ export default function ConfiguracionScreen({ navigation, route }) {
     setCategoriasExtraerTexto("");
   };
 
-  const SelectTicket = () => {
-    console.log("select ticket");
-    closeDialogTickets();
-  };
-
-  const OKDialogCategorias = async () => {
-    let montoTemp;
-    if (categoriaSeleccionada !== "Extraer de Texto") {
-      montoTemp = parseInt(categoriasMonto);
-      if (!validateMonto(montoTemp)) {
-        Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
-        return;
-      }
-    }
-    setDialogVisible(false);
-    let currentItems = [...items]; // arranco con la lista actual
-
-    if (categoriaSeleccionada === "Parejitas") {
-      for (let i = 0; i <= 9; i++) {
-        const number = parseInt(`${i}${i}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          false,
-          0,
-          currentItems,
-          tiemposAnteriores,
-        );
-        console.log("CURRENT ITEM DESDE PAREJITAS: ", currentItems);
-      }
-    }
-    if (categoriaSeleccionada === "Terminan en...") {
-      for (let i = 0; i <= 9; i++) {
-        const number = parseInt(`${i}${categoriasTerminaEn}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          false,
-          0,
-          currentItems,
-          tiemposAnteriores,
-        );
-        console.log("CURRENT ITEM DESDE TERMINAN EN: ", currentItems);
-      }
-    }
-    if (categoriaSeleccionada === "Inician con...") {
-      for (let i = 0; i <= 9; i++) {
-        const number = parseInt(`${categoriasInicianCon}${i}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          false,
-          0,
-          currentItems,
-          tiemposAnteriores,
-        );
-        console.log("CURRENT ITEM DESDE INICIAN CON: ", currentItems);
-      }
-    }
-    if (categoriaSeleccionada === "Desde / Hasta") {
-      const desde = parseInt(categoriasDesde);
-      const hasta = parseInt(categoriasHasta);
-
-      for (let i = desde; i <= hasta; i++) {
-        const number = parseInt(`${i}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          false,
-          0,
-          currentItems,
-          tiemposAnteriores,
-        );
-        console.log("CURRENT ITEM DESDE / HASTA: ", currentItems);
-      }
-    }
-    console.log("categoriaSeleccionada", categoriaSeleccionada);
-    if (categoriaSeleccionada === "Extraer de Texto") {
-      setLoading(true); // Mostrar loader
-
-      try {
-        const runGeminiExample = async () => {
-          const setting = userData.settings.find(
-            (s) => s.promt_extrae !== undefined,
-          );
-          const prompt = setting ? setting.promt_extrae : "";
-          const day = new Date().getDate();
-          const extraPrompt = prompt;
-          const text = categoriasExtraerTexto;
-          console.log("EXTRAER DE TEXTO - ", extraPrompt + " " + text);
-          const result = await parseMessage(text, day, extraPrompt);
-          console.log("Resultado parseado:", result);
-          return result;
-        };
-
-        const result = await runGeminiExample();
-        console.log("Resultado parseado despues de llamado:", result);
-
-        for (const item of result) {
-          const numero = convertNumero(parseInt(`${item.numero}`));
-          const monto = parseInt(`${item.monto}`);
-
-          [currentItems] = await verificaRestringidosYAgregaNumero(
-            monto,
-            numero,
-            false,
-            0,
-            currentItems,
-            tiemposAnteriores,
-          );
-
-          console.log("CURRENT ITEM DESDE / HASTA: ", currentItems);
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    setItems(currentItems);
-
-    const nuevosMontoNumeros = currentItems?.map((item) => ({
-      monto: item.monto,
-      numero: item.numero,
-      reventado: item.reventado,
-      montoReventado: item.montoReventado,
-      //...(item.montoReventado ? { rev: item.montoReventado } : {}),
-    }));
-    actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
-    setCategoriaSeleccionada(null);
-    setCategoriasMonto("");
-    setCategoriasTerminaEn("");
-    setCategoriasInicianCon("");
-    setCategoriasDesde("");
-    setCategoriasHasta("");
-    setCategoriasExtraerTexto("");
-  };
-
-  // 🔹 MÉTODOS DEL DROPDOWN
-  const openCategoriaSelector = () => {
-    setCategoriaDialogVisible(true);
-  };
-  const closeCategoriaSelector = () => setCategoriaDialogVisible(false);
-
-  const seleccionarCategoria = (categoria) => {
-    setCategoriaSeleccionada(categoria);
-    closeCategoriaSelector();
-  };
-
   useEffect(() => {}, [categoriaDialogVisible]);
 
   const { tiempo, setTiempo, resetTiempo, setClientName } = useTiempo();
+  const { userData, ticketProfile, setTicketProfile, logout } = useAuth();
 
   // El botón que actuará como anchor para el menú
   const MenuAnchor = (
@@ -305,14 +159,13 @@ export default function ConfiguracionScreen({ navigation, route }) {
             size={24}
             color="#fff" // Blanco para contraste con fondo verde
             style={{ marginRight: 20 }}
-            onPress={closeMenuHeader}
+            onPress={handleSave}
           />
           <MaterialIcons
             name="download"
             size={24}
             color="#fff" // Blanco para contraste con fondo verde
             style={{ marginRight: 15 }}
-            onPress={handleImagePress}
           />
           {/* Menú anclado al botón visible */}
           <Menu
@@ -354,13 +207,12 @@ export default function ConfiguracionScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, menuVisibleHeader, ultimoTicket]);
+  }, [navigation, menuVisibleHeader, ticketProfile]);
 
-  const { userData, logout } = useAuth();
+
 
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 
-  const [modalVisible, setModalVisible] = useState(false);
   const [sorteoNombre, setSorteoNombre] = useState("");
   const [sorteoId, setSorteoId] = useState(null);
 
@@ -385,13 +237,31 @@ export default function ConfiguracionScreen({ navigation, route }) {
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
 
-  const handleImagePress = () => {
-    //const mensaje = JSON.stringify(tiempoRef.current, null, 2);
-    const mensaje = JSON.stringify("aqui metodo para guardar", null, 2);
-    if (Platform.OS === "web") {
-      window.alert(`Contenido de "tiempo":\n${mensaje}`);
-    } else {
-      Alert.alert("Contenido de 'tiempo'", mensaje);
+  const handleSave = async () => {
+    if (ticketProfile) {
+      console.log("TICKET PROFILE A GUARDAR: ", ticketProfile);
+      let result;
+      try {
+        const url = `https://3jbe.tiempos.website/api/ticketProfile/${ticketProfile?.userId}`;
+        const response = await fetch(url, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(ticketProfile),
+        });
+
+        if (!response.ok) {
+          showSnackbar("Error al guardar la configuración.", 3);
+          throw new Error(`Error en el envío: ${response.status}`);
+        }
+        result = await response.json();
+        console.log("RESULT DEL SAVE CONFIG: ", result);
+        showSnackbar("La configuración fue guardada correctamente.", 1);
+      } catch (error) {
+        console.error("Error al guardar la configuración.", error);
+        showSnackbar("Error al guardar la configuración.", 3);
+      }
     }
   };
 
@@ -431,29 +301,40 @@ export default function ConfiguracionScreen({ navigation, route }) {
                 <TextInput
                   placeholder="Nombre Tiempos"
                   style={styles.input}
-                  value={tiempo.clientName}
-                  onChangeText={setClientName}
+                  value={ticketProfile?.ticketTitle}
+                  onChangeText={(text) =>
+                    setTicketProfile((prev) => ({ ...prev, ticketTitle: text }))
+                  }
                 />
                 <TextInput
                   placeholder="Nombre Vendedor"
                   style={styles.input}
-                  value={tiempo.clientName}
-                  onChangeText={setClientName}
+                  value={ticketProfile?.sellerName}
+                  onChangeText={(text) =>
+                    setTicketProfile((prev) => ({ ...prev, sellerName: text }))
+                  }
                 />
 
                 <TextInput
                   placeholder="Teléfono"
                   style={styles.input}
-                  value={tiempo.clientName}
-                  onChangeText={setClientName}
+                  value={ticketProfile?.phoneNumber}
+                  onChangeText={(text) =>
+                    setTicketProfile((prev) => ({ ...prev, phoneNumber: text }))
+                  }
                 />
 
                 <TextInput
                   placeholder="Pie de Tiempo"
-                  defaultValue={categoriasExtraerTexto}
-                  onChangeText={setCategoriasExtraerTexto}
+                  defaultValue={ticketProfile?.ticketFooter}
                   multiline={true} // <-- habilita multilinea
                   numberOfLines={4}
+                  onChangeText={(text) =>
+                    setTicketProfile((prev) => ({
+                      ...prev,
+                      ticketFooter: text,
+                    }))
+                  }
                   style={[
                     styles.input,
                     {
@@ -466,47 +347,59 @@ export default function ConfiguracionScreen({ navigation, route }) {
                   ]}
                 />
 
+                <Pressable
+                  style={styles.inputSmall}
+                  onPress={() => setModalPrintPaperSizeVisible(true)}
+                >
+                  <Text
+                    style={{
+                      color: ticketProfile?.printerSize ? "#000" : "#aaa",
+                    }}
+                  >
+                    {ticketProfile?.printerSize
+                      ? ticketProfile.printerSize
+                      : "Tamaño impresión"}
+                  </Text>
+                </Pressable>
+                <PrinterSizeSelectorModal
+                  visible={modalPrintPaperSizeVisible}
+                  onClose={() => setModalPrintPaperSizeVisible(false)}
+                  onSelect={(size) => {
+                    setTicketProfile((prev) => ({
+                      ...prev,
+                      printerSize: size,
+                    }));
+                  }}
+                />
+
                 <View style={styles.switchGroup}>
                   <Pressable
                     style={styles.switchRow}
-                    onPress={() => setLimpiar(!limpiar)}
-                  >
-                    <Text style={styles.switchLabel}>Impresión compacta</Text>
-                    <Switch value={limpiar} onValueChange={setLimpiar} />
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.switchRow}
-                    onPress={() => setLimpiar(!limpiar)}
+                    onPress={() =>
+                      setTicketProfile((prev) => ({
+                        ...prev,
+                        printBarCode: !prev?.printBarCode,
+                      }))
+                    }
                   >
                     <Text style={styles.switchLabel}>
                       Imprimir código de barras
                     </Text>
-                    <Switch value={limpiar} onValueChange={setLimpiar} />
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.switchRow}
-                    onPress={() => setLimpiar(!limpiar)}
-                  >
-                    <Text style={styles.switchLabel}>
-                      Ver tiempo antes de enviar
-                    </Text>
-                    <Switch value={limpiar} onValueChange={setLimpiar} />
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.switchRow}
-                    onPress={() => setLimpiar(!limpiar)}
-                  >
-                    <Text style={styles.switchLabel}>Requiere internet</Text>
-                    <Switch value={limpiar} onValueChange={setLimpiar} />
+                    <Switch
+                      value={ticketProfile?.printBarCode}
+                      onValueChange={(val) =>
+                        setTicketProfile((prev) => ({
+                          ...prev,
+                          printBarCode: val,
+                        }))
+                      }
+                    />
                   </Pressable>
                 </View>
               </View>
             </View>
 
-            {/* Total */}
+            {/* app version */}
             <View style={styles.totalBar}>
               <Text style={styles.totalText}>APP VERSION: </Text>
               <Text style={styles.totalValue}>1.0</Text>
@@ -514,97 +407,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
           </View>
         </>
       </View>
-
-      <Portal>
-        {/* Diálogo Tiempos Vendidos */}
-        <Dialog
-          visible={dialogTicketsVisible}
-          onDismiss={closeDialogTickets}
-          style={[
-            {
-              backgroundColor: "white",
-              borderRadius: 10,
-              marginHorizontal: 20,
-            },
-            isWeb && {
-              position: "absolute",
-              right: 0,
-              top: 10,
-              width: 400,
-              maxHeight: "90%",
-              elevation: 4,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-            },
-          ]}
-        >
-          <Dialog.Content>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 10,
-              }}
-            >
-              <MaterialIcons
-                name="format-list-numbered"
-                size={35}
-                color="#000"
-              />
-              <Text
-                style={{
-                  marginLeft: 8,
-                  fontWeight: "bold",
-                  color: "#000",
-                  fontSize: 18,
-                }}
-              >
-                TIEMPOS VENDIDOS
-              </Text>
-            </View>
-            <View style={{ maxHeight: height * 0.6 }}>
-              <ScrollView contentContainerStyle={{ paddingHorizontal: 10 }}>
-                {tiemposAnteriores.map((item, index) => (
-                  <Pressable
-                    key={item.id || index}
-                    onPress={() => console.log("Seleccionado", item)}
-                    style={{
-                      paddingVertical: 10,
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#eee",
-                    }}
-                  >
-                    <Text style={{ fontWeight: "bold" }}>
-                      Tiquete: # {item.ticketNumber || ""}
-                    </Text>
-                    <Text style={{ fontWeight: "bold" }}>
-                      Cliente: {item.clientName || "Sin nombre"}
-                    </Text>
-                    <Text style={{ color: "#555" }}>
-                      Fecha: {new Date(item.updatedAt).toLocaleString()}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              textColor="black"
-              style={{
-                backgroundColor: "white", // Fondo blanco
-                marginBottom: 10,
-                borderRadius: 3,
-              }}
-              onPress={closeDialogTickets}
-            >
-              CERRAR
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
     </Provider>
   );
 }
@@ -662,6 +464,7 @@ const styles = StyleSheet.create({
   },
   webFormContainer: {
     marginRight: 20,
+    minWidth: 410,
   },
   listContainer: {
     flex: 1,
@@ -709,14 +512,15 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 8,
     marginBottom: 10,
-    minWidth: 406,
   },
   inputSmall: {
-    flex: 1,
-    borderBottomWidth: 1,
+    borderWidth: 1,
     borderColor: "#ccc",
-    padding: 8,
-    minHeight: 40, // importante para móviles
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    minHeight: 44, // altura mínima estándar de input
+    justifyContent: "center", // centra verticalmente el texto
+    marginTop: 15,
   },
   inputSmallInvisible: {
     flex: 1,
@@ -783,7 +587,7 @@ const styles = StyleSheet.create({
   switchGroup: {
     flexDirection: "column",
     gap: Platform.OS === "web" ? 10 : 0, // solo en web,, // espacio entre líneas si usás expo SDK 50+, si no usás marginBottom en el hijo
- 
+    marginTop: Platform.OS === "web" ? 10 : 0,
   },
   switchRow: {
     flexDirection: "row",
@@ -796,5 +600,4 @@ const styles = StyleSheet.create({
     color: "#333",
     flexShrink: 1,
   },
-  
 });

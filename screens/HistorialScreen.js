@@ -135,9 +135,10 @@ export default function HistorialScreen({ navigation, route }) {
             </Text>
           )}
         </View>
-        <View style={styles.itemRow}>
-          <Text></Text>
-          {item.isDraw && (
+        {item.isDraw && (
+          <View style={styles.itemRow}>
+            <Text></Text>
+
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View
                 style={[
@@ -153,8 +154,8 @@ export default function HistorialScreen({ navigation, route }) {
                 Premios: ₡{item.price + item.revPrice}
               </Text>
             </View>
-          )}
-        </View>
+          </View>
+        )}
         <View style={styles.itemRow}>
           <Text></Text>
           <Text style={styles.itemSubtitle}>Subtotal: ₡{item.subTotal}</Text>

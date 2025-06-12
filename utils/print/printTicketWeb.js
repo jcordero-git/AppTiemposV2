@@ -1,5 +1,18 @@
-export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
+export const printTicketWeb = (
+  result,
+  sorteoSeleccionado,
+  vendedorData,
+  ticketProfile,
+) => {
   const { id: codigo, clientName, drawDate, createdAt, numbers = [] } = result;
+  const {
+    phoneNumber,
+    printBarCode,
+    printerSize,
+    sellerName,
+    ticketFooter,
+    ticketTitle,
+  } = ticketProfile;
 
   // Filtrar números normales y reventados (montoReventado según useReventado)
   const normalNumbers = numbers.filter((n) => parseFloat(n.monto) > 0);
@@ -69,8 +82,15 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
   const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${codigo.toString().padStart(3, "0")}`;
 
   // Vendedor nombre y código concatenados
-  const vendedorNombreCompleto = `${vendedorData.name}`.trim();
+  const vendedorNombre =
+    ticketProfile.sellerName?.trim() !== ""
+      ? ticketProfile.sellerName
+      : vendedorData.name || "";
   const vendedorCodigo = vendedorData.userCode || "";
+  const telefono =
+    ticketProfile.phoneNumber?.trim() !== ""
+      ? ticketProfile.phoneNumber
+      : vendedorData.phone || "N/A";
 
   // Porcentajes y valores desde sorteo o vendedor, según preferencia
   // Preferencia a sorteoSeleccionado.userValues si existe
@@ -144,11 +164,11 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
         <table style="text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 12px; margin-top: 6px; width: 100%;">
         <tr>
           <td>VENDEDOR:</td>
-          <td>${vendedorNombreCompleto} - ${vendedorCodigo}</td>
+          <td>${vendedorNombre} - ${vendedorCodigo}</td>
         </tr>
         <tr>
           <td>TEL.:</td>
-          <td>${vendedorData.phone || "N/A"}</td>
+          <td>${telefono || "N/A"}</td>
         </tr>
          <tr>
           <td>CLIENTE:</td>
@@ -188,23 +208,22 @@ export const printTicketWeb = (result, sorteoSeleccionado, vendedorData) => {
 
         <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 14px; margin-top: 6px;">
         <tr>
-          <td style="font-weight: bold; text-align: left;">PAGAMOS A</td>
+          <td style="font-weight: bold; text-align: left;">PAGAMOS</td>
           <td style="font-weight: bold; text-align: right;">${prizeTimes}</td>
         </tr>
       </table>
       <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 14px; margin-top: 6px;">
         <tr>
-          <td style="font-weight: bold; text-align: left;">REVENTADO A</td>
+          <td style="font-weight: bold; text-align: left;">REVENTADO</td>
           <td style="font-weight: bold; text-align: right;">${revPrizeTimes}</td>
         </tr>
       </table>
+
+      <h3>${ticketProfile.ticketTitle}</h3>
+
+
         <div style="margin: 6px 0;">
-          Test<br/>
-          Revise su boleta<br/>
-          Gracias y Suerte!<br/>
-          3 días para cambiar su premio<br/>
-          No se aceptan reclamos<br/>
-          Sinpe móvil 7223-9298
+          ${ticketProfile.ticketFooter}
         </div>
 
         

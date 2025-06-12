@@ -15,7 +15,7 @@ import * as Device from "expo-device";
 import { useAuth } from "../context/AuthContext";
 
 export default function LoginScreen({ navigation }) {
-  const { login } = useAuth();
+  const { login, saveTicketProfile } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -35,10 +35,60 @@ export default function LoginScreen({ navigation }) {
 
     if (result) {
       console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
-      login(result); // guarda los datos globalmente
+      await login(result); // guarda los datos globalmente
+
+      // ✅ Obtener ticketProfile usando el ID del usuario
+      const userId = result.id || result.userId; // depende del nombre exacto en la respuesta
+      try {
+        const profileResponse = await fetch(
+          `https://3jbe.tiempos.website/api/ticketProfile/${userId}`,
+        );
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+
+          if (Object.keys(profileData).length === 0) {
+            // ✅ Si no hay ticketProfile, crear uno por defecto
+            const defaultProfile = {
+              userId,
+              ticketTitle: "",
+              sellerName: result.name || "", // usa nombre del login
+              phoneNumber: result.phone || "", // usa teléfono del login
+              ticketFooter: "",
+              printerSize: "58",
+              lastPrinterMacAddress: "",
+              printBarCode: true,
+            };
+
+            console.log("Creando ticketProfile por defecto:", defaultProfile);
+            await saveTicketProfile(defaultProfile);
+          } else {
+            console.log("Ticket Profile encontrado:", profileData);
+            await saveTicketProfile(profileData);
+          }
+        } else {
+          // ⚠️ Error del servidor o no encontrado → crear por defecto también
+          const defaultProfile = {
+            userId,
+            ticketTitle: "",
+            sellerName: result.name || "",
+            phoneNumber: result.phone || "",
+            ticketFooter: "",
+            printerSize: "58",
+            lastPrinterMacAddress: "",
+            printBarCode: true,
+          };
+
+          console.warn("No se encontró ticketProfile, se usará default");
+          await saveTicketProfile(defaultProfile);
+        }
+      } catch (err) {
+        console.error("Error al obtener ticketProfile:", err);
+      }
+
       setLoading(false); // Mostrar loader
       //navigation.replace("Home", { userData: result });
     } else {
+      setLoading(false);
       Alert.alert("Error", "Usuario o contraseña incorrectos");
     }
   };
