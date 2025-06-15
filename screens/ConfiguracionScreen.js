@@ -45,7 +45,7 @@ import { parseMessage } from "../utils/UtilParseMessageAI";
 
 export default function ConfiguracionScreen({ navigation, route }) {
   console.log("🎯 RENDER Configuracion Screen");
-   const { showSnackbar } = useSnackbar();
+  const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
@@ -208,8 +208,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
       ),
     });
   }, [navigation, menuVisibleHeader, ticketProfile]);
-
-
 
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 

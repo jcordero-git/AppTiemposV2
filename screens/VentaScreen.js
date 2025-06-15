@@ -14,6 +14,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableWithoutFeedback,
+  Linking,
 } from "react-native";
 import {
   Menu,
@@ -24,15 +25,22 @@ import {
   Button,
   Snackbar,
 } from "react-native-paper";
-//import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { WebView } from "react-native-webview";
 
 import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
+import * as Print from "expo-print";
+import * as Sharing from "expo-sharing";
+import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
+
+import RenderHTML from "react-native-render-html";
+import { captureRef } from "react-native-view-shot";
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 import { format } from "date-fns";
-import { da, de, es, tr } from "date-fns/locale"; // idioma español
+import { da, es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
@@ -43,9 +51,23 @@ import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
 import mSorteoSingleton from "../models/mSorteoSingleton.js";
+import {
+  getInternetDate,
+  formatDate,
+  formatHour,
+  timeStrToMilliseconds,
+} from "../utils/datetimeUtils"; // ajusta el path si es necesario
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
+  const ticketRef = useRef(null);
+  const { widthRender } = useWindowDimensions();
+  const [html, setHtml] = React.useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [webviewHeight, setWebviewHeight] = useState(100); // altura inicial mínima
+  const [iframeHeight, setIframeHeight] = useState(100);
+  const iframeRef = useRef(null);
+
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -53,6 +75,7 @@ export default function VentaScreen({ navigation, route }) {
   const [dialogTicketsVisible, setDialogTicketsVisible] = useState(false);
   const [dialogRestringidoVisible, setDialogRestringidoVisible] =
     useState(false);
+  const [dialogPrintVisible, setDialogPrintVisible] = useState(false);
   const [idTicketSeleccionado, setIdTicketSeleccionado] = useState(0);
 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
@@ -93,6 +116,15 @@ export default function VentaScreen({ navigation, route }) {
   }
 
   // 🔹 MÉTODOS DEL DIÁLOGO
+
+  const openDialoPrint = () => {
+    setDialogPrintVisible(true);
+  };
+
+  const closeDialogPrint = () => {
+    setDialogPrintVisible(false);
+  };
+
   const openDialogRestringido = () => {
     setDialogRestringidoVisible(true);
   };
@@ -103,6 +135,7 @@ export default function VentaScreen({ navigation, route }) {
 
     setDialogRestringidoVisible(false);
   };
+
   const openDialogTickets = () => {
     const actualizaTiemposVendidos = async () => {
       const { tiemposVendidos, lastTicketNumber } =
@@ -118,10 +151,6 @@ export default function VentaScreen({ navigation, route }) {
   const closeDialogTickets = () => {
     setDialogTicketsVisible(false);
   };
-  // const openDialogCategorias = () => {
-  //   closeMenuHeader();
-  //   setDialogVisible(true);
-  // };
   const openDialogCategorias = useCallback(() => {
     closeMenuHeader();
     setDialogVisible(true);
@@ -328,19 +357,23 @@ export default function VentaScreen({ navigation, route }) {
             tiempoRef.current.numbers.length > 0) ||
             (tiempoSeleccionado && tiempoSeleccionado.id > 0)) && (
             <>
-              <MaterialIcons
+              {/* <MaterialIcons
                 name="print"
                 size={24}
                 color="#fff"
                 style={{ marginRight: 20 }}
                 onPress={handlePrint}
-              />
+              /> */}
               <MaterialIcons
-                name="image"
+                name={
+                  tiempoSeleccionado && tiempoSeleccionado.id > 0
+                    ? "share"
+                    : "save"
+                }
                 size={24}
                 color="#fff"
                 style={{ marginRight: 15 }}
-                onPress={handleImagePress}
+                onPress={handleShare}
               />
             </>
           )}
@@ -440,8 +473,6 @@ export default function VentaScreen({ navigation, route }) {
     }
   };
 
-
-
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -452,7 +483,7 @@ export default function VentaScreen({ navigation, route }) {
   const [limpiar, setLimpiar] = useState(true);
   const [reventar, setReventar] = useState(false);
   const [sorteo, setSorteo] = useState("");
-  const [fecha, setFecha] = useState(new Date()); // Siempre inicializa con un Date válido
+  const [fecha, setFecha] = useState(getInternetDate()); // Siempre inicializa con un Date válido
   const [monto, setMonto] = useState("");
   const [numero, setNumero] = useState("");
   const [montoDisponible, setMontoDisponible] = useState("");
@@ -504,29 +535,12 @@ export default function VentaScreen({ navigation, route }) {
   const [tiempoSeleccionado, setTiempoSeleccionado] = useState(null);
   const limpiarRef = useRef(limpiar);
 
-  const toInputDateFormat = (date) => {
-    // setTiempo((prev) => ({
-    //   ...prev,
-    //   fecha: date,
-    // }));
-    return date.toISOString().split("T")[0]; // "2025-04-29"
-  };
-
   const parseFechaLocalDesdeInput = (value) => {
     const [year, month, day] = value.split("-");
     return new Date(Number(year), Number(month) - 1, Number(day));
   };
 
-  const formatDate = (fecha) => {
-    if (!fecha) return "";
-    // setTiempo((prev) => ({
-    //   ...prev,
-    //   fecha: fecha,
-    // }));
-    return format(new Date(fecha), "EE dd/MM/yyyy", { locale: es });
-  };
-
-  const formattedDate = formatDate(fecha);
+  const formattedDate = formatDate(fecha, "EE dd/MM/yyyy");
 
   const handleImagePress = () => {
     const mensaje = JSON.stringify(tiempoRef.current, null, 2);
@@ -581,8 +595,56 @@ export default function VentaScreen({ navigation, route }) {
     submitReventar();
   };
 
+  const fetchSorteos = async (sorteoSeleccionado) => {
+    try {
+      const res = await fetch(
+        `https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`,
+      );
+      const data = await res.json();
+
+      const sorteosOrdenados = data.sort((a, b) => {
+        const horaA = new Date(`1970-01-01T${a.limitTime}Z`);
+        const horaB = new Date(`1970-01-01T${b.limitTime}Z`);
+        return horaA - horaB;
+      });
+
+      const sorteoActualizado = sorteosOrdenados.find(
+        (s) => s.id === sorteoSeleccionado.id,
+      );
+
+      if (sorteoActualizado) {
+        return sorteoActualizado;
+      } else {
+        console.warn("⚠️ Sorteo no encontrado tras actualización.");
+        return sorteoSeleccionado; // fallback
+      }
+    } catch (error) {
+      console.error("Error al obtener sorteos:", error);
+      return sorteoSeleccionado; // fallback en error
+    }
+  };
   const handlePrint = async () => {
     if (!fecha || !sorteoId || !userData?.id) return;
+    if (
+      formatDate(fecha, "yyyy-MM-dd") !==
+        formatDate(getInternetDate(), "yyyy-MM-dd") &&
+      !tiempoSeleccionado
+    ) {
+      showSnackbar("SORTEO CERRARO.", 3);
+      return;
+    } else {
+      const updatedSorteo = await fetchSorteos(mSorteo);
+      Object.assign(mSorteo, sorteo);
+      const internetTimeStr = format(getInternetDate(), "HH:mm:ss");
+      const serverLimit = updatedSorteo.limitTime;
+      if (
+        timeStrToMilliseconds(serverLimit) <=
+        timeStrToMilliseconds(internetTimeStr)
+      ) {
+        showSnackbar("SORTEO CERRARO.", 3);
+        return;
+      }
+    }
     let result;
     try {
       if (!tiempoSeleccionado) {
@@ -634,6 +696,167 @@ export default function VentaScreen({ navigation, route }) {
     }
   };
 
+  const handleShare = async () => {
+    setIframeHeight(100);
+    if (!fecha || !sorteoId || !userData?.id) return;
+    if (
+      formatDate(fecha, "yyyy-MM-dd") !==
+        formatDate(getInternetDate(), "yyyy-MM-dd") &&
+      !tiempoSeleccionado
+    ) {
+      showSnackbar("SORTEO CERRARO.", 3);
+      return;
+    } else {
+      const updatedSorteo = await fetchSorteos(mSorteo);
+      Object.assign(mSorteo, sorteo);
+      const internetTimeStr = format(getInternetDate(), "HH:mm:ss");
+      const serverLimit = updatedSorteo.limitTime;
+      if (
+        timeStrToMilliseconds(serverLimit) <=
+        timeStrToMilliseconds(internetTimeStr)
+      ) {
+        showSnackbar("SORTEO CERRARO.", 3);
+        return;
+      }
+    }
+    let result;
+    try {
+      if (!tiempoSeleccionado) {
+        const resultado = await inicializarYProcesar();
+        if (!resultado) {
+          return; // ⛔ No continúa si hay errores
+        }
+        const tiempoParaImprimir = resultado;
+        const url = `https://3jbe.tiempos.website/api/ticket/`;
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(tiempoParaImprimir),
+        });
+
+        if (!response.ok) {
+          showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
+          throw new Error(`Error en el envío: ${response.status}`);
+        }
+        result = await response.json();
+        const { tiemposVendidos, lastTicketNumber } =
+          await fetchTiemposAnteriores(
+            tiempoParaImprimir.drawCategoryId,
+            tiempoParaImprimir.drawDate,
+          );
+        showSnackbar("El ticket fue registrado correctamente.", 1);
+      } else {
+        result = tiempoSeleccionado;
+      }
+
+      const htmlGenerado = await generateHTML(
+        result,
+        mSorteo,
+        userData,
+        ticketProfile,
+      );
+      setHtml(htmlGenerado);
+      setLoaded(false);
+      setDialogPrintVisible(true);
+
+      if (Platform.OS === "web") {
+        // const whatsappUrl = `https://wa.me/")}`;
+        // window.open(whatsappUrl, "_blank");
+        window.location.href = "whatsapp://";
+      }
+
+      if (limpiarRef.current && !tiempoSeleccionado) {
+        limpiarDespuesDeImprimir();
+      }
+    } catch (error) {
+      console.error("Error al enviar el ticket:", error);
+      Alert.alert("Error", "No se pudo enviar el ticket.");
+      showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
+    }
+  };
+
+  useEffect(() => {
+    if (!html || !loaded) return;
+
+    const compartir = async () => {
+      if (Platform.OS === "web") {
+        const html2canvas = (await import("html2canvas")).default;
+        const container = window.document.createElement("div");
+
+        container.innerHTML = html;
+        container.style.width = "58mm";
+        container.style.padding = "10px";
+        container.style.margin = "10";
+        container.style.boxSizing = "border-box";
+        container.style.backgroundColor = "white";
+
+        window.document.body.appendChild(container);
+        await new Promise((r) => window.setTimeout(r, 100));
+
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+        });
+
+        const imgDataUrl = canvas.toDataURL("image/png");
+        const link = window.document.createElement("a");
+        link.href = imgDataUrl;
+        link.download = `ticket_${Date.now()}.png`;
+        link.click();
+
+        window.document.body.removeChild(container);
+      } else {
+        try {
+          const uri = await captureRef(ticketRef.current, {
+            format: "png",
+            quality: 1,
+            result: "tmpfile", // o base64 si prefieres compartir directamente
+          });
+
+          const canShare = await Sharing.isAvailableAsync();
+
+          if (canShare) {
+            await Sharing.shareAsync(uri, {
+              mimeType: "image/png",
+              dialogTitle: "Compartir ticket",
+            });
+          } else {
+            const url = `whatsapp://send?text=${encodeURIComponent("Revisa el ticket generado.")}`;
+            Linking.openURL(url);
+          }
+        } catch (e) {
+          console.error("Error compartiendo el ticket:", e);
+        }
+      }
+    };
+
+    compartir();
+  }, [loaded]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    const handleMessage = (event) => {
+      if (
+        event.data &&
+        typeof event.data === "object" &&
+        event.data.type === "htmlHeight"
+      ) {
+        const newHeight = parseInt(event.data.height, 10);
+        setIframeHeight((prev) => (newHeight > prev ? newHeight : prev));
+
+        console.log("entra a calcular htmlHeight", newHeight);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
   const cargarTiempoSeleccionado = (tiempoCargado) => {
     setIdTicketSeleccionado(tiempoCargado.id);
     setClientName(tiempoCargado.clientName || "");
@@ -671,12 +894,6 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const [isMontoLocked, setIsMontoLocked] = useState(false);
-
-  // Crear un JSON que contenga ambos valores
-  const data = {
-    sorteo: sorteoId,
-    fecha: format(fecha, "EEEE dd/MM/yyyy", { locale: es }),
-  };
 
   function getMontoPorNumero(items, numero) {
     return items?.reduce((sum, item) => {
@@ -927,7 +1144,7 @@ export default function VentaScreen({ navigation, route }) {
       );
     });
 
-    if (restriccionViolada) {     
+    if (restriccionViolada) {
       Alert.alert(
         "Restricción activa",
         `El monto para el número ${numero} debe ser mínimo ₡${restriccionViolada.restrictedAmount}.`,
@@ -949,8 +1166,9 @@ export default function VentaScreen({ navigation, route }) {
         `https://3jbe.tiempos.website/api/ticket/${drawCategoryId}/${drawDate}`,
       );
       const data = await response.json();
-      setTiemposAnteriores(data);
-      const ticketNumbers = data
+      const sortedData = data.sort((a, b) => b.id - a.id);
+      setTiemposAnteriores(sortedData);
+      const ticketNumbers = sortedData
         .map((item) => item.id)
         .filter((n) => typeof n === "number" && n > 0);
 
@@ -958,7 +1176,7 @@ export default function VentaScreen({ navigation, route }) {
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
 
       return {
-        tiemposVendidos: data,
+        tiemposVendidos: sortedData,
         lastTicketNumber,
       };
     } catch (error) {
@@ -1138,7 +1356,8 @@ export default function VentaScreen({ navigation, route }) {
         ticketNumber: 1,
         userId: userData.id,
         drawCategoryId: sorteoId,
-        drawDate: format(fecha, "yyyy-MM-dd", { locale: es }),
+        //drawDate: format(fecha, "yyyy-MM-dd", { locale: es }),
+        drawDate: formatDate(fecha, "yyyy-MM-dd"),
         numbers: [],
       };
       //setTiempo(tiempoBase);
@@ -1180,12 +1399,14 @@ export default function VentaScreen({ navigation, route }) {
 
       // Paso 6: Actualizar estado final
       setItems(currentItems);
-      const nuevosMontoNumeros = currentItems.map((item) => ({
-        monto: item.monto,
-        numero: item.numero,
-        reventado: item.reventado,
-        montoReventado: item.montoReventado,
-      }));
+      const nuevosMontoNumeros = currentItems
+        .map((item) => ({
+          monto: item.monto,
+          numero: item.numero,
+          reventado: item.reventado,
+          montoReventado: item.montoReventado,
+        }))
+        .sort((a, b) => b.monto - a.monto); // Orden descendente por monto
 
       actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
 
@@ -1332,6 +1553,22 @@ export default function VentaScreen({ navigation, route }) {
     }
   };
 
+  const cargaSorteoSeleccionado = async () => {
+    Object.assign(mSorteo, mSorteo); // ✅ Copia las propiedades sin reemplazar el objeto
+    setSorteoNombre(mSorteo.name);
+    setSorteoId(mSorteo.id);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        if (mSorteo.id !== 0) {
+          await cargaSorteoSeleccionado();
+        }
+      })();
+    }, [fecha, sorteoId]), // <--- agregá las dependencias acá
+  );
+
   useEffect(() => {
     submitNumero();
   }, [numero, reventar]);
@@ -1458,7 +1695,7 @@ export default function VentaScreen({ navigation, route }) {
                       </Pressable>
 
                       {/* <Text>Limpiar al imprimir</Text>
-                  <Switch value={limpiar} onValueChange={setLimpiar} /> */}
+        <Switch value={limpiar} onValueChange={setLimpiar} /> */}
 
                       {useReventado && (
                         <>
@@ -1474,10 +1711,10 @@ export default function VentaScreen({ navigation, route }) {
                           </Pressable>
 
                           {/* <Text>Reventar</Text>
-                      <Switch
-                        value={reventar}
-                        onValueChange={handleReventarChange}
-                      /> */}
+                <Switch
+                  value={reventar}
+                  onValueChange={handleReventarChange}
+                /> */}
                         </>
                       )}
                     </View>
@@ -1721,8 +1958,260 @@ export default function VentaScreen({ navigation, route }) {
           </View>
         </>
       </View>
+      {/* {html && (
+        <View>
+          <View
+            ref={ticketRef}
+            collapsable={false}
+            style={{
+              position: "absolute",
+              top: -1000,
+              width: 250, // 58mm aprox.
+              height: webviewHeight,
+              backgroundColor: "white",
+              opacity: 0, // siempre oculto
+              pointerEvents: "none",
+              overflow: "hidden", // evita barras de scroll
+            }}
+          >
+            <WebView
+              originWhitelist={["*"]}
+              source={{ html }}
+              onLoadEnd={() => setLoaded(true)}
+              scalesPageToFit={false}
+              onMessage={(event) => {
+                const height = parseInt(event.nativeEvent.data, 10);
+                setWebviewHeight(height);
+                setLoaded(true);
+              }}
+              injectedJavaScript={`
+          const meta = document.createElement('meta');
+          meta.setAttribute('name', 'viewport');
+          meta.setAttribute('content', 'width=250, initial-scale=1, maximum-scale=1, user-scalable=no');
+          document.head.appendChild(meta);
+          document.body.style.margin = '0';
+          document.body.style.padding = '15px';
+          document.documentElement.style.overflow = 'hidden';
+
+          setTimeout(() => {
+            const height = document.body.scrollHeight;
+            window.ReactNativeWebView.postMessage(height.toString());
+          }, 50);
+          true;
+        `}
+              style={{
+                width: 250,
+                height: webviewHeight,
+                backgroundColor: "white",
+              }}
+            />
+          </View>
+        </View>
+      )} */}
 
       <Portal>
+        {/* Diálogo print */}
+        <Dialog
+          visible={dialogPrintVisible}
+          onDismiss={closeDialogPrint}
+          style={[
+            {
+              backgroundColor: "white",
+              borderRadius: 10,
+              marginHorizontal: 20,
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          {/* Diálogo Restringido */}
+          <Dialog.Content>
+            {html && (
+              <View
+                style={{
+                  alignItems: "center",
+                  maxHeight: isWeb ? "90vh" : 600, // limita el diálogo si es muy alto
+                  overflow: "auto",
+                }}
+              >
+                <View
+                  ref={ticketRef}
+                  collapsable={false}
+                  style={{
+                    width: 250,
+                    backgroundColor: "white",
+                    borderWidth: 1,
+                    borderColor: "#ccc",
+                    overflow: "hidden",
+                    ...(Platform.OS === "web"
+                      ? {
+                          height: (iframeHeight || 300) + 20,
+                          overflow: "auto",
+                        }
+                      : {
+                          height: webviewHeight || 300,
+                          overflow: "scroll",
+                        }),
+                  }}
+                >
+                  {Platform.OS === "web" ? (
+                    <iframe
+                      ref={iframeRef}
+                      srcDoc={`
+                      <!DOCTYPE html>
+                      <html>
+                        <head>
+                          <meta name="viewport" content="width=60mm, initial-scale=1.0">
+                          <style>
+                            body { margin-left: 10px; padding: 0px; box-sizing: border-box; }
+                            .wrapper {
+                              margin-left: 25px;
+                              }
+                          </style>
+                          <script>
+                            function sendHeight() {
+                              const height = document.documentElement.scrollHeight;
+                              window.parent.postMessage({ type: "htmlHeight", height }, "*");
+                            }
+                    
+                            window.addEventListener("load", () => {
+                              sendHeight();
+                              // Retry a couple of times in case fonts/layouts shift content
+                              setTimeout(sendHeight, 100);
+                              setTimeout(sendHeight, 300);                              
+
+                            });
+                    
+                            // Optional: observe height changes dynamically
+                             window.addEventListener("DOMContentLoaded", () => {
+                              const body = document.body;
+                              if (body) {
+                                const observer = new ResizeObserver(sendHeight);
+                                observer.observe(body);
+                              }
+                            });
+
+
+                          </script>
+                        </head>
+                        <body>
+                          <div class="wrapper">
+                            ${html}
+                          </div>
+                         </body>
+                      </html>
+                    `}
+                      style={{
+                        width: "100%",
+                        height: iframeHeight,
+                        border: "none",
+                        display: "block",
+                      }}
+                      sandbox="allow-scripts allow-same-origin allow-modals"
+                    />
+                  ) : (
+                    <WebView
+                      originWhitelist={["*"]}
+                      source={{ html }}
+                      //onLoadEnd={() => setLoaded(true)}
+                      scalesPageToFit={false}
+                      onMessage={(event) => {
+                        const height = parseInt(event.nativeEvent.data, 10);
+                        setWebviewHeight(height);
+                        // setLoaded(true);
+                      }}
+                      injectedJavaScript={`
+                     const meta = document.createElement('meta');
+                     meta.setAttribute('name', 'viewport');
+                     meta.setAttribute('content', 'width=250, initial-scale=1, maximum-scale=1, user-scalable=no');
+                     document.head.appendChild(meta);
+                     document.body.style.margin = '0';
+                     document.body.style.padding = '10px';
+                     document.documentElement.style.overflow = 'hidden';
+ 
+                     setTimeout(() => {
+                       const height = document.body.scrollHeight;
+                       window.ReactNativeWebView.postMessage(height.toString());
+                     }, 100);
+                     true;
+                   `}
+                      style={{
+                        width: 250,
+                        height: webviewHeight || 300,
+                        backgroundColor: "white",
+                      }}
+                    />
+                  )}
+                </View>
+              </View>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                setDialogPrintVisible(false);
+                setWebviewHeight(100);
+                setIframeHeight(100);
+              }}
+            >
+              CANCELAR
+            </Button>
+            <Button
+              textColor="green"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                setDialogPrintVisible(false);
+                setLoaded(true);
+                setWebviewHeight(100);
+                setIframeHeight(100);
+                //closeDialogRestringido;
+                //resolverDialogRef.current?.(); // Resuelve la promesa
+              }}
+            >
+              COMPARTIR
+            </Button>
+            <Button
+              textColor="green"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                if (Platform.OS === "web" && iframeRef.current) {
+                  const iframeWindow = iframeRef.current.contentWindow;
+                  iframeWindow.focus();
+                  iframeWindow.print();
+                }
+                //setWebviewHeight(100);
+                //setIframeHeight(100);
+              }}
+            >
+              IMPRIMIR
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
         {/* Diálogo Restringido */}
         <Dialog
           visible={dialogRestringidoVisible}

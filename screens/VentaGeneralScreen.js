@@ -34,7 +34,7 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 import { format } from "date-fns";
-import { da, de, es, tr } from "date-fns/locale"; // idioma español
+import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
@@ -45,6 +45,7 @@ import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
 import mSorteoSingleton from "../models/mSorteoSingleton.js";
+import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 
 export default function VentaGeneralScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaGeneralScreen");
@@ -76,7 +77,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
   const [limpiar, setLimpiar] = useState(true);
   const [reventar, setReventar] = useState(false);
   const [sorteo, setSorteo] = useState("");
-  const [fecha, setFecha] = useState(new Date()); // Siempre inicializa con un Date válido
+  const [fecha, setFecha] = useState(getInternetDate()); // Siempre inicializa con un Date válido
   const [monto, setMonto] = useState("");
   const [numero, setNumero] = useState("");
   const [montoDisponible, setMontoDisponible] = useState("");
@@ -212,12 +213,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
   const tiempoRef = useRef(tiempo);
 
-  const formatDate = (fecha) => {
-    if (!fecha) return "";
-    return format(new Date(fecha), "EE dd/MM/yyyy", { locale: es });
-  };
-
-  const formattedDate = formatDate(fecha);
+  const formattedDate = formatDate(fecha, "EE dd/MM/yyyy");
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
@@ -273,7 +269,8 @@ export default function VentaGeneralScreen({ navigation, route }) {
       const { tiemposVendidos, lastTicketNumber } =
         await fetchTiemposAnteriores(
           sorteoId,
-          format(fecha, "yyyy-MM-dd", { locale: es }),
+          formatDate(fecha, "yyyy-MM-dd"),
+          //format(fecha, "yyyy-MM-dd", { locale: es }),
         );
       console.log("TIEMPOS VENDIDOS: ", tiemposVendidos);
 
@@ -347,14 +344,26 @@ export default function VentaGeneralScreen({ navigation, route }) {
     }
   };
 
+  const cargaSorteoSeleccionado = async () => {
+    setSorteoNombre(mSorteo.name);
+    setSorteoId(mSorteo.id);
+    console.log("sorteo cargado: ", mSorteo.name);
+  };
+
   useFocusEffect(
     useCallback(() => {
-      actualizaDesdeHeader();
-      return () => {
-        // cleanup si hace falta
-      };
-    }, [fecha, sorteoId, userData]), // <--- agregá las dependencias acá
+      (async () => {
+        if (mSorteo.id !== 0) {
+          await cargaSorteoSeleccionado();
+        }
+        actualizaDesdeHeader();
+        return () => {
+          // cleanup si hace falta
+        };
+      })();
+    }, [fecha, sorteoId, userData]),
   );
+
   useEffect(() => {
     if (fecha || sorteoId || userData?.id) {
       actualizaDesdeHeader();

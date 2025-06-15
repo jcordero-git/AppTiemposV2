@@ -30,6 +30,7 @@ import mHistory from "../models/mHistory";
 import { convertNumero, validateMonto, toFloat } from "../utils/numeroUtils";
 import { getTotalDraw } from "../utils/historyUtils";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
+import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 
 export default function HistorialScreen({ navigation, route }) {
   const { showSnackbar } = useSnackbar();
@@ -39,27 +40,17 @@ export default function HistorialScreen({ navigation, route }) {
   const [showPickerHasta, setShowPickerHasta] = useState(false);
 
   const { width } = useWindowDimensions();
-  const isWeb = width > 768;
+  const isWeb = width > 710;
 
-  const [fecha, setFecha] = useState(new Date());
   // Resta 2 meses desde hoy
-  const [fechaDesde, setfechaDesde] = useState(subMonths(new Date(), 2));
-  const [fechaHasta, setfechaHasta] = useState(subMonths(new Date(), 0));
+  const [fechaDesde, setfechaDesde] = useState(subMonths(getInternetDate(), 2));
+  const [fechaHasta, setfechaHasta] = useState(subMonths(getInternetDate(), 0));
   const [dialogVisible, setDialogVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const formatDate = (fecha) => {
-    try {
-      return format(fecha, "EE dd/MM/yyyy", { locale: es });
-    } catch (error) {
-      console.error("Error al formatear la fecha:", error);
-      return "";
-    }
-  };
-
   const formatDateForAPI = (fecha) => {
     try {
-      return format(fecha, "yyyy-MM-dd");
+      return formatDate(fecha, "yyyy-MM-dd");
     } catch (error) {
       console.error("Error al formatear la fecha:", error);
       return "";
@@ -68,15 +59,15 @@ export default function HistorialScreen({ navigation, route }) {
   const formatDateHastaForAPI = (fecha) => {
     try {
       const fechaAumentada = addDays(fecha, 1);
-      return format(fechaAumentada, "yyyy-MM-dd");
+      return formatDate(fechaAumentada, "yyyy-MM-dd");
     } catch (error) {
       console.error("Error al formatear la fecha hasta:", error);
       return "";
     }
   };
 
-  const formattedFechaDesde = formatDate(fechaDesde);
-  const formattedFechaHasta = formatDate(fechaHasta);
+  const formattedFechaDesde = formatDate(fechaDesde, "EE dd/MM/yyyy");
+  const formattedFechaHasta = formatDate(fechaHasta, "EE dd/MM/yyyy");
   //const formattedFechaDesdeAPI = formatDateForAPI(fechaDesde);
   //const formattedFechaHastaAPI = formatDateHastaForAPI(fechaHasta);
 
@@ -226,7 +217,7 @@ export default function HistorialScreen({ navigation, route }) {
   useFocusEffect(
     useCallback(() => {
       actualizaDesdeHeader();
-    }, [fechaDesde, fechaHasta, userData]), // <--- agregá las dependencias acá
+    }, [fechaDesde, fechaHasta, userData]),
   );
 
   useEffect(() => {

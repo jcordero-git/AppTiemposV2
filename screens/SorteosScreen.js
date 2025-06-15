@@ -18,7 +18,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { format, parse } from "date-fns";
 import { es } from "date-fns/locale"; // idioma español
 import { useAuth } from "../context/AuthContext";
-import { formatHour } from "../utils/timeUtils";
+import { formatHourStr } from "../utils/datetimeUtils";
 
 export default function SorteosScreen({ navigation }) {
   const route = useRoute();
@@ -98,7 +98,7 @@ export default function SorteosScreen({ navigation }) {
       <View style={styles.itemRow}>
         <Text style={styles.itemTitle}>{item.name}</Text>
         <View style={styles.itemDetailsRow}>
-          <Text style={styles.timeText}>{formatHour(item.limitTime)}</Text>
+          <Text style={styles.timeText}>{formatHourStr(item.limitTime)}</Text>
           <Text style={styles.pagaText}>PAGA</Text>
           <Text style={styles.vecesText}>{item.prizeTimes} veces</Text>
         </View>

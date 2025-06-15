@@ -1,6 +1,6 @@
 import { getInternetDate, formatDate, formatHour } from "../datetimeUtils"; // ajusta el path si es necesario
 
-export const printTicketWeb = (
+export const generateHTML = async (
   result,
   sorteoSeleccionado,
   vendedorData,
@@ -16,24 +16,8 @@ export const printTicketWeb = (
     ticketTitle,
   } = ticketProfile;
 
-  // Filtrar números normales y reventados (montoReventado según useReventado)
   const normalNumbers = numbers.filter((n) => parseFloat(n.monto) > 0);
   const reventados = numbers.filter((n) => parseFloat(n.montoReventado) > 0);
-
-  // const formatDate = (dateStr, addOneDay = false) => {
-  //   const date = new Date(dateStr);
-  //   if (addOneDay) date.setDate(date.getDate() + 1);
-  //   return date.toLocaleDateString("es-ES");
-  // };
-
-  // const formatTime = (dateStr) => {
-  //   const date = new Date(dateStr);
-  //   return date.toLocaleTimeString("en-US", {
-  //     hour: "2-digit",
-  //     minute: "2-digit",
-  //     hour12: true,
-  //   });
-  // };
 
   const formatBarcodeDate = (dateStr) => {
     const date = new Date(dateStr);
@@ -42,14 +26,11 @@ export const printTicketWeb = (
     const year = String(date.getFullYear()).slice(-2); // Solo los últimos 2 dígitos
     return `${day}${month}${year}`;
   };
-
-  // Total suma montos normales y reventados
   const total = numbers.reduce(
     (sum, n) => sum + parseInt(n.monto || 0) + parseInt(n.montoReventado || 0),
     0,
   );
 
-  // Función para agrupar números por monto y renderizar líneas
   const renderLines = (list, useReventado = false) => {
     const grouped = {};
     list.forEach((n) => {
@@ -69,7 +50,7 @@ export const printTicketWeb = (
           rows.push(`
           <tr>
             <td style="width: 60px; font-weight: bold;">${monto}</td>
-            <td>* ${grupo.join("&nbsp;&nbsp;")}</td>
+            <td>| ${grupo.join("&nbsp;&nbsp;")}</td>
           </tr>
         `);
         }
@@ -116,16 +97,19 @@ export const printTicketWeb = (
   const htmlContent = `
     <html>
       <head>
-        <title>Ticket</title>       
+        <title>Ticket</title>
+        <meta name="viewport" content="width=58mm, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>        
         <style>
           @media print {
             body { margin: 0; }
           }
           body {
-            width: 58mm;
+            width: 60mm;
             font-family: "Courier New", Courier, monospace;
             font-size: 12px;
-            padding: 5px;
+            padding: 0px;
+            margin: 0px;
             text-align: center;
           }
           h2, h3, h4 {
@@ -164,7 +148,7 @@ export const printTicketWeb = (
         <h3>CÓDIGO # ${String(codigo).padStart(2, "0")}</h3>
         <h3>${sorteoSeleccionado.name}</h3>
 
-        <table style="text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 12px; margin-top: 6px; width: 100%;">
+        <table style="text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 10px; margin-top: 6px; width: 100%;">
         <tr>
           <td>VENDEDOR:</td>
           <td>${vendedorNombre} - ${vendedorCodigo}</td>
@@ -194,7 +178,7 @@ export const printTicketWeb = (
         ${
           reventados.length > 0
             ? `
-          <div class="section-title">****REVENTADOS****</div>
+          <div class="section-title">**********REVENTADOS**********</div>
           ${renderLines(reventados, true)}
         `
             : ""
@@ -229,67 +213,10 @@ export const printTicketWeb = (
           ${ticketProfile.ticketFooter}
         </div>
 
-        
-
-        <script>
-          let pingInterval;
-
-          window.onload = function () {      
-          
-          
-          pingInterval = setInterval(() => {
-              if (window.opener) {
-                window.opener.postMessage("PRINT_PING", "*");
-              }
-            }, 500);
-
-            setTimeout(() => {
-              window.print();
-
-              window.onafterprint = function () {
-                clearInterval(pingInterval);
-                if (window.opener) {
-                  window.opener.postMessage("PRINT_DONE", "*");
-                }
-                window.close();
-              };
-
-              window.onbeforeunload = function () {
-                clearInterval(pingInterval);
-                if (window.opener) {
-                  window.opener.postMessage("PRINT_DONE", "*");
-                }
-              };
-            }, 300);
-          };
-        </script>
+    
       </body>
     </html>
   `;
 
-  const printWindow = window.open("", "_blank");
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
-
-  const tryPrint = () => {
-    // Esperar que el documento esté completamente cargado
-    const interval = window.setInterval(() => {
-      if (printWindow.document.readyState === "complete") {
-        window.clearInterval(interval);
-
-        // Esperamos un poco más para que el render termine completamente
-        window.setTimeout(() => {
-          try {
-            printWindow.focus(); // Necesario en algunos navegadores
-            printWindow.print();
-            printWindow.close();
-          } catch (e) {
-            console.error("Error al intentar imprimir:", e);
-          }
-        }, 500); // puedes ajustar este delay si es necesario
-      }
-    }, 100);
-  };
-
-  tryPrint();
+  return htmlContent;
 };
