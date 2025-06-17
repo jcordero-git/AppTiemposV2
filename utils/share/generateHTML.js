@@ -6,7 +6,14 @@ export const generateHTML = async (
   vendedorData,
   ticketProfile,
 ) => {
-  const { id: codigo, clientName, drawDate, createdAt, numbers = [] } = result;
+  const {
+    id: codigo,
+    clientName,
+    drawDate,
+    createdAt,
+    updatedAt,
+    numbers = [],
+  } = result;
   const {
     phoneNumber,
     printBarCode,
@@ -49,15 +56,15 @@ export const generateHTML = async (
           const grupo = numeros.slice(i, i + 3);
           rows.push(`
           <tr>
-            <td style="width: 60px; font-weight: bold;">${monto}</td>
-            <td>| ${grupo.join("&nbsp;&nbsp;")}</td>
+            <td style="width: 60px;">${monto}</td>
+            <td>* ${grupo.join(",&nbsp;")}</td>
           </tr>
         `);
         }
       });
 
     return `
-      <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 14px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
+      <table style="line-height: 0.5; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
         ${rows.join("")}
       </table>
     `;
@@ -98,19 +105,25 @@ export const generateHTML = async (
     <html>
       <head>
         <title>Ticket</title>
-        <meta name="viewport" content="width=58mm, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>        
         <style>
           @media print {
+            @page {
+                  size: 58mm auto;
+                  margin: 0;
+                }
             body { margin: 0; }
           }
           body {
             width: 60mm;
-            font-family: "Courier New", Courier, monospace;
+            font-family: monospace;
             font-size: 12px;
             padding: 0px;
             margin: 0px;
             text-align: center;
+            height: 100%;
+            line-height: 0.8;
           }
           h2, h3, h4 {
             margin: 2px 0;
@@ -122,7 +135,11 @@ export const generateHTML = async (
             margin: 2px 0;
           }
           .divider {
-            border-top: 1px dashed #000;
+            border-top: 2px dashed #000;
+            margin: 6px 0;
+          }
+          .dividerInvisible {
+            border-top: 1px dashed rgba(19, 18, 18, 0.29);
             margin: 6px 0;
           }
           .section-title {
@@ -144,11 +161,14 @@ export const generateHTML = async (
           }
         </style>
       </head>
-      <body>
-        <h3>CÓDIGO # ${String(codigo).padStart(2, "0")}</h3>
-        <h3>${sorteoSeleccionado.name}</h3>
+      <body style="line-height: 0.8;">
+       
+       <div class="dividerInvisible" style="height: 2px;  margin-bottom: 2px;"></div>
 
-        <table style="text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 10px; margin-top: 6px; width: 100%;">
+        <h3 style="width: 100%; font-family:  monospace; font-size:22px; margin-top: 4px;" >CODIGO # ${String(codigo).padStart(2, "0")}</h3>
+        <h3 style="width: 100%; font-family:  monospace; font-size: 22px; margin-top: 1px;" >${sorteoSeleccionado.name}</h3>
+
+        <table style="line-height: 0.8; text-align: left; font-family: monospace; font-size: 13px; margin-top: 8px; width: 100%;">
         <tr>
           <td>VENDEDOR:</td>
           <td>${vendedorNombre} - ${vendedorCodigo}</td>
@@ -167,7 +187,7 @@ export const generateHTML = async (
         </tr>
         <tr>
           <td>IMPRESIÓN:</td>
-          <td>${formatDate(getInternetDate(), "dd/MM/yyyy HH:mm:ss")} </td>
+          <td>${formatDate(new Date(), "dd/MM/yyyy HH:mm:ss")} </td>
         </tr>
       </table>
 
@@ -178,42 +198,73 @@ export const generateHTML = async (
         ${
           reventados.length > 0
             ? `
-          <div class="section-title">**********REVENTADOS**********</div>
+          <div style="width: 100%; font-family: monospace; font-size: 16px; font-weight: bold; class="section-title">*******REVENTADOS*******</div>
           ${renderLines(reventados, true)}
         `
             : ""
         }
 
         <div class="divider"></div>
-        <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 14px; margin-top: 6px;">
+        <table style="width: 100%; line-height: 0.5; font-family: monospace; font-size: 20px; font-weight: bold; margin-top: 10px;">
         <tr>
-          <td style="font-weight: bold; text-align: left;">TOTAL</td>
-          <td style="font-weight: bold; text-align: right;">${total}</td>
+          <td style="text-align: left;">TOTAL</td>
+          <td style="text-align: right;">${total}</td>
         </tr>
       </table>
         <div class="divider"></div>
 
-        <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 14px; margin-top: 6px;">
+        <table style="width: 100%; font-family:  monospace; font-size: 20px; margin-top: 0px;">
         <tr>
-          <td style="font-weight: bold; text-align: left;">PAGAMOS</td>
-          <td style="font-weight: bold; text-align: right;">${prizeTimes}</td>
+          <td style="text-align: left;">PAGAMOS</td>
+          <td style="text-align: right;">${prizeTimes}</td>
         </tr>
       </table>
-      <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 14px; margin-top: 6px;">
+      <table style="width: 100%; font-family: monospace; font-size: 20px; margin-top: 2px;">
         <tr>
-          <td style="font-weight: bold; text-align: left;">REVENTADO</td>
-          <td style="font-weight: bold; text-align: right;">${revPrizeTimes}</td>
+          <td style="text-align: left;">REVENTADO</td>
+          <td style="text-align: right;">${revPrizeTimes}</td>
         </tr>
       </table>
 
-      <h3>${ticketProfile.ticketTitle}</h3>
+      <h3 style="width: 100%; font-family:  monospace; font-size: 18px; margin-top: 8px;">${ticketProfile.ticketTitle}</h3>
 
 
-        <div style="margin: 6px 0;">
+        <div style="width: 100%; font-family:  monospace; font-size: 14px; margin-top: 8px;">
           ${ticketProfile.ticketFooter}
         </div>
 
+        ${
+          printBarCode === true
+            ? `
+           <div style="height: 40px;  margin-top: 6px; width: 100%;">
+            <div style="text-align:center; margin-top: 10px; width: 100%;">
+            <svg id="barcode"></svg>
+          </div>
+           </div>
+        `
+            : ""
+        }      
+
+        <div style="text-align:center; margin-top: 3px; font-family:  monospace; font-size: 20px;">
+            ${barcodeValue}
+          </div>
+
+        <div class="dividerInvisible" style="height: 2px;  margin-top: 40px;"></div>
     
+        <script>
+          document.addEventListener("DOMContentLoaded", function () {
+            JsBarcode("#barcode", "${barcodeValue}", {
+              format: "CODE128",
+              lineColor: "#000",
+              width: 1.2,
+              height: 30,
+              displayValue: false,
+              fontSize: 14,
+              margin: 0,
+            });
+          });
+        </script>
+
       </body>
     </html>
   `;

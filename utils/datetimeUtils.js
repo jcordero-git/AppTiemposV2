@@ -22,6 +22,24 @@ export function getInternetDate() {
   return internetDate ?? new Date();
 }
 
+export async function getUpdatedInternetDate(current = new Date()) {
+  const currentFormatted = format(current, "yyyy-MM-dd HH:mm");
+  const storedFormatted = internetDate
+    ? format(internetDate, "yyyy-MM-dd HH:mm")
+    : null;
+
+  console.debug({
+    internetDate,
+    currentFormatted,
+    storedFormatted,
+  });
+
+  if (!internetDate || currentFormatted !== storedFormatted) {
+    await syncInternetTime();
+  }
+  return internetDate ?? new Date();
+}
+
 export function formatHour(fecha) {
   if (!fecha) return "";
   return format(fecha, "hh:mm a", { locale: es }).toUpperCase();
@@ -44,7 +62,22 @@ export function formatHourStr(timeStr) {
 
 export function formatDate(fecha, formatStr) {
   if (!fecha) return "";
-  return format(new Date(fecha), formatStr, { locale: es });
+  console.log("FORMAT DATE", formatStr, fecha);
+  const dateObj = typeof fecha === "string" ? parseDateUTC(fecha) : fecha;
+  return format(dateObj, formatStr, { locale: es });
+}
+
+function parseDateUTC(fechaStr) {
+  const d = new Date(fechaStr);
+  // Crear una fecha "local" con los componentes UTC para evitar el corrimiento de día
+  return new Date(
+    d.getUTCFullYear(),
+    d.getUTCMonth(),
+    d.getUTCDate(),
+    d.getUTCHours(),
+    d.getUTCMinutes(),
+    d.getUTCSeconds(),
+  );
 }
 
 // Devuelve la fecha actual formateada (ej: "12 de junio de 2025, 10:21")

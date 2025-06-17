@@ -7,23 +7,23 @@ import { TiempoProvider } from "./models/mTiempoContext";
 import { SnackbarProvider } from "./context/SnackbarContext"; // Ajusta el path
 
 import MainNavigator from "./navigation/mainNavigator";
-import { syncInternetTime } from "./utils/datetimeUtils";
+// import { syncInternetTime } from "./utils/datetimeUtils";
 
 export default function App() {
-  useEffect(() => {
-    syncInternetTime("America/Costa_Rica"); // también puedes usar "America/Santiago", etc.
-  }, []);
+  // useEffect(() => {
+  //   syncInternetTime("America/Costa_Rica"); // también puedes usar "America/Santiago", etc.
+  // }, []);
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <TiempoProvider>
-        <PaperProvider>
-          <SnackbarProvider>
-            <AuthProvider>
+      <AuthProvider>
+        <TiempoProvider>
+          <PaperProvider>
+            <SnackbarProvider>
               <MainNavigator />
-            </AuthProvider>
-          </SnackbarProvider>
-        </PaperProvider>
-      </TiempoProvider>
+            </SnackbarProvider>
+          </PaperProvider>
+        </TiempoProvider>
+      </AuthProvider>
     </GestureHandlerRootView>
   );
 }

@@ -15,6 +15,9 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
   Linking,
+  Keyboard,
+  InteractionManager,
+  StatusBar,
 } from "react-native";
 import {
   Menu,
@@ -31,7 +34,9 @@ import { WebView } from "react-native-webview";
 import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
 import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
+import PrinterUtils from "../utils/print/printerUtils";
 
 import RenderHTML from "react-native-render-html";
 import { captureRef } from "react-native-view-shot";
@@ -45,6 +50,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
+import PreCargarModal from "../components/PreCargarModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
@@ -53,6 +59,7 @@ import { parseMessage } from "../utils/UtilParseMessageAI";
 import mSorteoSingleton from "../models/mSorteoSingleton.js";
 import {
   getInternetDate,
+  getUpdatedInternetDate,
   formatDate,
   formatHour,
   timeStrToMilliseconds,
@@ -67,6 +74,7 @@ export default function VentaScreen({ navigation, route }) {
   const [webviewHeight, setWebviewHeight] = useState(100); // altura inicial mínima
   const [iframeHeight, setIframeHeight] = useState(100);
   const iframeRef = useRef(null);
+  const [generateImage, setGenerateImage] = useState(false);
 
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
@@ -91,6 +99,13 @@ export default function VentaScreen({ navigation, route }) {
     useState(categoriasMonto);
 
   const menuAnchorRef = useRef(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      StatusBar.setBackgroundColor("#4CAF50");
+      StatusBar.setBarStyle("dark-content");
+    }, []),
+  );
 
   useEffect(() => {
     if (dialogVisible) setCategoriasMontoTemporal(categoriasMonto);
@@ -319,6 +334,9 @@ export default function VentaScreen({ navigation, route }) {
     </TouchableOpacity>
   );
   const [refreshHeader, setRefreshHeader] = useState(0);
+  const [isSharing, setIsSharing] = useState(false);
+  const isSharingRef = useRef(false);
+  const [modalVisiblePreCargar, setModalVisiblePreCargar] = useState(false);
 
   React.useLayoutEffect(() => {
     if (idTicketSeleccionado > 0) {
@@ -357,24 +375,18 @@ export default function VentaScreen({ navigation, route }) {
             tiempoRef.current.numbers.length > 0) ||
             (tiempoSeleccionado && tiempoSeleccionado.id > 0)) && (
             <>
-              {/* <MaterialIcons
-                name="print"
-                size={24}
-                color="#fff"
-                style={{ marginRight: 20 }}
-                onPress={handlePrint}
-              /> */}
-              <MaterialIcons
-                name={
-                  tiempoSeleccionado && tiempoSeleccionado.id > 0
-                    ? "share"
-                    : "save"
-                }
-                size={24}
-                color="#fff"
-                style={{ marginRight: 15 }}
+              <TouchableOpacity
+                disabled={isSharing}
                 onPress={handleShare}
-              />
+                style={{ opacity: isSharing ? 0.4 : 1 }}
+              >
+                <MaterialIcons
+                  name={tiempoSeleccionado?.id > 0 ? "share" : "save"}
+                  size={24}
+                  color="#fff"
+                  style={{ marginRight: 15 }}
+                />
+              </TouchableOpacity>
             </>
           )}
           {/* Menú anclado al botón visible */}
@@ -397,10 +409,14 @@ export default function VentaScreen({ navigation, route }) {
             <Menu.Item
               onPress={() => {
                 closeMenuHeader();
+                InteractionManager.runAfterInteractions(() => {
+                  setModalVisiblePreCargar(true);
+                });
               }}
               title="Pre Cargar"
               titleStyle={{ color: "#000" }} // Texto negro opcional
             />
+
             {tiempoSeleccionado == null && (
               <Menu.Item
                 onPress={openDialogCategorias}
@@ -428,10 +444,11 @@ export default function VentaScreen({ navigation, route }) {
     idTicketSeleccionado,
     refreshHeader,
     ticketProfile,
+    modalVisiblePreCargar,
   ]);
 
   const handleNuevoTiempo = async (id) => {
-    limpiarDespuesDeImprimir();
+    limpiarDespuesDeImprimir(true);
     setMostrarCampos(true);
     setcamposBloqueados(false);
     setTiempoSeleccionado(null);
@@ -476,6 +493,7 @@ export default function VentaScreen({ navigation, route }) {
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 
   const [modalVisible, setModalVisible] = useState(false);
+
   const [sorteoNombre, setSorteoNombre] = useState("");
   const [sorteoId, setSorteoId] = useState(null);
 
@@ -483,7 +501,7 @@ export default function VentaScreen({ navigation, route }) {
   const [limpiar, setLimpiar] = useState(true);
   const [reventar, setReventar] = useState(false);
   const [sorteo, setSorteo] = useState("");
-  const [fecha, setFecha] = useState(getInternetDate()); // Siempre inicializa con un Date válido
+  const [fecha, setFecha] = useState(new Date()); // Siempre inicializa con un Date válido
   const [monto, setMonto] = useState("");
   const [numero, setNumero] = useState("");
   const [montoDisponible, setMontoDisponible] = useState("");
@@ -531,6 +549,7 @@ export default function VentaScreen({ navigation, route }) {
   );
 
   const tiempoRef = useRef(tiempo);
+  const tiempoAImprimirRef = useRef(tiempo);
   //const tiempoSeleccionadoRef = useRef(tiempo);
   const [tiempoSeleccionado, setTiempoSeleccionado] = useState(null);
   const limpiarRef = useRef(limpiar);
@@ -623,105 +642,203 @@ export default function VentaScreen({ navigation, route }) {
       return sorteoSeleccionado; // fallback en error
     }
   };
-  const handlePrint = async () => {
-    if (!fecha || !sorteoId || !userData?.id) return;
-    if (
-      formatDate(fecha, "yyyy-MM-dd") !==
-        formatDate(getInternetDate(), "yyyy-MM-dd") &&
-      !tiempoSeleccionado
-    ) {
-      showSnackbar("SORTEO CERRARO.", 3);
-      return;
-    } else {
-      const updatedSorteo = await fetchSorteos(mSorteo);
-      Object.assign(mSorteo, sorteo);
-      const internetTimeStr = format(getInternetDate(), "HH:mm:ss");
-      const serverLimit = updatedSorteo.limitTime;
-      if (
-        timeStrToMilliseconds(serverLimit) <=
-        timeStrToMilliseconds(internetTimeStr)
-      ) {
-        showSnackbar("SORTEO CERRARO.", 3);
-        return;
-      }
-    }
-    let result;
-    try {
-      if (!tiempoSeleccionado) {
-        const resultado = await inicializarYProcesar();
-        if (!resultado) {
-          return; // ⛔ No continúa si hay errores
-        }
-        const tiempoParaImprimir = resultado;
-        const url = `https://3jbe.tiempos.website/api/ticket/`;
 
-        const response = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(tiempoParaImprimir),
+  const handlePrintBtDeprecated = async () => {
+    try {
+      console.log("TIEMPO SELECCIONADO DESDE PRINT BT: ", tiempoSeleccionado);
+      let tiempoAImprimir;
+
+      console.log(
+        "tiempo a imprimir ref desde print btn: ",
+        tiempoAImprimirRef.current,
+      );
+
+      if (tiempoSeleccionado !== null) {
+        tiempoAImprimir = tiempoSeleccionado;
+      } else {
+        console.log("entra al else 1", tiempoAImprimirRef.current);
+        tiempoAImprimir = tiempoAImprimirRef.current;
+        console.log("entra al else 2", tiempoAImprimir);
+      }
+
+      console.log("TIEMPO A IMPRIMIR: ", tiempoAImprimir);
+
+      if (Platform.OS === "android") {
+        // await Print.printAsync({
+        //   html: html, // tu HTML actual
+        // });
+        try {
+          const mac = ticketProfile.lastPrinterMacAddress;
+          console.log("Printer Mac Address from ticket profile: ", mac);
+          await PrinterUtils.initBluetooth();
+          try {
+            const isConnected = await PrinterUtils.connectToDevice(mac);
+            console.log("Paso el connectToDevice: isConnected?", isConnected);
+
+            console.log(
+              "TIEMPO SELECCIONADO DESDE PRINT BT ANRES DE ENVIAR A IMPRIMIR: ",
+              tiempoAImprimir,
+            );
+            await PrinterUtils.printTicket({
+              tiempo: tiempoAImprimir,
+              sorteoSeleccionado: mSorteo,
+              vendedorData: userData,
+              ticketProfile: ticketProfile,
+            });
+            console.log("Paso el PrinterUtils.printTicket: ");
+          } catch (error) {
+            console.warn(
+              "No se pudo conectar con el MAC guardado. Escaneando...",
+            );
+            const devices = await PrinterUtils.getDeviceList();
+            const found = devices.find((d) => d.inner_mac_address === mac);
+
+            console.log("Paso el found = devices.find: ", found);
+
+            if (!found) {
+              showSnackbar(
+                "La impresora no está disponible. Por favor, empareja desde los ajustes del sistema.",
+                3,
+              );
+              throw new Error(
+                "La impresora no está disponible. Por favor, empareja desde los ajustes del sistema.",
+              );
+            }
+            await PrinterUtils.connectToDevice(found.inner_mac_address);
+          }
+          await PrinterUtils.printTicket({
+            tiempo: tiempoAImprimir,
+            sorteoSeleccionado: mSorteo,
+            vendedorData: userData,
+            ticketProfile: ticketProfile,
+          });
+
+          if (limpiarRef.current && !tiempoSeleccionado) {
+            console.log("entra a limpiar campos");
+            limpiarDespuesDeImprimir();
+          }
+        } catch (err) {
+          console.error("Error en impresión:", err.message);
+          showSnackbar(
+            "La impresora no está disponible. Por favor, empareja desde los ajustes del sistema.",
+            3,
+          );
+        }
+      } else if (Platform.OS === "web") {
+        const iframeWindow = iframeRef.current.contentWindow;
+        iframeWindow.focus();
+        iframeWindow.print();
+      }
+    } catch (e) {
+      console.error("Error en impresión:", e);
+    }
+  };
+
+  const handlePrintBt = async () => {
+    try {
+      let tiempoAImprimir =
+        tiempoSeleccionado !== null
+          ? tiempoSeleccionado
+          : tiempoAImprimirRef.current;
+      if (Platform.OS === "android") {
+        const mac = ticketProfile.lastPrinterMacAddress;
+        try {
+          await PrinterUtils.connectToDevice(mac);
+        } catch (error) {
+          console.warn("No se pudo conectar al MAC guardado. Escaneando...");
+          const dispositivos = [];
+          await new Promise((resolve, reject) => {
+            PrinterUtils.scanDevices((device) => {
+              dispositivos.push(device);
+              if (device.id === mac) {
+                resolve();
+              }
+            });
+            window.setTimeout(() => {
+              reject(new Error("Tiempo de escaneo agotado"));
+            }, 10000);
+          });
+          const found = dispositivos.find((d) => d.id === mac);
+          if (!found) {
+            showSnackbar(
+              "Impresora no encontrada. Por favor empareje desde ajustes.",
+              3,
+            );
+            return;
+          }
+          await PrinterUtils.connectToDevice(found.id);
+        }
+        await PrinterUtils.printTicket({
+          tiempo: tiempoAImprimir,
+          sorteoSeleccionado: mSorteo,
+          vendedorData: userData,
+          ticketProfile: ticketProfile,
         });
 
-        if (!response.ok) {
-          showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
-          throw new Error(`Error en el envío: ${response.status}`);
+        if (limpiarRef.current && !tiempoSeleccionado) {
+          limpiarDespuesDeImprimir();
         }
-        result = await response.json();
-        const { tiemposVendidos, lastTicketNumber } =
-          await fetchTiemposAnteriores(
-            tiempoParaImprimir.drawCategoryId,
-            tiempoParaImprimir.drawDate,
-          );
-        showSnackbar("El ticket fue registrado correctamente.", 1);
-      } else {
-        result = tiempoSeleccionado;
+        await PrinterUtils.disconnect();
+      } else if (Platform.OS === "web") {
+        const iframeWindow = iframeRef.current.contentWindow;
+        iframeWindow.focus();
+        iframeWindow.print();
       }
-
-      if (Platform.OS === "web") {
-        const printWindow = printTicketWeb(
-          result,
-          mSorteo,
-          userData,
-          ticketProfile,
-        );
-      }
-      if (limpiarRef.current && !tiempoSeleccionado) {
-        limpiarDespuesDeImprimir();
-      }
-    } catch (error) {
-      console.error("Error al enviar el ticket:", error);
-      Alert.alert("Error", "No se pudo enviar el ticket.");
-      showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
+    } catch (e) {
+      console.error("Error al imprimir:", e);
+      showSnackbar(
+        "Hubo un error al imprimir. Revisa la conexión con la impresora.",
+        3,
+      );
     }
   };
 
   const handleShare = async () => {
+    if (isSharingRef.current) return; // Bloquea inmediatamente
+    isSharingRef.current = true;
+    setIsSharing(true); // Estado visual
+
     setIframeHeight(100);
-    if (!fecha || !sorteoId || !userData?.id) return;
-    if (
-      formatDate(fecha, "yyyy-MM-dd") !==
-        formatDate(getInternetDate(), "yyyy-MM-dd") &&
-      !tiempoSeleccionado
-    ) {
-      showSnackbar("SORTEO CERRARO.", 3);
-      return;
-    } else {
-      const updatedSorteo = await fetchSorteos(mSorteo);
-      Object.assign(mSorteo, sorteo);
-      const internetTimeStr = format(getInternetDate(), "HH:mm:ss");
-      const serverLimit = updatedSorteo.limitTime;
-      if (
-        timeStrToMilliseconds(serverLimit) <=
-        timeStrToMilliseconds(internetTimeStr)
-      ) {
-        showSnackbar("SORTEO CERRARO.", 3);
-        return;
-      }
-    }
+    setWebviewHeight(100);
     let result;
+
+    // 💡 Esperar que React Native aplique el cambio visualmente
+    // await new Promise((resolve) =>
+    //   requestAnimationFrame(() => {
+    //     InteractionManager.runAfterInteractions(resolve);
+    //   }),
+    // );
+
     try {
-      if (!tiempoSeleccionado) {
+      if (!fecha || !sorteoId || !userData?.id) return;
+
+      if (tiempoSeleccionado !== null) {
+        result = tiempoSeleccionado;
+      } else {
+        // if (
+        //   formatDate(fecha, "yyyy-MM-dd") !==
+        //     formatDate(getInternetDate(), "yyyy-MM-dd") &&
+        //   !tiempoSeleccionado
+        // ) {
+        //   showSnackbar("SORTEO CERRARO.", 3);
+        //   return;
+        // } else {
+        //   const updatedSorteo = await fetchSorteos(mSorteo);
+        //   Object.assign(mSorteo, sorteo);
+        //   const internetTimeStr = format(
+        //     await getUpdatedInternetDate(),
+        //     "HH:mm:ss",
+        //   );
+        //   const serverLimit = updatedSorteo.limitTime;
+        //   if (
+        //     timeStrToMilliseconds(serverLimit) <=
+        //     timeStrToMilliseconds(internetTimeStr)
+        //   ) {
+        //     showSnackbar("SORTEO CERRARO.", 3);
+        //     return;
+        //   }
+        // }
+
         const resultado = await inicializarYProcesar();
         if (!resultado) {
           return; // ⛔ No continúa si hay errores
@@ -748,8 +865,12 @@ export default function VentaScreen({ navigation, route }) {
             tiempoParaImprimir.drawDate,
           );
         showSnackbar("El ticket fue registrado correctamente.", 1);
-      } else {
-        result = tiempoSeleccionado;
+        tiempoRef.current = tiempoParaImprimir;
+        tiempoAImprimirRef.current = result;
+        console.log(
+          "tiempo a imprimir ref desde share: ",
+          tiempoAImprimirRef.current,
+        );
       }
 
       const htmlGenerado = await generateHTML(
@@ -761,22 +882,58 @@ export default function VentaScreen({ navigation, route }) {
       setHtml(htmlGenerado);
       setLoaded(false);
       setDialogPrintVisible(true);
+      Keyboard.dismiss(); // Oculta el teclado
 
       if (Platform.OS === "web") {
-        // const whatsappUrl = `https://wa.me/")}`;
-        // window.open(whatsappUrl, "_blank");
         window.location.href = "whatsapp://";
       }
 
       if (limpiarRef.current && !tiempoSeleccionado) {
-        limpiarDespuesDeImprimir();
+        //limpiarDespuesDeImprimir();//TODO: revisar esta linea, hay que limmpiar el tiemmpo.ref
       }
+
+      console.log("TIEMPO SELECCIONADO DESDE SHARE: ", tiempoSeleccionado);
     } catch (error) {
       console.error("Error al enviar el ticket:", error);
       Alert.alert("Error", "No se pudo enviar el ticket.");
       showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
+      setLoaded(false);
+    } finally {
+      isSharingRef.current = false;
+      setIsSharing(false); // Estado visual
     }
   };
+
+  const [imageToShare, setImageToShare] = useState(null);
+
+  useEffect(() => {
+    if (!imageToShare) return;
+
+    const share = async () => {
+      const path = FileSystem.documentDirectory + `ticket_${Date.now()}.png`;
+
+      await FileSystem.writeAsStringAsync(
+        path,
+        imageToShare.replace("data:image/png;base64,", ""),
+        { encoding: FileSystem.EncodingType.Base64 },
+      );
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        console.log("entra a compartir useefect");
+        await Sharing.shareAsync(path, {
+          mimeType: "image/png",
+          dialogTitle: "Compartir ticket",
+        });
+        //window.setTimeout(() => setGenerateImage(false), 500); // esperar medio segundo antes de ocultar
+      }
+
+      setGenerateImage(false);
+      setImageToShare(null); // limpiar
+    };
+
+    // Pequeño retraso para asegurar el contexto correcto del intent
+    window.setTimeout(share, 100);
+  }, [imageToShare]);
 
   useEffect(() => {
     if (!html || !loaded) return;
@@ -810,27 +967,28 @@ export default function VentaScreen({ navigation, route }) {
 
         window.document.body.removeChild(container);
       } else {
-        try {
-          const uri = await captureRef(ticketRef.current, {
-            format: "png",
-            quality: 1,
-            result: "tmpfile", // o base64 si prefieres compartir directamente
-          });
+        // try {
+        //   const uri = await captureRef(ticketRef.current, {
+        //     format: "png",
+        //     quality: 1,
+        //     result: "tmpfile", // o base64 si prefieres compartir directamente
+        //   });
 
-          const canShare = await Sharing.isAvailableAsync();
+        //   const canShare = await Sharing.isAvailableAsync();
 
-          if (canShare) {
-            await Sharing.shareAsync(uri, {
-              mimeType: "image/png",
-              dialogTitle: "Compartir ticket",
-            });
-          } else {
-            const url = `whatsapp://send?text=${encodeURIComponent("Revisa el ticket generado.")}`;
-            Linking.openURL(url);
-          }
-        } catch (e) {
-          console.error("Error compartiendo el ticket:", e);
-        }
+        //   if (canShare) {
+        //     await Sharing.shareAsync(uri, {
+        //       mimeType: "image/png",
+        //       dialogTitle: "Compartir ticket",
+        //     });
+        //   } else {
+        //     const url = `whatsapp://send?text=${encodeURIComponent("Revisa el ticket generado.")}`;
+        //     Linking.openURL(url);
+        //   }
+        // } catch (e) {
+        //   console.error("Error compartiendo el ticket:", e);
+        // }
+        setGenerateImage(true); // activa WebView oculto para capturar
       }
     };
 
@@ -859,7 +1017,7 @@ export default function VentaScreen({ navigation, route }) {
 
   const cargarTiempoSeleccionado = (tiempoCargado) => {
     setIdTicketSeleccionado(tiempoCargado.id);
-    setClientName(tiempoCargado.clientName || "");
+    setClientName(tiempoCargado.clientName || "Sin Nombre");
     const numbersConKey = (tiempoCargado.numbers || []).map((item) => ({
       ...item,
       key: generateKey(), // Asignas un key único aquí
@@ -876,21 +1034,24 @@ export default function VentaScreen({ navigation, route }) {
     setcamposBloqueados(true);
   };
 
-  const limpiarDespuesDeImprimir = () => {
-    const tiempoLimpio = {
-      ...tiempo,
-      numbers: [],
-      clientName: "",
-    };
-    setTiempo(tiempoLimpio);
-    setItems([]);
-    tiempoRef.current = tiempoLimpio;
-    setIdTicketSeleccionado(0);
+  const limpiarDespuesDeImprimir = (desdeNuevoTiempo = false) => {
+    if ((limpiarRef.current && !tiempoSeleccionado) || desdeNuevoTiempo) {
+      const tiempoLimpio = {
+        ...tiempo,
+        numbers: [],
+        clientName: "",
+      };
+      setTiempo(tiempoLimpio);
+      setItems([]);
+      tiempoRef.current = tiempoLimpio;
+      setIdTicketSeleccionado(0);
+      setDialogPrintVisible(false);
 
-    setMonto("");
-    setNumero("");
+      setMonto("");
+      setNumero("");
+    }
 
-    montoRef.current?.focus();
+    //montoRef.current?.focus();
   };
 
   const [isMontoLocked, setIsMontoLocked] = useState(false);
@@ -1423,6 +1584,7 @@ export default function VentaScreen({ navigation, route }) {
       setTiempo(tiempoFinal);
 
       tiempoRef.current = tiempoFinal;
+      tiempoAImprimirRef.current = tiempoFinal;
       setLoading(false); // Ocultar loader
       return isAllowed ? tiempoFinal : false;
       //return isAllowed; // ✅ validaciones pasaron
@@ -1600,13 +1762,16 @@ export default function VentaScreen({ navigation, route }) {
         <>
           <View style={styles.container}>
             {/* Formulario y Lista */}
+
             <View
               style={[styles.formAndListContainer, isWeb && styles.webLayout]}
             >
               {/* Formulario */}
+
               <View
                 style={[styles.formContainer, isWeb && styles.webFormContainer]}
               >
+                {/* <ScrollView style={{ flex: 1 }}> */}
                 <View style={styles.formRow}>
                   <Pressable
                     style={styles.inputSmallSorteo}
@@ -1765,22 +1930,27 @@ export default function VentaScreen({ navigation, route }) {
                           const cleaned = sanitized.startsWith("-")
                             ? "-" + sanitized.slice(1).replace(/-/g, "")
                             : sanitized.replace(/-/g, "");
-                          setMonto(cleaned);
+
+                          if (cleaned !== monto) {
+                            setMonto(cleaned);
+                          }
                         }}
-                        keyboardType="numeric"
+                        keyboardType="number-pad"
                         returnKeyType="done"
                         editable={!isMontoLocked}
                         onSubmitEditing={() => {
                           const montoNum = parseInt(monto, 10);
                           if (!isNaN(montoNum) && validateMonto(montoNum)) {
-                            numeroRef.current?.focus();
+                            window.setTimeout(() => {
+                              numeroRef.current?.focus();
+                            }, 100);
                           } else {
-                            Alert.alert(
-                              "Monto inválido",
-                              "Debe ser un múltiplo de 50.",
-                            );
+                            // Alert.alert(
+                            //   "Monto inválido",
+                            //   "Debe ser un múltiplo de 50.",
+                            // );
                             showSnackbar("Debe ingresar un monto válido.", 3);
-                            montoRef.current?.blur();
+                            //montoRef.current?.blur();
                             window.setTimeout(() => {
                               montoRef.current?.focus();
                             }, 100);
@@ -1797,7 +1967,6 @@ export default function VentaScreen({ navigation, route }) {
                         ]}
                         value={numero}
                         onChangeText={(text) => {
-                          // Eliminar cualquier carácter que no sea número y limitar a 2 dígitos
                           const cleaned = text
                             .replace(/[^0-9]/g, "")
                             .slice(0, 2);
@@ -1814,7 +1983,7 @@ export default function VentaScreen({ navigation, route }) {
                           //   }
                           // }
                         }}
-                        keyboardType="numeric"
+                        keyboardType="number-pad"
                         returnKeyType="done"
                         onFocus={() => {
                           const montoNum = parseInt(monto, 10);
@@ -1865,7 +2034,7 @@ export default function VentaScreen({ navigation, route }) {
                               : sanitized.replace(/-/g, "");
                             setMontoReventado(cleaned);
                           }}
-                          keyboardType="numeric"
+                          keyboardType="number-pad"
                           returnKeyType="done"
                           onSubmitEditing={() => {
                             const montoNum = parseInt(monto, 10);
@@ -1937,8 +2106,10 @@ export default function VentaScreen({ navigation, route }) {
                     )}
                   </>
                 )}
+                {/* </ScrollView> */}
               </View>
               <Divider style={{ backgroundColor: "rgba(0,0,0,0.12)" }} />
+
               {/* Lista */}
               <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
                 <FlatList
@@ -1949,7 +2120,6 @@ export default function VentaScreen({ navigation, route }) {
                 />
               </View>
             </View>
-
             {/* Total */}
             <View style={styles.totalBar}>
               <Text style={styles.totalText}>TOTAL: </Text>
@@ -2013,19 +2183,20 @@ export default function VentaScreen({ navigation, route }) {
         {/* Diálogo print */}
         <Dialog
           visible={dialogPrintVisible}
-          onDismiss={closeDialogPrint}
+          onDismiss={() => {}} // Evita cerrar al tocar fuera
           style={[
             {
               backgroundColor: "white",
               borderRadius: 10,
               marginHorizontal: 20,
+              maxHeight: "95%",
             },
             isWeb && {
               position: "absolute",
               right: 0,
               top: 10,
               width: 400,
-              maxHeight: "90%",
+              maxHeight: "100%",
               elevation: 4,
               shadowColor: "#000",
               shadowOffset: { width: 0, height: 2 },
@@ -2040,26 +2211,29 @@ export default function VentaScreen({ navigation, route }) {
               <View
                 style={{
                   alignItems: "center",
-                  maxHeight: isWeb ? "90vh" : 600, // limita el diálogo si es muy alto
+                  maxHeight: isWeb ? "75vh" : "90%", // limita el diálogo si es muy alto
                   overflow: "auto",
+                  //maxHeight: 800,
                 }}
               >
                 <View
                   ref={ticketRef}
                   collapsable={false}
                   style={{
-                    width: 250,
+                    width: 230,
                     backgroundColor: "white",
                     borderWidth: 1,
                     borderColor: "#ccc",
                     overflow: "hidden",
                     ...(Platform.OS === "web"
                       ? {
-                          height: (iframeHeight || 300) + 20,
+                          //height: (iframeHeight || 300) + 20,
+                          height: "100%",
                           overflow: "auto",
                         }
                       : {
-                          height: webviewHeight || 300,
+                          //height: webviewHeight || 300 + 20,
+                          height: "110%",
                           overflow: "scroll",
                         }),
                   }}
@@ -2073,9 +2247,10 @@ export default function VentaScreen({ navigation, route }) {
                         <head>
                           <meta name="viewport" content="width=60mm, initial-scale=1.0">
                           <style>
-                            body { margin-left: 10px; padding: 0px; box-sizing: border-box; }
+                            body { margin-left: 0px; padding: 0px; box-sizing: border-box; }
                             .wrapper {
-                              margin-left: 25px;
+                              margin-left: 5px;
+                              width: 57mm;
                               }
                           </style>
                           <script>
@@ -2120,24 +2295,24 @@ export default function VentaScreen({ navigation, route }) {
                       sandbox="allow-scripts allow-same-origin allow-modals"
                     />
                   ) : (
-                    <WebView
-                      originWhitelist={["*"]}
-                      source={{ html }}
-                      //onLoadEnd={() => setLoaded(true)}
-                      scalesPageToFit={false}
-                      onMessage={(event) => {
-                        const height = parseInt(event.nativeEvent.data, 10);
-                        setWebviewHeight(height);
-                        // setLoaded(true);
-                      }}
-                      injectedJavaScript={`
+                    <>
+                      <WebView
+                        originWhitelist={["*"]}
+                        source={{ html }}
+                        scalesPageToFit={false}
+                        onMessage={(event) => {
+                          const height = parseInt(event.nativeEvent.data, 10);
+                          setWebviewHeight(height);
+                        }}
+                        injectedJavaScript={`
                      const meta = document.createElement('meta');
                      meta.setAttribute('name', 'viewport');
-                     meta.setAttribute('content', 'width=250, initial-scale=1, maximum-scale=1, user-scalable=no');
+                     meta.setAttribute('content', 'width=240, initial-scale=1, maximum-scale=1, user-scalable=no');
                      document.head.appendChild(meta);
                      document.body.style.margin = '0';
-                     document.body.style.padding = '10px';
-                     document.documentElement.style.overflow = 'hidden';
+                     document.body.style.overflowY = 'scroll'; // ✅ Permite scroll vertical
+                     document.body.style.overflow = 'auto';
+                     document.documentElement.style.overflow = 'auto';
  
                      setTimeout(() => {
                        const height = document.body.scrollHeight;
@@ -2145,12 +2320,77 @@ export default function VentaScreen({ navigation, route }) {
                      }, 100);
                      true;
                    `}
-                      style={{
-                        width: 250,
-                        height: webviewHeight || 300,
-                        backgroundColor: "white",
-                      }}
-                    />
+                        style={{
+                          width: 250,
+                          height: webviewHeight || 300,
+                          backgroundColor: "white",
+                        }}
+                      />
+
+                      {/* WebView oculto para generar imagen */}
+                      {generateImage && (
+                        <WebView
+                          originWhitelist={["*"]}
+                          source={{
+                            html: `
+                            <!DOCTYPE html>
+                            <html>
+                              <head>
+                                <meta name="viewport" content="width=58mm, initial-scale=1.0">
+                                <style>
+                                  body { margin: 0; padding: 10px; background: white; box-sizing: border-box; }
+                                </style>
+                                <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+                              </head>
+                              <body>
+                                <div id="ticket">${html}</div>
+                                <script>
+                                  window.onload = () => {
+                                    setTimeout(() => {
+                                      html2canvas(document.getElementById("ticket"), {
+                                        scale: 2,
+                                        backgroundColor: "#ffffff"
+                                      }).then(canvas => {
+                                        const base64 = canvas.toDataURL("image/png");
+                                        window.ReactNativeWebView.postMessage(base64);
+                                      });
+                                    }, 300);
+                                  };
+                                </script>
+                              </body>
+                            </html>
+                          `,
+                          }}
+                          javaScriptEnabled
+                          onMessage={async (event) => {
+                            //setImageToShare(event.nativeEvent.data);
+
+                            const base64Image = event.nativeEvent.data;
+                            const path =
+                              FileSystem.documentDirectory +
+                              `ticket_${Date.now()}.png`;
+
+                            await FileSystem.writeAsStringAsync(
+                              path,
+                              base64Image.replace("data:image/png;base64,", ""),
+                              { encoding: FileSystem.EncodingType.Base64 },
+                            );
+
+                            const canShare = await Sharing.isAvailableAsync();
+                            if (canShare) {
+                              await Sharing.shareAsync(path, {
+                                mimeType: "image/png",
+                                dialogTitle: "Compartir ticket",
+                              });
+                              setRefreshHeader(true);
+                            }
+
+                            setGenerateImage(false);
+                          }}
+                          style={{ width: 0, height: 0, opacity: 0 }}
+                        />
+                      )}
+                    </>
                   )}
                 </View>
               </View>
@@ -2168,9 +2408,11 @@ export default function VentaScreen({ navigation, route }) {
                 setDialogPrintVisible(false);
                 setWebviewHeight(100);
                 setIframeHeight(100);
+                montoRef.current?.focus();
+                limpiarDespuesDeImprimir();
               }}
             >
-              CANCELAR
+              CERRAR
             </Button>
             <Button
               textColor="green"
@@ -2180,12 +2422,13 @@ export default function VentaScreen({ navigation, route }) {
                 borderRadius: 3,
               }}
               onPress={() => {
-                setDialogPrintVisible(false);
                 setLoaded(true);
-                setWebviewHeight(100);
-                setIframeHeight(100);
-                //closeDialogRestringido;
-                //resolverDialogRef.current?.(); // Resuelve la promesa
+                setGenerateImage(true);
+                // setWebviewHeight(100);
+                // setIframeHeight(100);
+                // montoRef.current?.focus();
+                // limpiarDespuesDeImprimir();
+                // setDialogPrintVisible(false);
               }}
             >
               COMPARTIR
@@ -2198,11 +2441,16 @@ export default function VentaScreen({ navigation, route }) {
                 borderRadius: 3,
               }}
               onPress={() => {
-                if (Platform.OS === "web" && iframeRef.current) {
-                  const iframeWindow = iframeRef.current.contentWindow;
-                  iframeWindow.focus();
-                  iframeWindow.print();
-                }
+                // if (Platform.OS === "web" && iframeRef.current) {
+                //   const iframeWindow = iframeRef.current.contentWindow;
+                //   iframeWindow.focus();
+                //   iframeWindow.print();
+                // }
+                // if (Platform.OS === "android") {
+                //   handlePrintBt();
+                // }
+                handlePrintBt();
+                //montoRef.current?.focus();
                 //setWebviewHeight(100);
                 //setIframeHeight(100);
               }}
@@ -2382,7 +2630,7 @@ export default function VentaScreen({ navigation, route }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button
-              textColor="black"
+              textColor="red"
               style={{
                 backgroundColor: "white", // Fondo blanco
                 marginBottom: 10,
@@ -2453,15 +2701,19 @@ export default function VentaScreen({ navigation, route }) {
                 style={styles.input}
                 defaultValue={categoriasMonto}
                 onChangeText={setCategoriasMonto}
-                keyboardType="numeric"
+                keyboardType="number-pad"
               />
             )}
             {categoriaSeleccionada === "Terminan en..." && (
               <TextInput
                 placeholder="Números que terminan en"
                 defaultValue={categoriasTerminaEn}
-                onChangeText={setCategoriasTerminaEn}
-                keyboardType="numeric"
+                //onChangeText={setCategoriasTerminaEn}
+                onChangeText={(text) => {
+                  setCategoriasTerminaEn(text);
+                }}
+                keyboardType="number-pad"
+                maxLength={1} // ← esto limita a 1 carácter
                 style={[styles.input, { marginTop: 15, textAlign: "center" }]}
               />
             )}
@@ -2469,8 +2721,12 @@ export default function VentaScreen({ navigation, route }) {
               <TextInput
                 placeholder="Números que inician con"
                 defaultValue={categoriasInicianCon}
-                onChangeText={setCategoriasInicianCon}
-                keyboardType="numeric"
+                //onChangeText={setCategoriasInicianCon}
+                onChangeText={(text) => {
+                  setCategoriasInicianCon(text);
+                }}
+                keyboardType="number-pad"
+                maxLength={1} // ← esto limita a 1 carácter
                 style={[styles.input, { marginTop: 15, textAlign: "center" }]}
               />
             )}
@@ -2486,8 +2742,12 @@ export default function VentaScreen({ navigation, route }) {
                   <TextInput
                     placeholder="Desde"
                     defaultValue={categoriasDesde}
-                    onChangeText={setCategoriasDesde}
-                    keyboardType="numeric"
+                    //onChangeText={setCategoriasDesde}
+                    onChangeText={(text) => {
+                      setCategoriasDesde(text);
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={2}
                     style={[
                       styles.input,
                       { marginTop: 15, textAlign: "center", width: 140 },
@@ -2496,8 +2756,12 @@ export default function VentaScreen({ navigation, route }) {
                   <TextInput
                     placeholder="Hasta"
                     defaultValue={categoriasHasta}
-                    onChangeText={setCategoriasHasta}
-                    keyboardType="numeric"
+                    //onChangeText={setCategoriasHasta}
+                    onChangeText={(text) => {
+                      setCategoriasHasta(text);
+                    }}
+                    keyboardType="number-pad"
+                    maxLength={2}
                     style={[
                       styles.input,
                       { marginTop: 15, textAlign: "center", width: 140 },
@@ -2644,6 +2908,19 @@ export default function VentaScreen({ navigation, route }) {
           </Dialog.Content>
         </Dialog>
       </Portal>
+
+      <PreCargarModal
+        visible={modalVisiblePreCargar}
+        onClose={() => {
+          setModalVisiblePreCargar(false);
+          closeMenuHeader();
+        }}
+        onSelect={(resultado) => {
+          console.log("CODIGO: ", resultado.codigo);
+          console.log("SORTEO: ", resultado.sorteo);
+          setModalVisiblePreCargar(false);
+        }}
+      />
     </Provider>
   );
 }

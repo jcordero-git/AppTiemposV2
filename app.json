@@ -16,7 +16,9 @@
       "supportsTablet": true
     },
     "android": {
-      "permissions": ["INTERNET"],
+      "permissions": [
+        "INTERNET"
+      ],
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
@@ -34,7 +36,8 @@
     },
     "owner": "jose.cordero.brenes",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "react-native-ble-plx"
     ]
   }
 }

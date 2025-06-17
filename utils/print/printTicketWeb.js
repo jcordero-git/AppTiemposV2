@@ -76,7 +76,7 @@ export const printTicketWeb = (
       });
 
     return `
-      <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 14px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
+      <table style="width: 100%; font-family: 'Courier New', Courier, monospace; font-size: 16px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
         ${rows.join("")}
       </table>
     `;
@@ -124,7 +124,6 @@ export const printTicketWeb = (
           body {
             width: 58mm;
             font-family: "Courier New", Courier, monospace;
-            font-size: 12px;
             padding: 5px;
             text-align: center;
           }
@@ -164,7 +163,7 @@ export const printTicketWeb = (
         <h3>CÓDIGO # ${String(codigo).padStart(2, "0")}</h3>
         <h3>${sorteoSeleccionado.name}</h3>
 
-        <table style="text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 12px; margin-top: 6px; width: 100%;">
+        <table style="text-align: left; font-family: 'Courier New', Courier, monospace; font-size: 14px; margin-top: 6px; width: 100%;">
         <tr>
           <td>VENDEDOR:</td>
           <td>${vendedorNombre} - ${vendedorCodigo}</td>

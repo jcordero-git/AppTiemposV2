@@ -9,44 +9,31 @@ import {
   TouchableOpacity,
   Pressable,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { mSorteo } from "../models/mSorteo";
+import PrinterUtils from "../utils/print/printerUtils";
 
-export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
+export default function PrinterSelectorModal({ visible, onClose, onSelect }) {
   const { userData } = useAuth();
-  const [sorteoItems, setSorteoItems] = useState([]);
-  //console.log("User desde modal:", userData.id);
-  /** @type {mSorteo[]} */
-  let mSorteos = [];
+  const [printerItems, setPrinterItems] = useState([]);
 
   useEffect(() => {
-    if (visible) {
-      fetch(`https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`)
-        .then((res) => {
-          return res.json();
-        })
-        .then((data) => {
-          // Ordenar los sorteos por limitTime (más temprano primero)
-          const sorteosOrdenados = data.sort((a, b) => {
-            const horaA = new Date(`1970-01-01T${a.limitTime}Z`);
-            const horaB = new Date(`1970-01-01T${b.limitTime}Z`);
-            return horaA - horaB;
-          });
-
-          if (Array.isArray(sorteosOrdenados)) {
-            mSorteos = sorteosOrdenados;
-          } else {
-            console.warn(
-              "⚠️ 'data sorteos' no es un array válido:",
-              sorteosOrdenados,
-            );
-          }
-          setSorteoItems(mSorteos);
-        })
-        .catch((error) => console.error("Error al obtener sorteos", error));
+    if (Platform.OS !== "web" && visible) {
+      loadPrinters();
     }
   }, [visible]);
+
+  const loadPrinters = async () => {
+    try {
+      const devices = await PrinterUtils.getDeviceList();
+      console.log("DEVICES PRINT: ", devices);
+      setPrinterItems(devices);
+    } catch (err) {
+      console.error("Error obteniendo impresoras:", err);
+    }
+  };
 
   return (
     <Modal
@@ -57,20 +44,22 @@ export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.modal} onPress={() => {}}>
-          <Text style={styles.title}>SORTEOS DISPONIBLES</Text>
+          <Text style={styles.title}>IMPRESORAS DISPONIBLES</Text>
           <FlatList
-            data={sorteoItems}
-            keyExtractor={(item) => item.id}
+            data={printerItems}
+            keyExtractor={(item) => item.inner_mac_address}
             renderItem={({ item }) => (
               <TouchableOpacity
                 style={styles.item}
                 onPress={() => {
-                  console.log("ITEM: ", item);
                   onSelect(item);
                   onClose();
                 }}
               >
-                <Text>{item.name}</Text>
+                <Text>{item.device_name}</Text>
+                <Text style={{ fontSize: 12, color: "#777" }}>
+                  {item.inner_mac_address}
+                </Text>
               </TouchableOpacity>
             )}
           />

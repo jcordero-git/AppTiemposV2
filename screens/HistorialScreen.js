@@ -683,7 +683,7 @@ export default function HistorialScreen({ navigation, route }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button
-              textColor="#4CAF50"
+              textColor="red"
               style={{
                 backgroundColor: "white", // Fondo blanco
                 marginBottom: 10,
