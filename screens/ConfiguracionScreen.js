@@ -530,12 +530,12 @@ export default function ConfiguracionScreen({ navigation, route }) {
                       <!DOCTYPE html>
                       <html>
                         <head>
-                          <meta name="viewport" content="width=60mm, initial-scale=1.0">
+                          <meta name="viewport" content="width=62mm, initial-scale=1.0">
                           <style>
                             body { margin-left: 0px; padding: 0px; box-sizing: border-box; }
                             .wrapper {
-                              margin-left: 5px;
-                              width: 57mm;
+                              margin-left: 10px;
+                              width: 58mm;
                               }
                           </style>
                           <script>
@@ -572,7 +572,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
                       </html>
                     `}
                         style={{
-                          width: 230,
+                          width: 245,
                           height: iframeHeight,
                           borderWidth: 1,
                           justifyContent: "center", // Centra verticalmente si tiene altura fija

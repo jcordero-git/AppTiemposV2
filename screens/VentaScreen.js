@@ -454,6 +454,78 @@ export default function VentaScreen({ navigation, route }) {
     setTiempoSeleccionado(null);
   };
 
+  function convertirFecha(fechaPreCarga) {
+    const dia = parseInt(fechaPreCarga.slice(0, 2), 10);
+    const mes = parseInt(fechaPreCarga.slice(2, 4), 10) - 1; // mes en JS es 0-based
+    const anioCorto = parseInt(fechaPreCarga.slice(4, 6), 10);
+    const anioCompleto = anioCorto < 50 ? 2000 + anioCorto : 1900 + anioCorto;
+  
+    const fecha = new Date(Date.UTC(anioCompleto, mes, dia));
+    fecha.setUTCDate(fecha.getUTCDate() + 1); // Compensar el desfase
+    return fecha.toISOString();
+  }
+
+  const handlePreCargaTiempo = async (resultado) => {
+    // Extraer y descomponer la clave
+    const [drawCategoryID, fechaPreCarga, codigoPreCarga] =
+      resultado.codigo.split("-");
+
+    const drawCategoryIDInt = parseInt(drawCategoryID, 10);
+    const codigoPreCargaInt = parseInt(codigoPreCarga, 10);
+    const fechaFormateada = convertirFecha(fechaPreCarga);
+    // Extraer los valores del objeto mSorteo
+    const { id: sorteoID, useReventado, restringidos } = resultado.sorteo;
+
+    // Ahora tienes:
+    console.log(drawCategoryIDInt); // "123"
+    console.log(fechaFormateada); // "20250617"
+    console.log(codigoPreCargaInt); // "456"
+
+    console.log(sorteoID); // 10
+    console.log(useReventado); // true
+    console.log(restringidos); // ["123", "456"]
+
+    console.log("tiempos vendidos", tiemposAnteriores);
+
+    const tiempoSeleccionado = tiemposAnteriores.find(
+      (tiempo) =>
+        tiempo.drawDate === fechaFormateada &&
+        tiempo.drawCategoryId === drawCategoryIDInt &&
+        tiempo.id === codigoPreCargaInt,
+    );
+    if (tiempoSeleccionado) {
+      console.log("tiempoSeleccionado", tiempoSeleccionado);
+      cargarNumeros_PreCargar(
+        tiempoSeleccionado,
+        resultado.sorteo,
+        restringidos,
+      );
+    } else {
+      console.log("tiemmpo no encontrado");
+    }
+  };
+
+  const cargarNumeros_PreCargar = (
+    tiempoCargado,
+    sorteo_PreCargar,
+    restingidos,
+  ) => {
+    setIdTicketSeleccionado(tiempoCargado.id);
+    setClientName(tiempoCargado.clientName || "Sin Nombre");
+    const numbersConKey = (tiempoCargado.numbers || []).map((item) => ({
+      ...item,
+      key: generateKey(),
+    }));
+    setItems(numbersConKey || []);
+    setSorteoNombre(sorteo_PreCargar.name);
+    console.log("SORTEO A PRECARGAR: ", sorteo_PreCargar.name);
+    setSorteoId(sorteo_PreCargar.id);
+    console.log("SORTEO ID A PRECARGAR: ", sorteo_PreCargar.id);
+    mSorteo.id = sorteo_PreCargar.id;
+
+    
+  };
+
   const handleBorrarTiempo = async (id) => {
     const url = `https://3jbe.tiempos.website/api/ticket/${id}`;
     try {
@@ -1335,6 +1407,8 @@ export default function VentaScreen({ navigation, route }) {
 
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
+
+      console.log("TIEMPOS VENDIDOS: ", sortedData);
 
       return {
         tiemposVendidos: sortedData,
@@ -2220,7 +2294,7 @@ export default function VentaScreen({ navigation, route }) {
                   ref={ticketRef}
                   collapsable={false}
                   style={{
-                    width: 230,
+                    width: 245,
                     backgroundColor: "white",
                     borderWidth: 1,
                     borderColor: "#ccc",
@@ -2249,7 +2323,7 @@ export default function VentaScreen({ navigation, route }) {
                           <style>
                             body { margin-left: 0px; padding: 0px; box-sizing: border-box; }
                             .wrapper {
-                              margin-left: 5px;
+                              margin-left: 12px;
                               width: 57mm;
                               }
                           </style>
@@ -2339,11 +2413,17 @@ export default function VentaScreen({ navigation, route }) {
                                 <meta name="viewport" content="width=58mm, initial-scale=1.0">
                                 <style>
                                   body { margin: 0; padding: 10px; background: white; box-sizing: border-box; }
-                                </style>
+                                 .wrapper {
+                                    margin-left: 10px;
+                                    width: 58mm;
+                                    }
+                                  </style>
                                 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
                               </head>
                               <body>
+                              <div class="wrapper">
                                 <div id="ticket">${html}</div>
+                                 </div>
                                 <script>
                                   window.onload = () => {
                                     setTimeout(() => {
@@ -2918,6 +2998,7 @@ export default function VentaScreen({ navigation, route }) {
         onSelect={(resultado) => {
           console.log("CODIGO: ", resultado.codigo);
           console.log("SORTEO: ", resultado.sorteo);
+          handlePreCargaTiempo(resultado);
           setModalVisiblePreCargar(false);
         }}
       />

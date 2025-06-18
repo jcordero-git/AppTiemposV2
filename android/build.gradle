@@ -9,6 +9,7 @@ buildscript {
         kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.25'
 
         ndkVersion = "26.1.10909125"
+        cmakeVersion = "3.22.1"
     }
     repositories {
         google()
@@ -16,16 +17,24 @@ buildscript {
     }
     dependencies {
         // classpath('com.android.tools.build:gradle')
-         classpath("com.android.tools.build:gradle:7.2.1")
+         classpath("com.android.tools.build:gradle:7.4.2")
         classpath('com.facebook.react:react-native-gradle-plugin')
         classpath('org.jetbrains.kotlin:kotlin-gradle-plugin')
     }
 }
 
+
 apply plugin: "com.facebook.react.rootproject"
 
 allprojects {
     repositories {
+        // Fuerza a nulificar cualquier toolchain para evitar conflicto
+       plugins.withType(JavaPlugin) {
+        extensions.configure(JavaPluginExtension) {
+            toolchain.languageVersion.set(null)
+        }
+    }
+    
         maven {
             // All of React Native (JS, Obj-C sources, Android binaries) is installed from npm
             url(new File(['node', '--print', "require.resolve('react-native/package.json')"].execute(null, rootDir).text.trim(), '../android'))

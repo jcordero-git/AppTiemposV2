@@ -168,7 +168,7 @@ export const generateHTML = async (
         <h3 style="width: 100%; font-family:  monospace; font-size:22px; margin-top: 4px;" >CODIGO # ${String(codigo).padStart(2, "0")}</h3>
         <h3 style="width: 100%; font-family:  monospace; font-size: 22px; margin-top: 1px;" >${sorteoSeleccionado.name}</h3>
 
-        <table style="line-height: 0.8; text-align: left; font-family: monospace; font-size: 13px; margin-top: 8px; width: 100%;">
+        <table style="line-height: 0.8; text-align: left; font-family: monospace; font-size: 12px; margin-top: 8px; width: 100%;">
         <tr>
           <td>VENDEDOR:</td>
           <td>${vendedorNombre} - ${vendedorCodigo}</td>
@@ -187,7 +187,7 @@ export const generateHTML = async (
         </tr>
         <tr>
           <td>IMPRESIÓN:</td>
-          <td>${formatDate(new Date(), "dd/MM/yyyy HH:mm:ss")} </td>
+          <td>${formatDate(new Date(), "dd/MM/yyyy hh:mm:a")} </td>
         </tr>
       </table>
 

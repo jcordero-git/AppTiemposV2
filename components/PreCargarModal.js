@@ -33,6 +33,7 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
   const isWeb = width > 710;
   const [modalVisible, setModalVisible] = useState(false);
   const [sorteoNombre, setSorteoNombre] = useState("");
+  let sorteoSeleccionado;
   const [codigo, setCodigo] = useState("");
   const [sorteoId, setSorteoId] = useState(null);
 
@@ -135,7 +136,7 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
                 setCodigo(formatted);
               }}
               keyboardType="default"
-              maxLength={13} // ← esto limita a 1 carácter
+              maxLength={14} // ← esto limita a 1 carácter
               style={[
                 styles.input,
                 {
@@ -172,11 +173,12 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
             visible={modalVisible}
             onClose={() => setModalVisible(false)}
             onSelect={(sorteo) => {
-              console.log("Sorteo Seleccionado: ", sorteo.name);
-              setSorteoId(sorteo.id);
+              console.log("Sorteo Seleccionado: ", sorteo);
+              //setSorteoId(sorteo.id);
               setSorteoNombre(sorteo.namme);
+              sorteoSeleccionado = sorteo;
 
-              Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
+              //Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
 
               // setSorteoId(mSorteo.id);
               //setSorteoNombre(mSorteo.name);
@@ -204,7 +206,7 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
             }}
             onPress={() => {
               setModalVisible(false);
-              onSelect({ codigo, sorteo: mSorteo });
+              onSelect({ codigo, sorteo: sorteoSeleccionado });
             }}
           >
             OK
