@@ -161,7 +161,7 @@ class PrinterUtils {
       }
       console.log("✅ Impresión completada.");
       await new Promise((resolve) => window.setTimeout(resolve, 1000));
-      this.disconnect();
+      //this.disconnect();
     } catch (error) {
       console.error("❌ Error al imprimir en fragmentos:", error);
     }
@@ -198,7 +198,7 @@ class PrinterUtils {
     cmds.push(GS, 0x40); // ESC @: reset
 
     cmds.push(GS, 0x68, 80); // Altura del código de barras
-    cmds.push(GS, 0x77, 2); // Ancho del código de barras
+    cmds.push(GS, 0x77, 2.1); // Ancho del código de barras
     cmds.push(GS, 0x48, 2); // Mostrar texto debajo
 
     cmds.push(GS, 0x6b, 0x49); // Imprimir CODE128
@@ -214,6 +214,7 @@ class PrinterUtils {
     sorteoSeleccionado,
     vendedorData,
     ticketProfile,
+    re_impresion,
   }) {
     const { id: codigo, clientName, drawDate, numbers = [] } = tiempo;
     const { phoneNumber, printBarCode, sellerName, ticketFooter, ticketTitle } =
@@ -254,7 +255,9 @@ class PrinterUtils {
       vendedorData.revPrizeTimes ??
       "";
 
-    const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${codigo.toString().padStart(3, "0")}`;
+    //const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${codigo.toString().padStart(3, "0")}`;
+    const barcodeValue = `${codigo.toString().padStart(3, "0")}`;
+
 
     // Alineación de texto
     const ALIGN_LEFT = Buffer.from([0x1b, 0x61, 0x00]); // Alinear a la izquierda
@@ -314,6 +317,7 @@ class PrinterUtils {
     parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
     parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
     parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(
       Buffer.from(`CODIGO # ${String(codigo).padStart(2, "0")}\n`, "ascii"),
     );
@@ -339,7 +343,7 @@ class PrinterUtils {
     );
     parts.push(
       Buffer.from(
-        `IMPRESION: ${formatDate(new Date(), "dd/MM/yyyy hh:mm:ss")}\n`,
+        `IMPRESION: ${formatDate(new Date(), "dd/MM/yyyy hh:mm:a")}\n`,
         "ascii",
       ),
     );
@@ -392,6 +396,15 @@ class PrinterUtils {
     parts.push(Buffer.from(`${ticketTitle}`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
+
+    if (re_impresion) {
+      parts.push(Buffer.from([0x1b, 0x21, 0x30])); // Doble ancho y alto
+      parts.push(Buffer.from(`RE-IMPRESION`, "ascii"));
+      parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
+      parts.push(Buffer.from([0x0a])); // Salto de Linea
+      parts.push(Buffer.from([0x0a])); // Salto de Linea
+    }
+
     parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
     parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
     parts.push(Buffer.from(`${ticketFooter}`, "ascii"));
@@ -400,9 +413,9 @@ class PrinterUtils {
     if (printBarCode) {
       parts.push(generarCodigoBarrasBuffer(barcodeValue));
     }
-    parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
-    parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
-    parts.push(Buffer.from(`${barcodeValue}\n\n`, "ascii"));
+    // parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
+    // parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
+    // parts.push(Buffer.from(`${barcodeValue}\n\n`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x1b, 0x61, 0x00])); // Alinear a la izquierda
@@ -416,11 +429,14 @@ class PrinterUtils {
 
   async disconnect() {
     if (this.device) {
-      await this.manager.cancelDeviceConnection(this.device.id);
-      await this.device.cancelConnection();
-      this.device = null;
-      this.deviceId = null;
-      console.log("device desconected");
+      try {
+        await this.manager.cancelDeviceConnection(this.device.id);
+        await this.device.cancelConnection();
+        this.device = null;
+        this.deviceId = null;
+      } catch (err) {
+        console.log("device disconected - disconect");
+      }
     }
   }
 
@@ -448,6 +464,8 @@ class PrinterUtils {
       }
 
       await this.sendInChunks(dataBuffer);
+
+      //this.disconnect();
     } catch (err) {
       console.error("❌ Error al imprimir:", err);
     }
@@ -464,7 +482,7 @@ function generarCodigoBarrasBuffer(barcodeValue) {
   comandos.push(Buffer.from([0x1d, 0x68, 50]));
 
   // Ancho del código de barras
-  comandos.push(Buffer.from([0x1d, 0x77, 2]));
+  comandos.push(Buffer.from([0x1d, 0x77, 5.8]));
 
   // No mostrar texto debajo
   comandos.push(Buffer.from([0x1d, 0x48, 0x00]));

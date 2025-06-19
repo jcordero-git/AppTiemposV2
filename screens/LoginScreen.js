@@ -204,16 +204,16 @@ const styles = StyleSheet.create({
     alignItems: "center", // Asegura que los elementos estén centrados en el formulario
   },
   input: {
-    backgroundColor: "white",
+    borderColor: "#ccc",
     padding: 12,
     marginBottom: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ccc",
+    //borderRadius: 8,
+    //borderWidth: 1,
+    borderBottomWidth: 1,
     width: "100%", // 🧠 hace que el input se adapte al contenedor
     maxWidth: 400, // 💻 previene que sea muy ancho en pantallas grandes
     fontSize: 16,
-    outlineStyle: "none", // ✅ importante para Web (quita el borde azul feo)
+    //outlineStyle: "none", // ✅ importante para Web (quita el borde azul feo)
   },
   title: {
     fontSize: 34,
@@ -232,12 +232,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#4CAF50",
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 8,
+    borderRadius: 3,
     width: "100%",
     maxWidth: 400,
   },
   buttonPressed: {
-    backgroundColor: "#005BBB",
+    backgroundColor: "#2e8532",
   },
   buttonText: {
     color: "#fff",

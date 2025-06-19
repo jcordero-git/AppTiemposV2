@@ -303,6 +303,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
         { monto: "200000", numero: "34" },
         { monto: "50800", numero: "38" },
         { monto: "8400", numero: "32" },
+        {monto: 1100, numero: '74', reventado: true, montoReventado: 600},
         { monto: "200", numero: "99" },
         { monto: "200", numero: "55" },
         { monto: "200", numero: "44" },

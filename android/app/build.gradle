@@ -89,9 +89,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.jose.cordero.brenes.AppTiemposV2'
+    namespace 'tiempos.com.apptiemposv2'
     defaultConfig {
-        applicationId 'com.jose.cordero.brenes.AppTiemposV2'
+        applicationId 'tiempos.com.apptiemposv2'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
@@ -120,6 +120,14 @@ android {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
+        }
+        applicationVariants.all{
+            variant ->
+                variant.outputs.each{
+                    output->
+                        def name = "appt-v${variant.versionName}.apk"
+                        output.outputFileName = name
+                }
         }
     }
     packagingOptions {

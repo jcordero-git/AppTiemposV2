@@ -5,6 +5,7 @@ export const generateHTML = async (
   sorteoSeleccionado,
   vendedorData,
   ticketProfile,
+  re_impresion,
 ) => {
   const {
     id: codigo,
@@ -64,14 +65,15 @@ export const generateHTML = async (
       });
 
     return `
-      <table style="line-height: 0.5; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
+      <table style="line-height: 0.6; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
         ${rows.join("")}
       </table>
     `;
   };
 
   // Código para el barcode
-  const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${codigo.toString().padStart(3, "0")}`;
+  //const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${codigo.toString().padStart(3, "0")}`;
+  const barcodeValue = `${codigo.toString().padStart(3, "0")}`;
 
   // Vendedor nombre y código concatenados
   const vendedorNombre =
@@ -116,7 +118,7 @@ export const generateHTML = async (
             body { margin: 0; }
           }
           body {
-            width: 60mm;
+            // width: 60mm;
             font-family: monospace;
             font-size: 12px;
             padding: 0px;
@@ -139,7 +141,7 @@ export const generateHTML = async (
             margin: 6px 0;
           }
           .dividerInvisible {
-            border-top: 1px dashed rgba(19, 18, 18, 0.29);
+            border-top: 1px dashed rgba(19, 18, 18, 0.50);
             margin: 6px 0;
           }
           .section-title {
@@ -228,6 +230,14 @@ export const generateHTML = async (
 
       <h3 style="width: 100%; font-family:  monospace; font-size: 18px; margin-top: 8px;">${ticketProfile.ticketTitle}</h3>
 
+       ${
+         re_impresion === true
+           ? `
+           <h3 style="width: 100%; font-family:  monospace; font-size: 24px; margin-top: 8px;">RE-IMPRESION</h3>
+        `
+           : ""
+       }    
+
 
         <div style="width: 100%; font-family:  monospace; font-size: 14px; margin-top: 8px;">
           ${ticketProfile.ticketFooter}
@@ -245,10 +255,6 @@ export const generateHTML = async (
             : ""
         }      
 
-        <div style="text-align:center; margin-top: 3px; font-family:  monospace; font-size: 20px;">
-            ${barcodeValue}
-          </div>
-
         <div class="dividerInvisible" style="height: 2px;  margin-top: 40px;"></div>
     
         <script>
@@ -256,7 +262,7 @@ export const generateHTML = async (
             JsBarcode("#barcode", "${barcodeValue}", {
               format: "CODE128",
               lineColor: "#000",
-              width: 1.2,
+              width: 3,
               height: 30,
               displayValue: false,
               fontSize: 14,

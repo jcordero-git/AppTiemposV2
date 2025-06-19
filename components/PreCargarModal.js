@@ -33,7 +33,7 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
   const isWeb = width > 710;
   const [modalVisible, setModalVisible] = useState(false);
   const [sorteoNombre, setSorteoNombre] = useState("");
-  let sorteoSeleccionado;
+  const [sorteoSeleccionado, setSorteoSeleccionado] = useState(null);
   const [codigo, setCodigo] = useState("");
   const [sorteoId, setSorteoId] = useState(null);
 
@@ -55,6 +55,7 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
   useEffect(() => {
     (async () => {
       if (mSorteo.id !== 0) {
+        setSorteoSeleccionado(mSorteo);
         await cargaSorteoSeleccionado();
       }
     })();
@@ -111,6 +112,7 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
             style={{
               flexDirection: "row",
               alignItems: "center",
+              justifyContent: "space-between", // <-- importante
               marginBottom: 10,
             }}
           >
@@ -125,6 +127,10 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
             >
               PRE CARGAR
             </Text>
+
+            <TouchableOpacity style={styles.iconButton} onPress={() => {}}>
+              <MaterialIcons name={"camera-alt"} size={24} color="black" />
+            </TouchableOpacity>
           </View>
           <View style={styles.row}>
             <TextInput
@@ -151,9 +157,9 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
               ]}
             />
 
-            <TouchableOpacity style={styles.iconButton} onPress={() => {}}>
+            {/* <TouchableOpacity style={styles.iconButton} onPress={() => {}}>
               <MaterialIcons name={"qr-code"} size={20} color="black" />
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
 
           <Pressable
@@ -175,13 +181,11 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
             onSelect={(sorteo) => {
               console.log("Sorteo Seleccionado: ", sorteo);
               //setSorteoId(sorteo.id);
-              setSorteoNombre(sorteo.namme);
-              sorteoSeleccionado = sorteo;
-
+              setSorteoNombre(sorteo.name);
+              setSorteoSeleccionado(sorteo);
               //Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
 
               // setSorteoId(mSorteo.id);
-              //setSorteoNombre(mSorteo.name);
             }}
           />
         </Dialog.Content>
@@ -281,6 +285,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: "#ccc",
+    backgroundColor: "white",
   },
 });

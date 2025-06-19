@@ -50,7 +50,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
-import PreCargarModal from "../components/PreCargarModal";
+import RestringidosModal from "../components/RestringidosModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
@@ -84,7 +84,11 @@ export default function VentaScreen({ navigation, route }) {
   const [dialogRestringidoVisible, setDialogRestringidoVisible] =
     useState(false);
   const [dialogPrintVisible, setDialogPrintVisible] = useState(false);
+  const [dialogPrecargarVisible, setDialogPrecargarVisible] = useState(false);
+  const [codigo, setCodigo] = useState("");
   const [idTicketSeleccionado, setIdTicketSeleccionado] = useState(0);
+  const [posisionSorteoModalAlaIzquierda, setposisionSorteoModalAlaIzquierda] =
+    useState(false);
 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [categoriasMonto, setCategoriasMonto] = useState("");
@@ -94,6 +98,9 @@ export default function VentaScreen({ navigation, route }) {
   const [categoriasHasta, setCategoriasHasta] = useState("");
   const [categoriasExtraerTexto, setCategoriasExtraerTexto] = useState("");
   const [loading, setLoading] = useState(false);
+  let tiempoNumerosBackup = null;
+  const ejecutadoPorRestringidoDialogRef = useRef(false);
+  const [hovered, setHovered] = useState(false);
 
   const [categoriasMontoTemporal, setCategoriasMontoTemporal] =
     useState(categoriasMonto);
@@ -144,11 +151,32 @@ export default function VentaScreen({ navigation, route }) {
     setDialogRestringidoVisible(true);
   };
 
-  const closeDialogRestringido = () => {
+  const closeDialogRestringido = async () => {
     setNumero("");
-    numeroRef.current?.focus();
-
+    //numeroRef.current?.focus();
     setDialogRestringidoVisible(false);
+  };
+
+  const closeDialogPreCarga = async () => {
+    setDialogPrecargarVisible(false);
+    setCodigo("");
+  };
+
+  const actualizaRestringidos = async () => {
+    // Paso 1: Obtener restricciones
+    const response = await fetch(
+      `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+    );
+    const data = await response.json();
+
+    const diaDelMes = new Date().getDate().toString().padStart(2, "0");
+    const reglasProcesadas = data.map((item) => {
+      if (item.restricted === "{DATE}") {
+        return { ...item, restricted: diaDelMes };
+      }
+      return item;
+    });
+    mSorteo.restringidos = reglasProcesadas;
   };
 
   const openDialogTickets = () => {
@@ -277,7 +305,6 @@ export default function VentaScreen({ navigation, route }) {
         for (const item of result) {
           const numero = convertNumero(parseInt(`${item.numero}`));
           const monto = parseInt(`${item.monto}`);
-
           [currentItems] = await verificaRestringidosYAgregaNumero(
             monto,
             numero,
@@ -336,7 +363,9 @@ export default function VentaScreen({ navigation, route }) {
   const [refreshHeader, setRefreshHeader] = useState(0);
   const [isSharing, setIsSharing] = useState(false);
   const isSharingRef = useRef(false);
-  const [modalVisiblePreCargar, setModalVisiblePreCargar] = useState(false);
+  //const [modalVisiblePreCargar, setModalVisiblePreCargar] = useState(false);
+  const [restringidosModalVisible, setRestringidosModalVisible] =
+    useState(false);
 
   React.useLayoutEffect(() => {
     if (idTicketSeleccionado > 0) {
@@ -376,9 +405,9 @@ export default function VentaScreen({ navigation, route }) {
             (tiempoSeleccionado && tiempoSeleccionado.id > 0)) && (
             <>
               <TouchableOpacity
-                disabled={isSharing}
+                disabled={isSharingRef.current}
                 onPress={handleShare}
-                style={{ opacity: isSharing ? 0.4 : 1 }}
+                style={{ opacity: isSharingRef.current ? 0.4 : 1 }}
               >
                 <MaterialIcons
                   name={tiempoSeleccionado?.id > 0 ? "share" : "save"}
@@ -409,9 +438,11 @@ export default function VentaScreen({ navigation, route }) {
             <Menu.Item
               onPress={() => {
                 closeMenuHeader();
-                InteractionManager.runAfterInteractions(() => {
-                  setModalVisiblePreCargar(true);
-                });
+                setDialogPrecargarVisible(true);
+                handleNuevoTiempo();
+                if (tiempoSeleccionado !== null) {
+                  setCodigo(tiempoSeleccionado.id);
+                }
               }}
               title="Pre Cargar"
               titleStyle={{ color: "#000" }} // Texto negro opcional
@@ -444,7 +475,7 @@ export default function VentaScreen({ navigation, route }) {
     idTicketSeleccionado,
     refreshHeader,
     ticketProfile,
-    modalVisiblePreCargar,
+    isSharing,
   ]);
 
   const handleNuevoTiempo = async (id) => {
@@ -454,76 +485,118 @@ export default function VentaScreen({ navigation, route }) {
     setTiempoSeleccionado(null);
   };
 
-  function convertirFecha(fechaPreCarga) {
-    const dia = parseInt(fechaPreCarga.slice(0, 2), 10);
-    const mes = parseInt(fechaPreCarga.slice(2, 4), 10) - 1; // mes en JS es 0-based
-    const anioCorto = parseInt(fechaPreCarga.slice(4, 6), 10);
-    const anioCompleto = anioCorto < 50 ? 2000 + anioCorto : 1900 + anioCorto;
-  
-    const fecha = new Date(Date.UTC(anioCompleto, mes, dia));
-    fecha.setUTCDate(fecha.getUTCDate() + 1); // Compensar el desfase
-    return fecha.toISOString();
-  }
+  // function convertirFecha(fechaPreCarga) {
+  //   const dia = parseInt(fechaPreCarga.slice(0, 2), 10);
+  //   const mes = parseInt(fechaPreCarga.slice(2, 4), 10) - 1; // mes en JS es 0-based
+  //   const anioCorto = parseInt(fechaPreCarga.slice(4, 6), 10);
+  //   const anioCompleto = anioCorto < 50 ? 2000 + anioCorto : 1900 + anioCorto;
 
-  const handlePreCargaTiempo = async (resultado) => {
-    // Extraer y descomponer la clave
-    const [drawCategoryID, fechaPreCarga, codigoPreCarga] =
-      resultado.codigo.split("-");
+  //   const fecha = new Date(Date(anioCompleto, mes, dia));
+  //   //fecha.setUTCDate(fecha.getUTCDate() + 1); // Compensar el desfase
+  //   return formatDate(fecha, "yyyy-MM-dd");
+  // }
 
-    const drawCategoryIDInt = parseInt(drawCategoryID, 10);
-    const codigoPreCargaInt = parseInt(codigoPreCarga, 10);
-    const fechaFormateada = convertirFecha(fechaPreCarga);
-    // Extraer los valores del objeto mSorteo
-    const { id: sorteoID, useReventado, restringidos } = resultado.sorteo;
-
-    // Ahora tienes:
-    console.log(drawCategoryIDInt); // "123"
-    console.log(fechaFormateada); // "20250617"
-    console.log(codigoPreCargaInt); // "456"
-
-    console.log(sorteoID); // 10
-    console.log(useReventado); // true
-    console.log(restringidos); // ["123", "456"]
-
-    console.log("tiempos vendidos", tiemposAnteriores);
-
-    const tiempoSeleccionado = tiemposAnteriores.find(
-      (tiempo) =>
-        tiempo.drawDate === fechaFormateada &&
-        tiempo.drawCategoryId === drawCategoryIDInt &&
-        tiempo.id === codigoPreCargaInt,
+  const [restringidosDisponibles, setRestrigosDisponibles] = useState([]);
+  const handleMuestraRestringidosDisponibles = async (resultado) => {
+    const tiemposVendidos = tiemposAnteriores; // fallback al estado
+    const setting = userData.settings.find(
+      (s) => s.porcentaje_reventado_restringido !== undefined,
     );
-    if (tiempoSeleccionado) {
-      console.log("tiempoSeleccionado", tiempoSeleccionado);
-      cargarNumeros_PreCargar(
-        tiempoSeleccionado,
-        resultado.sorteo,
-        restringidos,
-      );
-    } else {
-      console.log("tiemmpo no encontrado");
+    const porcentaje_reventado_restringido = setting
+      ? parseFloat(setting.porcentaje_reventado_restringido)
+      : 100; // valor por defecto si no se encuentra
+
+    const nuevoArray = [];
+    const numerosAgregados = new Set();
+
+    for (const restriccion of mSorteo.restringidos) {
+      const numeros = restriccion.restricted.split(",");
+
+      for (const numero of numeros) {
+        const numeroLimpio = numero.trim();
+
+        if (numerosAgregados.has(numeroLimpio)) {
+          continue;
+        }
+
+        const [allowRestringido, montoDisponible] = allowRestringidoFunction(
+          numeroLimpio,
+          0,
+          items,
+          tiemposVendidos,
+        );
+
+        let [allowRestringidoReventado, montoDisponibleReventado] =
+          allowRestringidoReventadoFunction(
+            numeroLimpio,
+            0,
+            porcentaje_reventado_restringido,
+            items,
+            tiemposVendidos,
+          );
+
+        nuevoArray.push({
+          numero: numeroLimpio,
+          permitido: allowRestringido,
+          monto: Math.max(0, montoDisponible),
+          rev_permitido: allowRestringidoReventado,
+          rev_monto: montoDisponibleReventado,
+        });
+        numerosAgregados.add(numeroLimpio);
+      }
     }
+    setRestrigosDisponibles(nuevoArray); // ✅ guardar en el estado
+    setRestringidosModalVisible(true);
   };
 
-  const cargarNumeros_PreCargar = (
-    tiempoCargado,
-    sorteo_PreCargar,
-    restingidos,
-  ) => {
-    setIdTicketSeleccionado(tiempoCargado.id);
-    setClientName(tiempoCargado.clientName || "Sin Nombre");
-    const numbersConKey = (tiempoCargado.numbers || []).map((item) => ({
-      ...item,
-      key: generateKey(),
-    }));
-    setItems(numbersConKey || []);
-    setSorteoNombre(sorteo_PreCargar.name);
-    console.log("SORTEO A PRECARGAR: ", sorteo_PreCargar.name);
-    setSorteoId(sorteo_PreCargar.id);
-    console.log("SORTEO ID A PRECARGAR: ", sorteo_PreCargar.id);
-    mSorteo.id = sorteo_PreCargar.id;
+  const handlePreCargaTiempo = async (codigo) => {
+    const codigoPreCargaInt = parseInt(codigo, 10);
+    const tiempoSeleccionado = await fetchTiempoByID(codigoPreCargaInt);
+    tiempoRef.current = {
+      ...tiempoRef.current,
+      numbers: [...tiempoSeleccionado.numbers],
+      clientName: tiempoSeleccionado.clientName,
+    };
+    tiempoNumerosBackup = tiempoSeleccionado;
+    const resultado = await inicializarYProcesar(tiempoRef.current);
+    if (!resultado) {
+      return; // ⛔ No continúa si hay errores
+    }
+    setDialogPrecargarVisible(false);
+  };
 
-    
+  const fetchTiempoByID = async (code) => {
+    const token = userData.token;
+    try {
+      if (code === 0) {
+        return null;
+      }
+      const response = await fetch(
+        `https://3jbe.tiempos.website/api/ticket/${code}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      console.log("RESPONSE DEL FETCH TIEMPO: ", response.status);
+
+      if (response.status !== 200) {
+        console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
+        showSnackbar("⚠️ Error al obtener tiempos: Status: ", response.status);
+        logout();
+        return null;
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error("Error al cargar el tiempos:", error);
+      showSnackbar("⚠️ Tiempo no encontrado.", 2);
+      return null; // ✅ fallback seguro
+    }
   };
 
   const handleBorrarTiempo = async (id) => {
@@ -553,7 +626,10 @@ export default function VentaScreen({ navigation, route }) {
       setcamposBloqueados(false);
       setTiempo([]);
       setClientName("");
-      const isAllowed = await inicializarYProcesar();
+      ejecutadoPorRestringidoDialogRef.current = false;
+
+      tiempoNumerosBackup = tiempoRef.current;
+      const isAllowed = await inicializarYProcesar(tiempoNumerosBackup);
       setMostrarCampos(true);
     } catch (error) {
       console.error("Error al enviar el ticket:", error);
@@ -715,97 +791,6 @@ export default function VentaScreen({ navigation, route }) {
     }
   };
 
-  const handlePrintBtDeprecated = async () => {
-    try {
-      console.log("TIEMPO SELECCIONADO DESDE PRINT BT: ", tiempoSeleccionado);
-      let tiempoAImprimir;
-
-      console.log(
-        "tiempo a imprimir ref desde print btn: ",
-        tiempoAImprimirRef.current,
-      );
-
-      if (tiempoSeleccionado !== null) {
-        tiempoAImprimir = tiempoSeleccionado;
-      } else {
-        console.log("entra al else 1", tiempoAImprimirRef.current);
-        tiempoAImprimir = tiempoAImprimirRef.current;
-        console.log("entra al else 2", tiempoAImprimir);
-      }
-
-      console.log("TIEMPO A IMPRIMIR: ", tiempoAImprimir);
-
-      if (Platform.OS === "android") {
-        // await Print.printAsync({
-        //   html: html, // tu HTML actual
-        // });
-        try {
-          const mac = ticketProfile.lastPrinterMacAddress;
-          console.log("Printer Mac Address from ticket profile: ", mac);
-          await PrinterUtils.initBluetooth();
-          try {
-            const isConnected = await PrinterUtils.connectToDevice(mac);
-            console.log("Paso el connectToDevice: isConnected?", isConnected);
-
-            console.log(
-              "TIEMPO SELECCIONADO DESDE PRINT BT ANRES DE ENVIAR A IMPRIMIR: ",
-              tiempoAImprimir,
-            );
-            await PrinterUtils.printTicket({
-              tiempo: tiempoAImprimir,
-              sorteoSeleccionado: mSorteo,
-              vendedorData: userData,
-              ticketProfile: ticketProfile,
-            });
-            console.log("Paso el PrinterUtils.printTicket: ");
-          } catch (error) {
-            console.warn(
-              "No se pudo conectar con el MAC guardado. Escaneando...",
-            );
-            const devices = await PrinterUtils.getDeviceList();
-            const found = devices.find((d) => d.inner_mac_address === mac);
-
-            console.log("Paso el found = devices.find: ", found);
-
-            if (!found) {
-              showSnackbar(
-                "La impresora no está disponible. Por favor, empareja desde los ajustes del sistema.",
-                3,
-              );
-              throw new Error(
-                "La impresora no está disponible. Por favor, empareja desde los ajustes del sistema.",
-              );
-            }
-            await PrinterUtils.connectToDevice(found.inner_mac_address);
-          }
-          await PrinterUtils.printTicket({
-            tiempo: tiempoAImprimir,
-            sorteoSeleccionado: mSorteo,
-            vendedorData: userData,
-            ticketProfile: ticketProfile,
-          });
-
-          if (limpiarRef.current && !tiempoSeleccionado) {
-            console.log("entra a limpiar campos");
-            limpiarDespuesDeImprimir();
-          }
-        } catch (err) {
-          console.error("Error en impresión:", err.message);
-          showSnackbar(
-            "La impresora no está disponible. Por favor, empareja desde los ajustes del sistema.",
-            3,
-          );
-        }
-      } else if (Platform.OS === "web") {
-        const iframeWindow = iframeRef.current.contentWindow;
-        iframeWindow.focus();
-        iframeWindow.print();
-      }
-    } catch (e) {
-      console.error("Error en impresión:", e);
-    }
-  };
-
   const handlePrintBt = async () => {
     try {
       let tiempoAImprimir =
@@ -845,6 +830,7 @@ export default function VentaScreen({ navigation, route }) {
           sorteoSeleccionado: mSorteo,
           vendedorData: userData,
           ticketProfile: ticketProfile,
+          re_impresion: tiempoSeleccionado !== null ? true : false,
         });
 
         if (limpiarRef.current && !tiempoSeleccionado) {
@@ -910,8 +896,9 @@ export default function VentaScreen({ navigation, route }) {
         //     return;
         //   }
         // }
-
-        const resultado = await inicializarYProcesar();
+        ejecutadoPorRestringidoDialogRef.current = false;
+        tiempoNumerosBackup = tiempoRef.current;
+        const resultado = await inicializarYProcesar(tiempoNumerosBackup);
         if (!resultado) {
           return; // ⛔ No continúa si hay errores
         }
@@ -939,10 +926,6 @@ export default function VentaScreen({ navigation, route }) {
         showSnackbar("El ticket fue registrado correctamente.", 1);
         tiempoRef.current = tiempoParaImprimir;
         tiempoAImprimirRef.current = result;
-        console.log(
-          "tiempo a imprimir ref desde share: ",
-          tiempoAImprimirRef.current,
-        );
       }
 
       const htmlGenerado = await generateHTML(
@@ -950,6 +933,7 @@ export default function VentaScreen({ navigation, route }) {
         mSorteo,
         userData,
         ticketProfile,
+        tiempoSeleccionado !== null ? true : false,
       );
       setHtml(htmlGenerado);
       setLoaded(false);
@@ -963,8 +947,8 @@ export default function VentaScreen({ navigation, route }) {
       if (limpiarRef.current && !tiempoSeleccionado) {
         //limpiarDespuesDeImprimir();//TODO: revisar esta linea, hay que limmpiar el tiemmpo.ref
       }
-
-      console.log("TIEMPO SELECCIONADO DESDE SHARE: ", tiempoSeleccionado);
+      isSharingRef.current = false;
+      setIsSharing(false); // Estado visual
     } catch (error) {
       console.error("Error al enviar el ticket:", error);
       Alert.alert("Error", "No se pudo enviar el ticket.");
@@ -991,7 +975,6 @@ export default function VentaScreen({ navigation, route }) {
       );
       const canShare = await Sharing.isAvailableAsync();
       if (canShare) {
-        console.log("entra a compartir useefect");
         await Sharing.shareAsync(path, {
           mimeType: "image/png",
           dialogTitle: "Compartir ticket",
@@ -1078,8 +1061,6 @@ export default function VentaScreen({ navigation, route }) {
       ) {
         const newHeight = parseInt(event.data.height, 10);
         setIframeHeight((prev) => (newHeight > prev ? newHeight : prev));
-
-        console.log("entra a calcular htmlHeight", newHeight);
       }
     };
 
@@ -1119,6 +1100,7 @@ export default function VentaScreen({ navigation, route }) {
       setIdTicketSeleccionado(0);
       setDialogPrintVisible(false);
 
+      setIsMontoLocked(false);
       setMonto("");
       setNumero("");
     }
@@ -1127,6 +1109,16 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const [isMontoLocked, setIsMontoLocked] = useState(false);
+  const [shouldFocusMonto, setShouldFocusMonto] = useState(false);
+
+  useEffect(() => {
+    if (!isMontoLocked && shouldFocusMonto) {
+      window.setTimeout(() => {
+        montoRef.current?.focus();
+      }, 100); // o prueba con 300
+      setShouldFocusMonto(false); // Reset
+    }
+  }, [isMontoLocked, shouldFocusMonto]);
 
   function getMontoPorNumero(items, numero) {
     return items?.reduce((sum, item) => {
@@ -1387,7 +1379,8 @@ export default function VentaScreen({ navigation, route }) {
     return false; // Todo bien
   };
 
-  const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
+  const fetchTiemposAnteriores_insecure = async (drawCategoryId, drawDate) => {
+    const token = userData.token;
     try {
       if (drawCategoryId === 0 || !drawDate) {
         return {
@@ -1408,7 +1401,55 @@ export default function VentaScreen({ navigation, route }) {
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
 
-      console.log("TIEMPOS VENDIDOS: ", sortedData);
+      return {
+        tiemposVendidos: sortedData,
+        lastTicketNumber,
+      };
+    } catch (error) {
+      console.error("Error al cargar tiempos anteriores:", error);
+      return [[], 0]; // ✅ fallback seguro
+    }
+  };
+
+  const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
+    const token = userData.token;
+    try {
+      if (drawCategoryId === 0 || !drawDate) {
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+      const response = await fetch(
+        `https://3jbe.tiempos.website/api/ticket/${drawCategoryId}/${drawDate}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      if (response.status !== 200) {
+        console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
+        showSnackbar("⚠️ Error al obtener tiempos: Status: ", response.status);
+        logout();
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+
+      const data = await response.json();
+      const sortedData = data.sort((a, b) => b.id - a.id);
+      setTiemposAnteriores(sortedData);
+      const ticketNumbers = sortedData
+        .map((item) => item.id)
+        .filter((n) => typeof n === "number" && n > 0);
+
+      const lastTicketNumber =
+        ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
 
       return {
         tiemposVendidos: sortedData,
@@ -1436,9 +1477,7 @@ export default function VentaScreen({ navigation, route }) {
     const montoAlreadyInserted = totalSinReventados(items);
 
     const motoVentaTotal = montoAlreadyInserted + sumMonto_restrictedNum;
-
     const totalPorNumero_AlreadyInserted = getMontoPorNumero(items, numero);
-
     const totalPorNumero_TiemposVendidos = Number(
       getMontoPorNumeroEnTiemposVendidos(tiemposVendidosExternos, numero) || 0,
     );
@@ -1464,7 +1503,10 @@ export default function VentaScreen({ navigation, route }) {
           (totalPorNumero_TiemposVendidos + totalPorNumero_AlreadyInserted);
         return [false, montoDisponible];
       } else {
-        return [true, montoAllowed];
+        montoDisponible =
+          montoAllowed -
+          (totalPorNumero_TiemposVendidos + totalPorNumero_AlreadyInserted);
+        return [true, montoDisponible];
       }
     }
   }
@@ -1557,7 +1599,7 @@ export default function VentaScreen({ navigation, route }) {
     }
   }
 
-  const inicializarYProcesar = async () => {
+  const inicializarYProcesar = async (tiempoNumerosBackup) => {
     try {
       setLoading(true); // Mostrar loader
 
@@ -1581,10 +1623,10 @@ export default function VentaScreen({ navigation, route }) {
       mSorteo.restringidos = reglasProcesadas;
 
       // Paso 2: Guardar copia de números anteriores
-      const numbersOriginales = [...(tiempoRef.current.numbers || [])];
+      const numbersOriginales = [...(tiempoNumerosBackup.numbers || [])];
 
       // Paso 3: Limpiar tiempo y items
-      const tiempoBackup = { ...tiempoRef.current };
+      const tiempoBackup = { ...tiempoNumerosBackup };
 
       const tiempoBase = {
         ...tiempo,
@@ -1673,7 +1715,9 @@ export default function VentaScreen({ navigation, route }) {
   useEffect(() => {
     if (!fecha || !sorteoId || !userData?.id) return;
     async function execute() {
-      const isAllowed = await inicializarYProcesar();
+      ejecutadoPorRestringidoDialogRef.current = false;
+      tiempoNumerosBackup = tiempoRef.current;
+      const isAllowed = await inicializarYProcesar(tiempoNumerosBackup);
     }
     execute();
   }, [sorteoId, fecha]);
@@ -1713,28 +1757,32 @@ export default function VentaScreen({ navigation, route }) {
     let updatedItems = currentItems ? [...currentItems] : [...items];
     if (allowRestringido) {
       if (reventar) {
-        let [allowRestringidoReventado, montoDisponibleReventado] =
-          allowRestringidoReventadoFunction(
-            numero,
-            montoReventado,
-            porcentaje_reventado_restringido,
-            currentItems,
-            tiemposVendidos,
-          );
+        if (mSorteo.useReventado === true) {
+          let [allowRestringidoReventado, montoDisponibleReventado] =
+            allowRestringidoReventadoFunction(
+              numero,
+              montoReventado,
+              porcentaje_reventado_restringido,
+              currentItems,
+              tiemposVendidos,
+            );
 
-        if (montoDisponibleReventado < 0) montoDisponibleReventado = 0;
-        if (allowRestringidoReventado) {
-          updatedItems = txtNumeroDone(
-            updatedItems,
-            monto,
-            numero,
-            reventar,
-            montoReventado,
-          );
+          if (montoDisponibleReventado < 0) montoDisponibleReventado = 0;
+          if (allowRestringidoReventado) {
+            updatedItems = txtNumeroDone(
+              updatedItems,
+              monto,
+              numero,
+              reventar,
+              montoReventado,
+            );
+          } else {
+            setAbiertoPorReventado(true);
+            await esperarConfirmacionDialog(numero, montoDisponibleReventado);
+            return [currentItems ?? items, false];
+          }
         } else {
-          setAbiertoPorReventado(true);
-          await esperarConfirmacionDialog(numero, montoDisponibleReventado);
-          return [currentItems ?? items, false];
+          showSnackbar("El sorteo no admite reventados.", 3);
         }
       } else {
         updatedItems = txtNumeroDone(
@@ -1760,6 +1808,16 @@ export default function VentaScreen({ navigation, route }) {
           Alert.alert("Error", "Debe ingresar monto y número válidos.");
           return;
         }
+        tiempoNumerosBackup = tiempoRef.current;
+        const nuevoNumero = {
+          monto: monto,
+          numero: numero,
+          reventado: false,
+          montoReventado: 0,
+        };
+        tiempoNumerosBackup.numbers.push(nuevoNumero);
+        ejecutadoPorRestringidoDialogRef.current = false;
+
         const [currentItems] = await verificaRestringidosYAgregaNumero(
           monto,
           numero,
@@ -1806,7 +1864,7 @@ export default function VentaScreen({ navigation, route }) {
   );
 
   useEffect(() => {
-    submitNumero();
+    if (monto !== "") submitNumero();
   }, [numero, reventar]);
 
   return (
@@ -1849,7 +1907,10 @@ export default function VentaScreen({ navigation, route }) {
                 <View style={styles.formRow}>
                   <Pressable
                     style={styles.inputSmallSorteo}
-                    onPress={() => setModalVisible(true)}
+                    onPress={() => {
+                      setposisionSorteoModalAlaIzquierda(true);
+                      setModalVisible(true);
+                    }}
                     editable={!camposBloqueados}
                     disabled={camposBloqueados}
                   >
@@ -1857,7 +1918,7 @@ export default function VentaScreen({ navigation, route }) {
                       {sorteoNombre || "Sorteo"}
                     </Text>
                   </Pressable>
-                  <SorteoSelectorModal
+                  {/* <SorteoSelectorModal
                     visible={modalVisible}
                     onClose={() => setModalVisible(false)}
                     onSelect={(sorteo) => {
@@ -1873,7 +1934,8 @@ export default function VentaScreen({ navigation, route }) {
                         sorteoId: sorteo.id,
                       }));
                     }}
-                  />
+                    leftPosition={true}
+                  /> */}
 
                   {Platform.OS === "web" ? (
                     <View pointerEvents={camposBloqueados ? "none" : "auto"}>
@@ -1916,7 +1978,7 @@ export default function VentaScreen({ navigation, route }) {
                     placeholder="Nombre Cliente"
                     style={styles.input}
                     value={tiempo.clientName}
-                    onChangeText={setClientName}
+                    onChangeText={(text) => setClientName(text.toUpperCase())}
                     editable={!camposBloqueados}
                   />
                 </View>
@@ -1964,10 +2026,16 @@ export default function VentaScreen({ navigation, route }) {
                         style={styles.iconButton}
                         onPress={() => {
                           if (isMontoLocked) {
-                            // Desbloquear si ya estaba bloqueado
                             setIsMontoLocked(false);
-                            montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+                            setShouldFocusMonto(true);
                             setMonto("");
+
+                            // montoRef.current?.focus();
+                            //  window.setTimeout(() => {
+                            //   montoRef.current?.focus();
+                            // }, 100);
+                            // setMonto("e");
+                            // setIsMontoLocked(false);
                           } else {
                             const montoNum = parseInt(monto, 10);
                             if (!isNaN(montoNum) && validateMonto(montoNum)) {
@@ -2012,12 +2080,14 @@ export default function VentaScreen({ navigation, route }) {
                         keyboardType="number-pad"
                         returnKeyType="done"
                         editable={!isMontoLocked}
+                        blurOnSubmit={false}
                         onSubmitEditing={() => {
                           const montoNum = parseInt(monto, 10);
                           if (!isNaN(montoNum) && validateMonto(montoNum)) {
-                            window.setTimeout(() => {
-                              numeroRef.current?.focus();
-                            }, 100);
+                            numeroRef.current?.focus();
+                            // window.setTimeout(() => {
+                            //   numeroRef.current?.focus();
+                            // }, 100);
                           } else {
                             // Alert.alert(
                             //   "Monto inválido",
@@ -2025,9 +2095,9 @@ export default function VentaScreen({ navigation, route }) {
                             // );
                             showSnackbar("Debe ingresar un monto válido.", 3);
                             //montoRef.current?.blur();
-                            window.setTimeout(() => {
-                              montoRef.current?.focus();
-                            }, 100);
+                            // window.setTimeout(() => {
+                            //   montoRef.current?.focus();
+                            // }, 100);
                           }
                         }}
                       />
@@ -2048,8 +2118,7 @@ export default function VentaScreen({ navigation, route }) {
 
                           // if (cleaned.length === 2) {
                           //   if (reventar) {
-                          //     reventarRef.current?.blur();
-                          //     window.setTimeout(() =>{
+                          //     window.setTimeout(() => {
                           //       reventarRef.current?.focus();
                           //     });
                           //   } else {
@@ -2059,6 +2128,7 @@ export default function VentaScreen({ navigation, route }) {
                         }}
                         keyboardType="number-pad"
                         returnKeyType="done"
+                        blurOnSubmit={false}
                         onFocus={() => {
                           const montoNum = parseInt(monto, 10);
                           if (
@@ -2072,22 +2142,34 @@ export default function VentaScreen({ navigation, route }) {
                           }
                         }}
                         onSubmitEditing={() => {
-                          if (numero.length !== 2) {
-                            numeroRef.current?.blur();
-                            window.setTimeout(() => {
-                              numeroRef.current?.focus();
-                              showSnackbar(
-                                "Debe ingresar un número de 2 dígitos.",
-                                3,
-                              );
-                            }, 100);
-                          } else {
+                          if (numero.length === 2) {
                             if (reventar) {
                               reventarRef.current?.focus();
                             } else {
                               submitNumero();
                             }
+                          } else {
+                            showSnackbar(
+                              "Debe ingresar un número de 2 dígitos.",
+                              3,
+                            );
                           }
+
+                          // if (numero.length !== 2) {
+                          //   window.setTimeout(() => {
+                          //     numeroRef.current?.focus();
+                          //     showSnackbar(
+                          //       "Debe ingresar un número de 2 dígitos.",
+                          //       3,
+                          //     );
+                          //   }, 100);
+                          // } else {
+                          //   if (reventar) {
+                          //     reventarRef.current?.focus();
+                          //   } else {
+                          //     submitNumero();
+                          //   }
+                          // }
                         }}
                       />
                     </View>
@@ -2110,6 +2192,7 @@ export default function VentaScreen({ navigation, route }) {
                           }}
                           keyboardType="number-pad"
                           returnKeyType="done"
+                          blurOnSubmit={false}
                           onSubmitEditing={() => {
                             const montoNum = parseInt(monto, 10);
                             const montoReventadoNum = parseInt(
@@ -2126,7 +2209,6 @@ export default function VentaScreen({ navigation, route }) {
                                 "Debe ser un múltiplo de 50.",
                               );
                               showSnackbar("Debe ingresar un monto válido.", 3);
-                              reventarRef.current?.blur();
                               window.setTimeout(() => {
                                 reventarRef.current?.focus();
                               }, 100);
@@ -2138,7 +2220,6 @@ export default function VentaScreen({ navigation, route }) {
                                 "El monto reventado no puede ser mayor al monto original.",
                                 3,
                               );
-                              reventarRef.current?.blur();
                               window.setTimeout(() => {
                                 reventarRef.current?.focus();
                               }, 100);
@@ -2196,8 +2277,35 @@ export default function VentaScreen({ navigation, route }) {
             </View>
             {/* Total */}
             <View style={styles.totalBar}>
-              <Text style={styles.totalText}>TOTAL: </Text>
-              <Text style={styles.totalValue}>₡{total?.toFixed(2)}</Text>
+              <Pressable
+                onPress={() => {
+                  handleMuestraRestringidosDisponibles();
+                }}
+                onHoverIn={() => Platform.OS === "web" && setHovered(true)}
+                onHoverOut={() => Platform.OS === "web" && setHovered(false)}
+                style={styles.iconButtonRestringidos}
+              >
+                <MaterialIcons name="warning" size={20} color="red" />
+              </Pressable>
+              <RestringidosModal
+                visible={restringidosModalVisible}
+                onClose={() => setRestringidosModalVisible(false)}
+                onSelect={(sorteo) => {}}
+                data={restringidosDisponibles}
+                useReventado={mSorteo.useReventado}
+              />
+              {hovered && (
+                <View style={styles.tooltip}>
+                  <Text style={styles.tooltipText}>
+                    Ver números restingidos
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.totalTextGroup}>
+                <Text style={styles.totalText}>TOTAL: </Text>
+                <Text style={styles.totalValue}>₡{total?.toFixed(2)}</Text>
+              </View>
             </View>
           </View>
         </>
@@ -2319,12 +2427,13 @@ export default function VentaScreen({ navigation, route }) {
                       <!DOCTYPE html>
                       <html>
                         <head>
-                          <meta name="viewport" content="width=60mm, initial-scale=1.0">
+                          <meta name="viewport", initial-scale=1.0">
                           <style>
                             body { margin-left: 0px; padding: 0px; box-sizing: border-box; }
                             .wrapper {
-                              margin-left: 12px;
-                              width: 57mm;
+                              // margin-left: 5px;
+                              //justify-content: "center"
+                              //width: 58mm;
                               }
                           </style>
                           <script>
@@ -2381,7 +2490,7 @@ export default function VentaScreen({ navigation, route }) {
                         injectedJavaScript={`
                      const meta = document.createElement('meta');
                      meta.setAttribute('name', 'viewport');
-                     meta.setAttribute('content', 'width=240, initial-scale=1, maximum-scale=1, user-scalable=no');
+                     meta.setAttribute('content', 'width=245, initial-scale=1, maximum-scale=1, user-scalable=no');
                      document.head.appendChild(meta);
                      document.body.style.margin = '0';
                      document.body.style.overflowY = 'scroll'; // ✅ Permite scroll vertical
@@ -2395,9 +2504,10 @@ export default function VentaScreen({ navigation, route }) {
                      true;
                    `}
                         style={{
-                          width: 250,
+                          width: "100%",
                           height: webviewHeight || 300,
                           backgroundColor: "white",
+                          //marginLeft: 8,
                         }}
                       />
 
@@ -2410,18 +2520,18 @@ export default function VentaScreen({ navigation, route }) {
                             <!DOCTYPE html>
                             <html>
                               <head>
-                                <meta name="viewport" content="width=58mm, initial-scale=1.0">
+                                <meta name="viewport" content="width=60mm, initial-scale=1.0">
                                 <style>
                                   body { margin: 0; padding: 10px; background: white; box-sizing: border-box; }
                                  .wrapper {
-                                    margin-left: 10px;
-                                    width: 58mm;
+                                    //margin-left: 30px;
+                                    //width: 56mm;
                                     }
                                   </style>
                                 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
                               </head>
                               <body>
-                              <div class="wrapper">
+                                <div class="wrapper">
                                 <div id="ticket">${html}</div>
                                  </div>
                                 <script>
@@ -2542,7 +2652,10 @@ export default function VentaScreen({ navigation, route }) {
 
         {/* Diálogo Restringido */}
         <Dialog
-          visible={dialogRestringidoVisible}
+          visible={
+            dialogRestringidoVisible &&
+            !ejecutadoPorRestringidoDialogRef.current
+          }
           onDismiss={closeDialogRestringido}
           style={[
             {
@@ -2573,7 +2686,7 @@ export default function VentaScreen({ navigation, route }) {
                 marginBottom: 10,
               }}
             >
-              <MaterialIcons name="warning" size={35} color="#f09359" />
+              <MaterialIcons name="warning" size={35} color="red" />
               <Text
                 style={{
                   marginLeft: 8,
@@ -2602,31 +2715,19 @@ export default function VentaScreen({ navigation, route }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button
-              textColor="black"
-              style={{
-                backgroundColor: "white", // Fondo blanco
-                marginBottom: 10,
-                borderRadius: 3,
-              }}
-              onPress={closeDialogRestringido}
-            >
-              SYNC RESTRINGIDOS
-            </Button>
-
-            <Button
-              textColor="green"
+              textColor="red"
               style={{
                 backgroundColor: "white", // Fondo blanco
                 marginBottom: 10,
                 borderRadius: 3,
               }}
               onPress={() => {
-                setDialogRestringidoVisible(false);
-                //closeDialogRestringido;
+                //setDialogRestringidoVisible(false);
+                closeDialogRestringido();
                 resolverDialogRef.current?.(); // Resuelve la promesa
               }}
             >
-              OK
+              CERRAR
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -2987,20 +3088,164 @@ export default function VentaScreen({ navigation, route }) {
             </Button>
           </Dialog.Content>
         </Dialog>
+        {/* Diálogo para precargar tiempo */}
+        <Dialog
+          visible={dialogPrecargarVisible}
+          onDismiss={closeDialogPreCarga}
+          style={[
+            {
+              backgroundColor: "white", // Fondo blanco
+              borderRadius: 10, // Bordes redondeados
+              marginHorizontal: 20, // Margen lateral
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4, // sombra en Android
+              shadowColor: "#000", // sombra en iOS
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between", // <-- importante
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons name="qr-code" size={35} color="#000" />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                PRE CARGAR
+              </Text>
+
+              <TouchableOpacity style={styles.iconButton} onPress={() => {}}>
+                <MaterialIcons name={"camera-alt"} size={24} color="black" />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.row}>
+              <TextInput
+                placeholder="CODIGO"
+                value={codigo}
+                onChangeText={(text) => {
+                  setCodigo(text);
+                }}
+                keyboardType="numeric-pad"
+                style={[
+                  styles.input,
+                  {
+                    flex: 1,
+                    marginTop: 15,
+                    textAlign: "center",
+                    fontSize: 18,
+                    letterSpacing: 1,
+                    fontWeight: "bold",
+                    fontFamily: "monospace",
+                  },
+                ]}
+              />
+            </View>
+
+            <Pressable
+              style={styles.inputSmall}
+              onPress={() => {
+                setposisionSorteoModalAlaIzquierda(false);
+                setModalVisible(true);
+              }}
+            >
+              <Text
+                style={{
+                  color: sorteoNombre ? "#000" : "#aaa",
+                  textAlign: "center",
+                }}
+              >
+                {sorteoNombre || "Sorteo"}
+              </Text>
+            </Pressable>
+            {/* <SorteoSelectorModal
+              visible={modalVisible}
+              onClose={() => setModalVisible(false)}
+              onSelect={(sorteo) => {
+                console.log("Sorteo Seleccionado: ", sorteo);
+                setSorteoId(sorteo.id);
+                setSorteoNombre(sorteo.name);
+                Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
+              }}
+              leftPosition={false}
+            /> */}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={closeDialogPreCarga}
+            >
+              CANCELAR
+            </Button>
+            <Button
+              textColor="#4CAF50"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                handlePreCargaTiempo(codigo);
+              }}
+            >
+              OK
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
 
-      <PreCargarModal
+      {/* <PreCargarModal
         visible={modalVisiblePreCargar}
         onClose={() => {
           setModalVisiblePreCargar(false);
           closeMenuHeader();
         }}
         onSelect={(resultado) => {
-          console.log("CODIGO: ", resultado.codigo);
-          console.log("SORTEO: ", resultado.sorteo);
           handlePreCargaTiempo(resultado);
           setModalVisiblePreCargar(false);
         }}
+      /> */}
+
+      <SorteoSelectorModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSelect={(sorteo) => {
+          Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
+
+          setSorteoId(mSorteo.id);
+          setSorteoNombre(mSorteo.name);
+          setUseReventado(mSorteo.useReventado);
+          setReventar(false);
+          setMontoReventado("");
+          setTiempo((prev) => ({
+            ...prev,
+            sorteoId: sorteo.id,
+          }));
+        }}
+        leftPosition={posisionSorteoModalAlaIzquierda}
       />
     </Provider>
   );
@@ -3158,8 +3403,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginTop: 0,
-    backgroundColor: "#ccc",
+    backgroundColor: "#e6e1e1",
     borderRadius: 8,
+    cursor: "pointer",
+  },
+  iconButtonRestringidos: {
+    width: 27,
+    height: 27,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 0,
+    //backgroundColor: "#e6e1e1",
+    borderRadius: 8,
+    cursor: "pointer",
   },
   montoContainer: {
     flexDirection: "column",
@@ -3177,10 +3433,15 @@ const styles = StyleSheet.create({
   totalBar: {
     marginTop: 10,
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     paddingTop: 10,
     borderTopWidth: 1,
     borderColor: "#ccc",
+  },
+  totalTextGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8, // si usas React Native >= 0.71, si no, usa marginRight
   },
   totalText: {
     fontWeight: "bold",
@@ -3202,5 +3463,19 @@ const styles = StyleSheet.create({
     boxShadow: "0 0 10px rgba(0,0,0,0.3)",
     zIndex: 1000, // asegurarse que quede encima de todo
     overflowY: "auto",
+  },
+  tooltip: {
+    position: "absolute",
+    top: -24,
+    left: 0,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    zIndex: 10,
+  },
+  tooltipText: {
+    color: "white",
+    fontSize: 12,
   },
 });

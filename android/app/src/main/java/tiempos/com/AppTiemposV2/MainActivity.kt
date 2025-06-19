@@ -1,4 +1,4 @@
-package com.jose.cordero.brenes.AppTiemposV2
+package tiempos.com.apptiemposv2
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

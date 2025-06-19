@@ -62,7 +62,6 @@ export function formatHourStr(timeStr) {
 
 export function formatDate(fecha, formatStr) {
   if (!fecha) return "";
-  console.log("FORMAT DATE", formatStr, fecha);
   const dateObj = typeof fecha === "string" ? parseDateUTC(fecha) : fecha;
   return format(dateObj, formatStr, { locale: es });
 }

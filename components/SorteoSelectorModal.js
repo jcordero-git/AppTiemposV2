@@ -9,16 +9,25 @@ import {
   TouchableOpacity,
   Pressable,
   StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { mSorteo } from "../models/mSorteo";
 
-export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
+export default function SorteoSelectorModal({
+  visible,
+  onClose,
+  onSelect,
+  leftPosition,
+}) {
   const { userData } = useAuth();
   const [sorteoItems, setSorteoItems] = useState([]);
   //console.log("User desde modal:", userData.id);
   /** @type {mSorteo[]} */
   let mSorteos = [];
+  const { width, height } = useWindowDimensions();
+  const isWeb = width > 710;
+  //const leftPosition = false;
 
   useEffect(() => {
     if (visible) {
@@ -55,8 +64,20 @@ export default function SorteoSelectorModal({ visible, onClose, onSelect }) {
       animationType="fade"
       onRequestClose={onClose}
     >
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={styles.modal} onPress={() => {}}>
+      <Pressable
+        style={[styles.overlay, { justifyContent: "center" }]}
+        onPress={onClose}
+      >
+        <Pressable
+          style={[
+            styles.modal,
+            { marginHorizontal: 20 },
+            isWeb && { position: "absolute", top: 74, width: 400 },
+            isWeb && leftPosition && { left: 0 },
+            isWeb && !leftPosition && { right: 0 },
+          ]}
+          onPress={() => {}}
+        >
           <Text style={styles.title}>SORTEOS DISPONIBLES</Text>
           <FlatList
             data={sorteoItems}
@@ -84,15 +105,15 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "center",
+    //justifyContent: "center",
     alignItems: "center",
   },
   modal: {
+    //top: 74,
+    width: "90%",
     backgroundColor: "#fff",
-    width: "80%",
     borderRadius: 10,
     padding: 20,
-    maxHeight: "70%",
   },
   title: {
     fontSize: 18,

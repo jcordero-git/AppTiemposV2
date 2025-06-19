@@ -1,4 +1,4 @@
-package com.jose.cordero.brenes.AppTiemposV2
+package tiempos.com.apptiemposv2
 
 import android.app.Application
 import android.content.res.Configuration
