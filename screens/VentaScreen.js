@@ -496,6 +496,24 @@ export default function VentaScreen({ navigation, route }) {
   //   return formatDate(fecha, "yyyy-MM-dd");
   // }
 
+  const fetchRestringidosBySorteoID = async () => {
+    // Paso 1: Obtener restricciones
+    const response = await fetch(
+      `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+    );
+    const data = await response.json();
+
+    const diaDelMes = new Date().getDate().toString().padStart(2, "0");
+    const reglasProcesadas = data.map((item) => {
+      if (item.restricted === "{DATE}") {
+        return { ...item, restricted: diaDelMes };
+      }
+      return item;
+    });
+
+    mSorteo.restringidos = reglasProcesadas;
+  };
+
   const [restringidosDisponibles, setRestrigosDisponibles] = useState([]);
   const handleMuestraRestringidosDisponibles = async (resultado) => {
     const tiemposVendidos = tiemposAnteriores; // fallback al estado
@@ -508,6 +526,10 @@ export default function VentaScreen({ navigation, route }) {
 
     const nuevoArray = [];
     const numerosAgregados = new Set();
+
+    console.log("RESTRINGIDOS SIN ACTUALIZAR: ", mSorteo.restringidos);
+    await fetchRestringidosBySorteoID();
+    console.log("RESTRINGIDOS ACTUALIZADOS: ", mSorteo.restringidos);
 
     for (const restriccion of mSorteo.restringidos) {
       const numeros = restriccion.restricted.split(",");
@@ -1867,6 +1889,11 @@ export default function VentaScreen({ navigation, route }) {
     if (monto !== "") submitNumero();
   }, [numero, reventar]);
 
+  const extractBodyFromHTML = (htmlString) => {
+    const bodyContentMatch = htmlString.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    return bodyContentMatch ? bodyContentMatch[1] : htmlString;
+  };
+
   return (
     <Provider>
       <View style={{ flex: 1 }}>
@@ -2515,6 +2542,7 @@ export default function VentaScreen({ navigation, route }) {
                       {generateImage && (
                         <WebView
                           originWhitelist={["*"]}
+                          renderToHardwareTextureAndroid={true}
                           source={{
                             html: `
                             <!DOCTYPE html>
@@ -2522,7 +2550,7 @@ export default function VentaScreen({ navigation, route }) {
                               <head>
                                 <meta name="viewport" content="width=60mm, initial-scale=1.0">
                                 <style>
-                                  body { margin: 0; padding: 10px; background: white; box-sizing: border-box; }
+                                  body { margin: 0; padding: 0px; opacity: 0; background: transparent; box-sizing: border-box; }
                                  .wrapper {
                                     //margin-left: 30px;
                                     //width: 56mm;
@@ -2536,15 +2564,24 @@ export default function VentaScreen({ navigation, route }) {
                                  </div>
                                 <script>
                                   window.onload = () => {
+                                    console.log("ONLOAD fired");
+
                                     setTimeout(() => {
-                                      html2canvas(document.getElementById("ticket"), {
+                                        const el = document.getElementById("ticket");
+                                        if (!el) {
+                                          console.log("No ticket element found");
+                                          return;
+                                        }
+
+                                      html2canvas(el, {
                                         scale: 2,
                                         backgroundColor: "#ffffff"
                                       }).then(canvas => {
+                                        console.log("Canvas generated");
                                         const base64 = canvas.toDataURL("image/png");
                                         window.ReactNativeWebView.postMessage(base64);
                                       });
-                                    }, 300);
+                                    }, 500);
                                   };
                                 </script>
                               </body>
@@ -2577,7 +2614,16 @@ export default function VentaScreen({ navigation, route }) {
 
                             setGenerateImage(false);
                           }}
-                          style={{ width: 0, height: 0, opacity: 0 }}
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            opacity: 1,
+                            top: -9999,
+                            left: -9999,
+                            backgroundColor: "transparent",
+                            position: "absolute",
+                            pointerEvents: "none",
+                          }}
                         />
                       )}
                     </>
@@ -3117,25 +3163,48 @@ export default function VentaScreen({ navigation, route }) {
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                justifyContent: "space-between", // <-- importante
+                justifyContent: "space-between", // 🔥 clave para separar lados
                 marginBottom: 10,
               }}
             >
-              <MaterialIcons name="qr-code" size={35} color="#000" />
-              <Text
+              <View
                 style={{
-                  marginLeft: 8,
-                  fontWeight: "bold",
-                  color: "#000",
-                  fontSize: 18,
+                  flexDirection: "row",
+                  alignItems: "center",
                 }}
               >
-                PRE CARGAR
-              </Text>
-
-              <TouchableOpacity style={styles.iconButton} onPress={() => {}}>
-                <MaterialIcons name={"camera-alt"} size={24} color="black" />
-              </TouchableOpacity>
+                <MaterialIcons name="qr-code" size={35} color="#000" />
+                <Text
+                  style={{
+                    marginLeft: 8,
+                    fontWeight: "bold",
+                    color: "#000",
+                    fontSize: 18,
+                  }}
+                >
+                  PRE CARGAR
+                </Text>
+              </View>
+              {!isWeb && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "center", // <-- importante
+                    marginBottom: 10,
+                  }}
+                >
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={() => {}}
+                  >
+                    <MaterialIcons
+                      name={"camera-alt"}
+                      size={24}
+                      color="black"
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
             <View style={styles.row}>
               <TextInput

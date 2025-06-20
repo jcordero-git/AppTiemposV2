@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
 import { useNavigation, useRoute } from "@react-navigation/native";
 
 import {
@@ -20,50 +26,8 @@ import { es } from "date-fns/locale"; // idioma español
 import { useAuth } from "../context/AuthContext";
 import { formatHourStr } from "../utils/datetimeUtils";
 
-export default function SorteosScreen({ navigation }) {
+const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
   const route = useRoute();
-
-  React.useLayoutEffect(() => {
-    const data = route.params?.data || {
-      sorteo: "No Sorteo",
-      fecha: "No Fecha",
-    };
-
-    navigation.setOptions({
-      title: "SORTEOS",
-      headerStyle: { backgroundColor: "#4CAF50" },
-      headerTintColor: "#fff",
-      headerRight: () => (
-        <>
-          <MaterialIcons
-            name="search"
-            size={24}
-            color="#fff" // Blanco para contraste con fondo verde
-            style={{ marginRight: 15 }}
-            onPress={() => {
-              Alert.alert(
-                "Datos del sorteo",
-                `Sorteo: ${data.sorteo}\nFecha: ${data.fecha}`,
-              );
-            }}
-          />
-          <MaterialIcons
-            name="sync"
-            size={24}
-            color="#fff" // Blanco para contraste con fondo verde
-            style={{ marginRight: 15 }}
-            onPress={() => {
-              Alert.alert(
-                "Datos del sorteo",
-                `Sorteo: ${data.sorteo}\nFecha: ${data.fecha}`,
-              );
-            }}
-          />
-        </>
-      ),
-    });
-  }, [navigation, route.params]);
-
   const { userData, logout } = useAuth();
 
   const [modalVisible, setModalVisible] = useState(false);
@@ -79,6 +43,35 @@ export default function SorteosScreen({ navigation }) {
   const isWeb = width > 768;
 
   const [items, setItems] = useState([]);
+
+  React.useLayoutEffect(() => {
+    if (!navigation?.setOptions) return;
+    const data = route.params?.data || {
+      sorteo: "No Sorteo",
+      fecha: "No Fecha",
+    };
+
+    navigation.setOptions({
+      title: "SORTEOS",
+      headerStyle: { backgroundColor: "#4CAF50" },
+      headerTintColor: "#fff",
+      headerRight: () => (
+        <>
+          <MaterialIcons
+            name="sync"
+            size={24}
+            color="#fff" // Blanco para contraste con fondo verde
+            style={{ marginRight: 15 }}
+            onPress={() => {
+              fetchSorteos();
+            }}
+          />
+        </>
+      ),
+    });
+  }, [navigation, route.params]);
+
+  
 
   // const formatHour = (timeStr) => {
   //   try {
@@ -106,41 +99,56 @@ export default function SorteosScreen({ navigation }) {
     </TouchableOpacity>
   );
 
+  // const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
+  //   const fetchSorteos = async () => {
+  //     console.log("syn desde sorteo layout screen");
+  //     fetchSorteosLocal();
+  //   };
+
+  //   useImperativeHandle(ref, () => ({
+  //     reloadSorteos: fetchSorteos,
+  //   }));
+  // });
+
+  const fetchSorteos = async () => {
+    try {
+      const response = await fetch(
+        `https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`,
+      );
+      const data = await response.json();
+      // Asegúrate de mapear los datos al formato que esperas en FlatList
+      console.log("Sorteos:", data);
+      // Ordenar por limitTime (hora) - más temprano primero
+      const sorteosOrdenados = data.sort((a, b) => {
+        const horaA = new Date(`1970-01-01T${a.limitTime}Z`);
+        const horaB = new Date(`1970-01-01T${b.limitTime}Z`);
+        return horaA - horaB;
+      });
+
+      console.log("Sorteos ordenados:", sorteosOrdenados);
+
+      const sorteosFormateados = sorteosOrdenados.map((item, index) => ({
+        key: item.id.toString(), // necesario para FlatList
+        id: item.id,
+        name: item.name || "Sin nombre",
+        prizeTimes: item.userValues?.prizeTimes || 0,
+        revPrizeTimes: item.userValues?.revPrizeTimes || 0,
+        limitTime: item.limitTime || "",
+        useReventado: item.useReventado,
+      }));
+      setItems(sorteosFormateados);
+      console.log("Sorteos formateados:", sorteosFormateados);
+    } catch (error) {
+      console.error("Error al obtener sorteos", error);
+      Alert.alert("Error", "No se pudieron cargar los sorteos.");
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    reloadSorteos: fetchSorteos,
+  }));
+
   useEffect(() => {
-    const fetchSorteos = async () => {
-      try {
-        const response = await fetch(
-          `https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`,
-        );
-        const data = await response.json();
-        // Asegúrate de mapear los datos al formato que esperas en FlatList
-        console.log("Sorteos:", data);
-        // Ordenar por limitTime (hora) - más temprano primero
-        const sorteosOrdenados = data.sort((a, b) => {
-          const horaA = new Date(`1970-01-01T${a.limitTime}Z`);
-          const horaB = new Date(`1970-01-01T${b.limitTime}Z`);
-          return horaA - horaB;
-        });
-
-        console.log("Sorteos ordenados:", sorteosOrdenados);
-
-        const sorteosFormateados = sorteosOrdenados.map((item, index) => ({
-          key: item.id.toString(), // necesario para FlatList
-          id: item.id,
-          name: item.name || "Sin nombre",
-          prizeTimes: item.userValues?.prizeTimes || 0,
-          revPrizeTimes: item.userValues?.revPrizeTimes || 0,
-          limitTime: item.limitTime || "",
-          useReventado: item.useReventado,
-        }));
-        setItems(sorteosFormateados);
-        console.log("Sorteos formateados:", sorteosFormateados);
-      } catch (error) {
-        console.error("Error al obtener sorteos", error);
-        Alert.alert("Error", "No se pudieron cargar los sorteos.");
-      }
-    };
-
     if (userData?.id) {
       fetchSorteos();
     }
@@ -162,7 +170,8 @@ export default function SorteosScreen({ navigation }) {
       </View>
     </View>
   );
-}
+});
+export default SorteosScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -170,7 +179,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingRight: 16,
     paddingLeft: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
     justifyContent: "flex-start",
   },
   header: {
@@ -206,7 +215,7 @@ const styles = StyleSheet.create({
   },
   formAndListContainer: {
     flexDirection: "column",
-    marginTop: 20,
+    marginTop: 12,
     flex: 1,
   },
   webLayout: {
@@ -235,6 +244,7 @@ const styles = StyleSheet.create({
   },
   itemRow: {
     borderBottomWidth: 1,
+    borderTopWidth: 1,
     borderColor: "#eee",
     paddingVertical: 12,
   },

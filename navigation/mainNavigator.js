@@ -13,7 +13,6 @@ const Stack = createNativeStackNavigator();
 
 export default function MainNavigator() {
   const context = useContext(AuthContext);
-  console.log("📦 CONTEXTO:", context); // ¿Te da `undefined`?
 
   const { userData, loading } = useContext(AuthContext);
 

@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { Ionicons } from "@expo/vector-icons";
-import { Alert } from "react-native"; // Importar Alert para mostrar el mensaje
+import { Alert, Platform, useWindowDimensions } from "react-native"; // Importar Alert para mostrar el mensaje
 
 import VentaScreen from "./VentaScreen";
 import PremiosScreen from "./PremiosScreen";
 import VentaGeneralScreen from "./VentaGeneralScreen";
 import HistorialScreen from "./HistorialScreen";
-import SorteosScreen from "./SorteosScreen";
+import SorteosScreen from "../screens/SorteosScreen";
+import SorteosLayoutScreen from "../screens/SorteosLayoutScreen";
 import ConfiguracionScreen from "./ConfiguracionScreen";
 
 const Drawer = createDrawerNavigator();
@@ -15,6 +16,8 @@ const Drawer = createDrawerNavigator();
 export default function DrawerNavigator() {
   const [sorteo, setSorteo] = useState(""); // Estado para Sorteo
   const [fecha, setFecha] = useState(new Date()); // Estado para Fecha
+  const { width } = useWindowDimensions();
+  const isWeb = Platform.OS === "web" && width > 768;
 
   return (
     <Drawer.Navigator
@@ -55,8 +58,8 @@ export default function DrawerNavigator() {
         options={{ drawerLabel: "HISTORIAL" }}
       />
       <Drawer.Screen
-        name="Sorteos"
-        component={SorteosScreen}
+        name="SORTEOS"
+        component={isWeb ? SorteosLayoutScreen : SorteosScreen}
         options={{ drawerLabel: "SORTEOS" }}
       />
       <Drawer.Screen

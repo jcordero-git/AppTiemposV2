@@ -11,6 +11,7 @@ import {
   ScrollView,
   useWindowDimensions,
   StyleSheet,
+  Platform,
 } from "react-native";
 import { useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -27,6 +28,8 @@ export default function SorteoDetalleScreen({ navigation, route }) {
   const isWeb = width > 710;
 
   useEffect(() => {
+    if (!sorteo || !userData) return;
+
     setHora(formatHourStr(sorteo.limitTime));
     if (typeof sorteo?.useReventado === "boolean")
       setReventar(sorteo.useReventado);
@@ -41,7 +44,7 @@ export default function SorteoDetalleScreen({ navigation, route }) {
         setFechaRestringida(tieneFecha);
       })
       .catch((err) => console.error("Error al cargar restricciones:", err));
-  }, []);
+  }, [sorteo, userData]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: sorteo.name });
@@ -76,7 +79,13 @@ export default function SorteoDetalleScreen({ navigation, route }) {
   return (
     <View style={styles.scrollContainer}>
       <View style={[styles.mainContainer, isWeb && styles.webLayout]}>
-        <View style={[styles.panel, isWeb && styles.webPanelLeft]}>
+        <View
+          style={[
+            styles.panel,
+            isWeb && styles.webPanelLeft,
+            isWeb && { width: "40%" },
+          ]}
+        >
           <TextInput
             value={sorteo?.name}
             editable={false}
@@ -165,6 +174,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     padding: 20,
     flex: 1,
+    pointerEvents: "none",
   },
   webLayout: {
     flexDirection: "row",
@@ -178,7 +188,7 @@ const styles = StyleSheet.create({
   },
   webPanelLeft: {
     marginRight: 20,
-    minWidth: 410,
+    minWidth: 320,
   },
   titleInput: {
     fontSize: 18,

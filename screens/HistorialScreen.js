@@ -621,6 +621,7 @@ export default function HistorialScreen({ navigation, route }) {
                   flexDirection: "row",
                   justifyContent: "center",
                   alignItems: "center", // opcional: centra verticalmente también
+                  pointerEvents: "none",
                 }}
               >
                 <TextInput
@@ -628,6 +629,7 @@ export default function HistorialScreen({ navigation, route }) {
                   value={formattedFechaDesde}
                   keyboardType="numeric"
                   editable={false}
+                  disabled={false}
                   style={[
                     styles.input,
                     {
@@ -643,6 +645,7 @@ export default function HistorialScreen({ navigation, route }) {
                   value={formattedFechaHasta}
                   keyboardType="numeric"
                   editable={false}
+                  disabled={false}
                   style={[
                     styles.input,
                     {
