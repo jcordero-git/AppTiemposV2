@@ -6,6 +6,7 @@ import { ActivityIndicator, View } from "react-native";
 
 import { AuthContext } from "../context/AuthContext";
 import LoginScreen from "../screens/LoginScreen";
+import ResetPasswordScreen from "../screens/ResetPasswordScreen";
 import DrawerNavigator from "../screens/DrawerNavigator";
 import SorteoDetalleScreen from "../screens/SorteoDetalleScreen";
 
@@ -53,6 +54,11 @@ export default function MainNavigator() {
             />
           </>
         )}
+        <Stack.Screen
+          name="ResetPassword"
+          component={ResetPasswordScreen}
+          options={{ title: "Restablecer Contraseña" }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

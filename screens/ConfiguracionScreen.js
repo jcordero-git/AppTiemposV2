@@ -44,6 +44,7 @@ import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
 import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
+import Constants from "expo-constants";
 
 export default function ConfiguracionScreen({ navigation, route }) {
   console.log("🎯 RENDER Configuracion Screen");
@@ -82,6 +83,8 @@ export default function ConfiguracionScreen({ navigation, route }) {
 
   const openMenuHeader = () => setMenuVisibleHeader(true);
   const closeMenuHeader = () => setMenuVisibleHeader(false);
+  const apkVersion =
+    Constants.manifest?.version || Constants.expoConfig?.version;
 
   //PROMESAS
   const resolverDialogRef = useRef(null);
@@ -152,6 +155,11 @@ export default function ConfiguracionScreen({ navigation, route }) {
     logout,
   } = useAuth();
 
+  const settingBackendURL = userData.settings.find(
+    (s) => s.backend_url !== undefined,
+  );
+  const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
+
   // El botón que actuará como anchor para el menú
   const MenuAnchor = (
     <TouchableOpacity onPress={openMenuHeader} style={{ marginRight: 10 }}>
@@ -209,6 +217,13 @@ export default function ConfiguracionScreen({ navigation, route }) {
             /> */}
             <Menu.Item
               onPress={() => {
+                handleCambiarContrasena();
+              }}
+              title="Cambiar contraseña"
+              titleStyle={{ color: "#000" }} // Texto negro opcional
+            />
+            <Menu.Item
+              onPress={() => {
                 closeMenuHeader();
                 logout();
               }}
@@ -246,13 +261,55 @@ export default function ConfiguracionScreen({ navigation, route }) {
 
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
+  const handleCambiarContrasena = async () => {
+    closeMenuHeader();
+    const tokenCambiarContrasena = await fetchTokenCambiarContrasena();
+    navigation.navigate("ResetPassword", {
+      token: tokenCambiarContrasena,
+    });
+  };
+
+  const fetchTokenCambiarContrasena = async () => {
+    setLoading(true);
+    const getTokenBody = { generatedBy: 0 };
+    if (userData) {
+      console.log("USUARIO A CAMBIAR CONTRASENA: ", userData.name);
+      let result;
+      try {
+        const url = `https://auth.tiempos.website/token/${userData.email}`;
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(getTokenBody),
+        });
+
+        if (!response.ok) {
+          showSnackbar("Error al generar token.", 3);
+          throw new Error(`Error al generar toen: ${response.status}`);
+        }
+        result = await response.json();
+        console.log("RESULT GET TOKEN: ", result);
+        showSnackbar("Token generado correctamente.", 1);
+        setLoading(false);
+        return result;
+      } catch (error) {
+        console.error("Error al generar token.", error);
+        showSnackbar("Error al generar token.", 3);
+        setLoading(false);
+        return null;
+      }
+    }
+  };
 
   const handleSave = async () => {
+    setLoading(true);
     if (ticketProfile) {
       console.log("TICKET PROFILE A GUARDAR: ", ticketProfile);
       let result;
       try {
-        const url = `https://3jbe.tiempos.website/api/ticketProfile/${ticketProfile?.userId}`;
+        const url = `${backend_url}/api/ticketProfile/${ticketProfile?.userId}`;
         const response = await fetch(url, {
           method: "PUT",
           headers: {
@@ -269,9 +326,11 @@ export default function ConfiguracionScreen({ navigation, route }) {
         console.log("RESULT DEL SAVE CONFIG: ", result);
         showSnackbar("La configuración fue guardada correctamente.", 1);
         await saveTicketProfile(ticketProfile);
+        setLoading(false);
       } catch (error) {
         console.error("Error al guardar la configuración.", error);
         showSnackbar("Error al guardar la configuración.", 3);
+        setLoading(false);
       }
     }
   };
@@ -303,7 +362,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
         { monto: "200000", numero: "34" },
         { monto: "50800", numero: "38" },
         { monto: "8400", numero: "32" },
-        {monto: 1100, numero: '74', reventado: true, montoReventado: 600},
+        { monto: 1100, numero: "74", reventado: true, montoReventado: 600 },
         { monto: "200", numero: "99" },
         { monto: "200", numero: "55" },
         { monto: "200", numero: "44" },
@@ -418,7 +477,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
                         marginTop: 15,
                         textAlign: "center",
                         height: 100, // altura inicial en píxeles
-                        maxHeight: 150, // altura máxima que puede crecer
+                        maxHeight: 350, // altura máxima que puede crecer
                         textAlignVertical: "top", // para que el texto inicie en la parte superior (Android)
                       },
                     ]}
@@ -592,7 +651,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
             {/* app version */}
             <View style={styles.totalBar}>
               <Text style={styles.totalText}>APP VERSION: </Text>
-              <Text style={styles.totalValue}>1.0</Text>
+              <Text style={styles.totalValue}>{apkVersion}</Text>
             </View>
           </View>
         </>
@@ -777,7 +836,7 @@ const styles = StyleSheet.create({
   switchGroup: {
     flexDirection: "column",
     gap: Platform.OS === "web" ? 10 : 0, // solo en web,, // espacio entre líneas si usás expo SDK 50+, si no usás marginBottom en el hijo
-    marginTop: Platform.OS === "web" ? 10 : 0,
+    marginTop: 10,
   },
   switchRow: {
     flexDirection: "row",

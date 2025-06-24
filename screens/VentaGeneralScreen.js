@@ -69,6 +69,11 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
   const [refreshHeader, setRefreshHeader] = useState(0);
   const { userData, logout } = useAuth();
+  const token = userData.token;
+  const settingBackendURL = userData.settings.find(
+    (s) => s.backend_url !== undefined,
+  );
+  const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
   const [modalVisible, setModalVisible] = useState(false);
   const [sorteoNombre, setSorteoNombre] = useState("");
@@ -238,7 +243,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
       );
       console.log("obteniendo tiempos vendidos: drawDate: ", drawDate);
       const response = await fetch(
-        `https://3jbe.tiempos.website/api/ticket/${drawCategoryId}/${drawDate}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}?token=${token}`,
       );
       const data = await response.json();
       console.log("tiempos obtenidos: ", data);
@@ -479,6 +484,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
                         sorteoId: sorteo.id,
                       }));
                     }}
+                    leftPosition={true}
                   />
 
                   {Platform.OS === "web" ? (
@@ -533,7 +539,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
             {/* Total */}
             <View style={styles.totalBar}>
               <Text style={styles.totalText}>TOTAL: </Text>
-              <Text style={styles.totalValue}>₡{montoTotal?.toFixed(2)}</Text>
+              <Text style={styles.totalValue}>₡{montoTotal?.toFixed(0)}</Text>
             </View>
           </View>
         </>

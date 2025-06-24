@@ -11,8 +11,15 @@ import {
   TouchableWithoutFeedback,
 } from "react-native";
 import React, { useState } from "react";
-import * as Device from "expo-device";
 import { useAuth } from "../context/AuthContext";
+import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
+import * as Device from "expo-device";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
+import * as Application from "expo-application";
+import * as SecureStore from "expo-secure-store";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { v4 as uuidv4 } from "uuid";
 
 export default function LoginScreen({ navigation }) {
   const { login, saveTicketProfile } = useAuth();
@@ -20,28 +27,85 @@ export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const { showSnackbar } = useSnackbar();
+
+  const getStoredUUID = async () => {
+    return "uuid";
+  };
+
+  const loginUser = async ({ username, password, imei, apkVersion }) => {
+    try {
+      console.log(
+        "body:",
+        JSON.stringify({ username, password, imei, apkVersion }),
+      );
+
+      const response = await fetch("https://auth.tiempos.website/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ username, password, imei, apkVersion }),
+      });
+
+      const data = await response.json();
+      console.log("SUCCESS: ", data.success);
+      if (data.success === false) {
+        console.warn("Usuario no encontrado.", data.message);
+        return null;
+      }
+
+      // Verifica si hay datos válidos
+      if (response.ok && data && Object.keys(data).length > 0) {
+        //console.log("Login exitoso:", data);
+        return data;
+      } else {
+        console.log("Credenciales incorrectas o sin respuesta");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error al hacer login:", error);
+      return null;
+    }
+  };
 
   const handleLogin = async () => {
     console.log("Email:", username); // 🔍 Imprime el resultado en la consola
     console.log("password:", password); // 🔍 Imprime el resultado en la consola
     setLoading(true); // Mostrar loader
 
+    const apkVersion =
+      Constants.manifest?.version || Constants.expoConfig?.version;
+    const imei = await getStoredUUID();
+    console.log("IMEI: ------------------", imei);
+
     const result = await loginUser({
-      email: username,
+      username: username,
       password,
-      emei: "123456789012345", // Puedes obtenerlo con expo-device si es real
-      apkVersion: "1.0.0",
+      imei: imei, // Puedes obtenerlo con expo-device si es real
+      apkVersion: apkVersion,
     });
 
     if (result) {
-      console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
-      await login(result); // guarda los datos globalmente
+      // console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
+      //  console.log("Respuesta del login user id:", result.id); // 🔍 Imprime el resultado en la consola
+      await login(result, username, password); // guarda los datos globalmente
+
+      console.log("RESULT********* TIEMPOS LOGIN", result);
+      console.log("TOKEN********* TIEMPOS LOGIN", result.token);
 
       // ✅ Obtener ticketProfile usando el ID del usuario
       const userId = result.id || result.userId; // depende del nombre exacto en la respuesta
       try {
+        const settingBackendURL = result.settings.find(
+          (s) => s.backend_url !== undefined,
+        );
+        const backend_url = settingBackendURL
+          ? settingBackendURL.backend_url
+          : "";
         const profileResponse = await fetch(
-          `https://3jbe.tiempos.website/api/ticketProfile/${userId}`,
+          `${backend_url}/api/ticketProfile/${userId}`,
         );
         if (profileResponse.ok) {
           const profileData = await profileResponse.json();
@@ -89,7 +153,8 @@ export default function LoginScreen({ navigation }) {
       //navigation.replace("Home", { userData: result });
     } else {
       setLoading(false);
-      Alert.alert("Error", "Usuario o contraseña incorrectos");
+      //Alert.alert("Error", "Usuario o contraseña incorrectos");
+      showSnackbar("Usuario o contraseña incorrectos", 3);
     }
   };
 
@@ -146,41 +211,17 @@ export default function LoginScreen({ navigation }) {
         >
           <Text style={styles.buttonText}>INICIAR SESIÓN</Text>
         </Pressable>
+        <Pressable onPress={() => navigation.navigate("ResetPassword")}>
+          <Text
+            style={{ marginTop: 15, color: "#4CAF50", textAlign: "center" }}
+          >
+            Restablecer Contraseña
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
 }
-
-const loginUser = async ({ email, password, emei, apkVersion }) => {
-  try {
-    console.log("Email:", email); // 🔍 Imprime el resultado en la consola
-    const response = await fetch(
-      "https://3jbe.tiempos.website/api/user/loginV2",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ email, password, emei, apkVersion }),
-      },
-    );
-    console.log("response: ", response);
-    const data = await response.json();
-
-    // Verifica si hay datos válidos
-    if (response.ok && data && Object.keys(data).length > 0) {
-      //console.log("Login exitoso:", data);
-      return data;
-    } else {
-      console.log("Credenciales incorrectas o sin respuesta");
-      return null;
-    }
-  } catch (error) {
-    console.error("Error al hacer login:", error);
-    return null;
-  }
-};
 
 const styles = StyleSheet.create({
   container: {

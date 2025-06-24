@@ -57,7 +57,7 @@ export const generateHTML = async (
           const grupo = numeros.slice(i, i + 3);
           rows.push(`
           <tr>
-            <td style="width: 60px;">${monto}</td>
+            <td style="width: 58px;">${monto}</td>
             <td>* ${grupo.join(",&nbsp;")}</td>
           </tr>
         `);
@@ -65,7 +65,7 @@ export const generateHTML = async (
       });
 
     return `
-      <table style="line-height: 0.6; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
+      <table style="line-height: 0.5; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
         ${rows.join("")}
       </table>
     `;
@@ -205,14 +205,14 @@ export const generateHTML = async (
         `
             : ""
         }
-
+        <div  style="line-height: 0.5;">
         <div class="divider"></div>
         <table style="width: 100%; line-height: 0.5; font-family: monospace; font-size: 20px; font-weight: bold; margin-top: 10px;">
-        <tr>
-          <td style="text-align: left;">TOTAL</td>
-          <td style="text-align: right;">${total}</td>
-        </tr>
-      </table>
+          <tr>
+            <td style="text-align: left;">TOTAL</td>
+            <td style="text-align: right;">${total}</td>
+          </tr>
+          </table>
         <div class="divider"></div>
 
         <table style="width: 100%; font-family:  monospace; font-size: 20px; margin-top: 0px;">
@@ -221,12 +221,19 @@ export const generateHTML = async (
           <td style="text-align: right;">${prizeTimes}</td>
         </tr>
       </table>
+       ${
+         sorteoSeleccionado.useReventado === true
+           ? `
       <table style="width: 100%; font-family: monospace; font-size: 20px; margin-top: 2px;">
         <tr>
           <td style="text-align: left;">REVENTADO</td>
           <td style="text-align: right;">${revPrizeTimes}</td>
         </tr>
       </table>
+      `
+           : ""
+       }   
+       </div>
 
       <h3 style="width: 100%; font-family:  monospace; font-size: 18px; margin-top: 8px;">${ticketProfile.ticketTitle}</h3>
 

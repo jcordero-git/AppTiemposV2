@@ -36,6 +36,10 @@ export default function HistorialScreen({ navigation, route }) {
   const { showSnackbar } = useSnackbar();
   console.log("🎯 RENDER Historial Screen");
   const { userData } = useAuth();
+  const settingBackendURL = userData.settings.find(
+    (s) => s.backend_url !== undefined,
+  );
+  const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
   const [showPickerDesde, setShowPickerDesde] = useState(false);
   const [showPickerHasta, setShowPickerHasta] = useState(false);
 
@@ -113,7 +117,7 @@ export default function HistorialScreen({ navigation, route }) {
         <View style={styles.itemRow}>
           <Text style={styles.itemTitle}>{item.description}</Text>
           <Text style={styles.itemSubtitle}>
-            Monto: ₡{item.amount + item.revAmount}
+            Monto: ₡{Number(item.amount + item.revAmount).toFixed(0)}
           </Text>
         </View>
         <View style={styles.itemRow}>
@@ -142,14 +146,14 @@ export default function HistorialScreen({ navigation, route }) {
                 <Text style={styles.circleText}>#{item.priceNumber}</Text>
               </View>
               <Text style={styles.itemSubtitle}>
-                Premios: ₡{item.price + item.revPrice}
+                Premios: ₡{Number(item.price + item.revPrice).toFixed(0)}
               </Text>
             </View>
           </View>
         )}
         <View style={styles.itemRow}>
           <Text></Text>
-          <Text style={styles.itemSubtitle}>Subtotal: ₡{item.subTotal}</Text>
+          <Text style={styles.itemSubtitle}>Subtotal: ₡{Number(item.subTotal).toFixed(0)}</Text>
         </View>
         <View style={styles.itemRow}>
           <Text></Text>
@@ -262,7 +266,7 @@ export default function HistorialScreen({ navigation, route }) {
     );
     try {
       const drawsResponse = await fetch(
-        `https://3jbe.tiempos.website/api/draw/consolidated/${desde}/${hasta}?userId=${userData.id}`,
+        `${backend_url}/api/draw/consolidated/${desde}/${hasta}?userId=${userData.id}`,
       );
       const dataDraws = await drawsResponse.json();
       console.log("dataDraws api: ", dataDraws);
@@ -555,7 +559,7 @@ export default function HistorialScreen({ navigation, route }) {
               { color: total < 0 ? "red" : total > 0 ? "green" : "black" },
             ]}
           >
-            ₡{total.toFixed(2)}
+            ₡{total.toFixed(0)}
           </Text>
         </View>
       </View>
@@ -662,7 +666,7 @@ export default function HistorialScreen({ navigation, route }) {
                 <View style={{ flexDirection: "row", marginBottom: 4 }}>
                   <Text style={styles.labelLeft}>VENTA:</Text>
                   <Text style={styles.labelRight}>
-                    ₡{ventaTotalFloat.toFixed(2)}
+                    ₡{ventaTotalFloat.toFixed(0)}
                   </Text>
                 </View>
 
@@ -670,7 +674,7 @@ export default function HistorialScreen({ navigation, route }) {
                 <View style={{ flexDirection: "row", marginBottom: 4 }}>
                   <Text style={styles.labelLeft}>COMISIÓN:</Text>
                   <Text style={styles.labelRight}>
-                    ₡{comisionTotalFloat.toFixed(2)}
+                    ₡{comisionTotalFloat.toFixed(0)}
                   </Text>
                 </View>
 
@@ -678,7 +682,7 @@ export default function HistorialScreen({ navigation, route }) {
                 <View style={{ flexDirection: "row", marginBottom: 4 }}>
                   <Text style={styles.labelLeft}>PREMIOS:</Text>
                   <Text style={styles.labelRight}>
-                    ₡{premiosTotalFloat.toFixed(2)}
+                    ₡{premiosTotalFloat.toFixed(0)}
                   </Text>
                 </View>
               </View>

@@ -21,6 +21,10 @@ export default function SorteoSelectorModal({
   leftPosition,
 }) {
   const { userData } = useAuth();
+  const settingBackendURL = userData.settings.find(
+    (s) => s.backend_url !== undefined,
+  );
+  const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
   const [sorteoItems, setSorteoItems] = useState([]);
   //console.log("User desde modal:", userData.id);
   /** @type {mSorteo[]} */
@@ -31,7 +35,7 @@ export default function SorteoSelectorModal({
 
   useEffect(() => {
     if (visible) {
-      fetch(`https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`)
+      fetch(`${backend_url}/api/drawCategory/user/${userData.id}`)
         .then((res) => {
           return res.json();
         })

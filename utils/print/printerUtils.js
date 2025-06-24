@@ -258,7 +258,6 @@ class PrinterUtils {
     //const barcodeValue = `${String(sorteoSeleccionado.id).padStart(3, "0")}-${formatBarcodeDate(drawDate)}-${codigo.toString().padStart(3, "0")}`;
     const barcodeValue = `${codigo.toString().padStart(3, "0")}`;
 
-
     // Alineación de texto
     const ALIGN_LEFT = Buffer.from([0x1b, 0x61, 0x00]); // Alinear a la izquierda
     const ALIGN_CENTER = Buffer.from([0x1b, 0x61, 0x01]); // Centrar texto
@@ -383,12 +382,14 @@ class PrinterUtils {
     parts.push(
       Buffer.from(alignLeftRight("PAGAMOS", prizeTimes.toString()), "ascii"),
     );
-    parts.push(
-      Buffer.from(
-        alignLeftRight("REVENTADOS", revPrizeTimes.toString()),
-        "ascii",
-      ),
-    );
+    if (sorteoSeleccionado.useReventado === true) {
+      parts.push(
+        Buffer.from(
+          alignLeftRight("REVENTADOS", revPrizeTimes.toString()),
+          "ascii",
+        ),
+      );
+    }
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center

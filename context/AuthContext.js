@@ -28,9 +28,14 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  const login = async (data) => {
-    setUserData(data);
-    await AsyncStorage.setItem("userData", JSON.stringify(data));
+  const login = async (data, username, password) => {
+    const fullData = {
+      ...data,
+      username,
+      password,
+    };
+    setUserData(fullData);
+    await AsyncStorage.setItem("userData", JSON.stringify(fullData));
   };
 
   const saveTicketProfile = async (profile) => {

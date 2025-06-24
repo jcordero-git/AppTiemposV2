@@ -57,6 +57,7 @@ import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
 import mSorteoSingleton from "../models/mSorteoSingleton.js";
+import Constants from "expo-constants";
 import {
   getInternetDate,
   getUpdatedInternetDate,
@@ -76,7 +77,7 @@ export default function VentaScreen({ navigation, route }) {
   const iframeRef = useRef(null);
   const [generateImage, setGenerateImage] = useState(false);
 
-  const { showSnackbar } = useSnackbar();
+  const { showSnackbar, showConfirm } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
@@ -104,8 +105,22 @@ export default function VentaScreen({ navigation, route }) {
 
   const [categoriasMontoTemporal, setCategoriasMontoTemporal] =
     useState(categoriasMonto);
+  const { tiempo, setTiempo, resetTiempo, setClientName } = useTiempo();
+  const { userData, logout, ticketProfile, login, saveTicketProfile } =
+    useAuth();
+  const token = userData.token;
 
   const menuAnchorRef = useRef(null);
+  const settingBackendURL = userData.settings.find(
+    (s) => s.backend_url !== undefined,
+  );
+  const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
+  const settingPorcentakeRevRestringido = userData.settings.find(
+    (s) => s.porcentaje_reventado_restringido !== undefined,
+  );
+
+  //const corsProxy = "https://cors-anywhere.herokuapp.com/";
+  //const corsProxy = "";
 
   useFocusEffect(
     useCallback(() => {
@@ -165,7 +180,8 @@ export default function VentaScreen({ navigation, route }) {
   const actualizaRestringidos = async () => {
     // Paso 1: Obtener restricciones
     const response = await fetch(
-      `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+      //`https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+      `${backend_url}/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
     );
     const data = await response.json();
 
@@ -219,7 +235,7 @@ export default function VentaScreen({ navigation, route }) {
     if (categoriaSeleccionada !== "Extraer de Texto") {
       montoTemp = parseInt(categoriasMonto);
       if (!validateMonto(montoTemp)) {
-        Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
+        //Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
         return;
       }
     }
@@ -289,11 +305,14 @@ export default function VentaScreen({ navigation, route }) {
       setLoading(true); // Mostrar loader
 
       try {
+        const userDataUpdated = await handleLogin();
+
         const runGeminiExample = async () => {
-          const setting = userData.settings.find(
+          const setting = userDataUpdated.settings.find(
             (s) => s.promt_extrae !== undefined,
           );
           const prompt = setting ? setting.promt_extrae : "";
+
           const day = new Date().getDate();
           const extraPrompt = prompt;
           const text = categoriasExtraerTexto;
@@ -314,8 +333,9 @@ export default function VentaScreen({ navigation, route }) {
             tiemposAnteriores,
           );
         }
+        //setLoading(false);
       } finally {
-        setLoading(false);
+        // setLoading(false);
       }
     }
 
@@ -336,6 +356,127 @@ export default function VentaScreen({ navigation, route }) {
     setCategoriasDesde("");
     setCategoriasHasta("");
     setCategoriasExtraerTexto("");
+    setLoading(false);
+  };
+
+  const loginUser = async ({ username, password, imei, apkVersion }) => {
+    try {
+      console.log(
+        "body:",
+        JSON.stringify({ username, password, imei, apkVersion }),
+      );
+
+      const response = await fetch("https://auth.tiempos.website/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ username, password, imei, apkVersion }),
+      });
+
+      const data = await response.json();
+      console.log("SUCCESS: ", data.success);
+      if (data.success === false) {
+        console.warn("Usuario no encontrado.", data.message);
+        return null;
+      }
+
+      // Verifica si hay datos válidos
+      if (response.ok && data && Object.keys(data).length > 0) {
+        //console.log("Login exitoso:", data);
+        return data;
+      } else {
+        console.log("Credenciales incorrectas o sin respuesta");
+        return null;
+      }
+    } catch (error) {
+      console.error("Error al hacer login:", error);
+      return null;
+    }
+  };
+
+  const getStoredUUID = async () => {
+    return "uuid";
+  };
+
+  const handleLogin = async () => {
+    //setLoading(true); // Mostrar loader
+
+    const apkVersion =
+      Constants.manifest?.version || Constants.expoConfig?.version;
+    const imei = await getStoredUUID();
+    console.log("IMEI: ------------------", imei);
+
+    const result = await loginUser({
+      username: userData.username,
+      password: userData.password,
+      imei: imei, // Puedes obtenerlo con expo-device si es real
+      apkVersion: apkVersion,
+    });
+
+    if (result) {
+      // console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
+      //  console.log("Respuesta del login user id:", result.id); // 🔍 Imprime el resultado en la consola
+      await login(result, userData.username, userData.password); // guarda los datos globalmente
+
+      // ✅ Obtener ticketProfile usando el ID del usuario
+      const userId = result.id || result.userId; // depende del nombre exacto en la respuesta
+      try {
+        const profileResponse = await fetch(
+          `${backend_url}/api/ticketProfile/${userId}`,
+        );
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+
+          if (Object.keys(profileData).length === 0) {
+            // ✅ Si no hay ticketProfile, crear uno por defecto
+            const defaultProfile = {
+              userId,
+              ticketTitle: "",
+              sellerName: result.name || "", // usa nombre del login
+              phoneNumber: result.phone || "", // usa teléfono del login
+              ticketFooter: "",
+              printerSize: "58",
+              lastPrinterMacAddress: "",
+              printBarCode: true,
+            };
+
+            console.log("Creando ticketProfile por defecto:", defaultProfile);
+            await saveTicketProfile(defaultProfile);
+          } else {
+            console.log("Ticket Profile encontrado:", profileData);
+            await saveTicketProfile(profileData);
+          }
+        } else {
+          // ⚠️ Error del servidor o no encontrado → crear por defecto también
+          const defaultProfile = {
+            userId,
+            ticketTitle: "",
+            sellerName: result.name || "",
+            phoneNumber: result.phone || "",
+            ticketFooter: "",
+            printerSize: "58",
+            lastPrinterMacAddress: "",
+            printBarCode: true,
+          };
+
+          console.warn("No se encontró ticketProfile, se usará default");
+          await saveTicketProfile(defaultProfile);
+        }
+      } catch (err) {
+        console.error("Error al obtener ticketProfile:", err);
+      }
+
+      //setLoading(false); // Mostrar loader
+      return result;
+      //navigation.replace("Home", { userData: result });
+    } else {
+      setLoading(false);
+      //Alert.alert("Error", "Usuario o contraseña incorrectos");
+      showSnackbar("Usuario o contraseña incorrectos", 3);
+      return null;
+    }
   };
 
   // 🔹 MÉTODOS DEL DROPDOWN
@@ -350,9 +491,6 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   useEffect(() => {}, [categoriaDialogVisible]);
-
-  const { tiempo, setTiempo, resetTiempo, setClientName } = useTiempo();
-  const { userData, logout, ticketProfile } = useAuth();
 
   // El botón que actuará como anchor para el menú
   const MenuAnchor = (
@@ -425,16 +563,16 @@ export default function VentaScreen({ navigation, route }) {
             anchor={MenuAnchor}
             contentStyle={{ backgroundColor: "white", marginRight: 15 }} // Fondo blanco
           >
-            {tiempoSeleccionado && tiempoSeleccionado.id > 0 && (
-              <Menu.Item
-                onPress={() => {
-                  closeMenuHeader();
-                  handleNuevoTiempo();
-                }}
-                title="Nuevo Tiempo"
-                titleStyle={{ color: "green" }}
-              />
-            )}
+            {/* {tiempoSeleccionado && tiempoSeleccionado.id > 0 && ( */}
+            <Menu.Item
+              onPress={() => {
+                closeMenuHeader();
+                handleNuevoTiempo();
+              }}
+              title="Nuevo Tiempo"
+              titleStyle={{ color: "green" }}
+            />
+            {/* )} */}
             <Menu.Item
               onPress={() => {
                 closeMenuHeader();
@@ -499,7 +637,8 @@ export default function VentaScreen({ navigation, route }) {
   const fetchRestringidosBySorteoID = async () => {
     // Paso 1: Obtener restricciones
     const response = await fetch(
-      `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+      //`https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+      `${backend_url}/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
     );
     const data = await response.json();
 
@@ -548,7 +687,7 @@ export default function VentaScreen({ navigation, route }) {
           tiemposVendidos,
         );
 
-        let [allowRestringidoReventado, montoDisponibleReventado] =
+        const [allowRestringidoReventado, montoDisponibleReventado] =
           allowRestringidoReventadoFunction(
             numeroLimpio,
             0,
@@ -588,17 +727,18 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const fetchTiempoByID = async (code) => {
-    const token = userData.token;
     try {
       if (code === 0) {
         return null;
       }
       const response = await fetch(
-        `https://3jbe.tiempos.website/api/ticket/${code}`,
+        //`https://3jbe.tiempos.website/api/ticket/${code}`,
+        `${backend_url}/api/ticket/${code}?token=${token}`,
+
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${token}`,
+            //"X-Access-Token": `${token}`,
             "Content-Type": "application/json",
           },
         },
@@ -621,12 +761,14 @@ export default function VentaScreen({ navigation, route }) {
     }
   };
 
-  const handleBorrarTiempo = async (id) => {
-    const url = `https://3jbe.tiempos.website/api/ticket/${id}`;
+  const fetchDeleteTiempo = async (id) => {
+    const url = `${backend_url}/api/ticket/${id}?token=${token}`;
+
     try {
       const response = await fetch(url, {
         method: "DELETE",
         headers: {
+          //"x-access-token": `${token}`,
           "Content-Type": "application/json",
         },
         // body: JSON.stringify(tiempoParaImprimir),
@@ -655,9 +797,16 @@ export default function VentaScreen({ navigation, route }) {
       setMostrarCampos(true);
     } catch (error) {
       console.error("Error al enviar el ticket:", error);
-      Alert.alert("Error", "No se pudo eliminar el ticket.");
+      //Alert.alert("Error", "No se pudo eliminar el ticket.");
       showSnackbar("Error al eliminar el ticket.", 3);
     }
+  };
+
+  const handleBorrarTiempo = async (id) => {
+    showConfirm({
+      message: "¿Estás seguro de que deseas eliminar este ticket?",
+      onConfirm: () => fetchDeleteTiempo(id),
+    });
   };
 
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
@@ -731,15 +880,6 @@ export default function VentaScreen({ navigation, route }) {
 
   const formattedDate = formatDate(fecha, "EE dd/MM/yyyy");
 
-  const handleImagePress = () => {
-    const mensaje = JSON.stringify(tiempoRef.current, null, 2);
-    if (Platform.OS === "web") {
-      window.alert(`Contenido de "tiempo":\n${mensaje}`);
-    } else {
-      Alert.alert("Contenido de 'tiempo'", mensaje);
-    }
-  };
-
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
     if (selectedDate) {
@@ -781,13 +921,18 @@ export default function VentaScreen({ navigation, route }) {
       }));
       actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
     };
+    if (numero.length === 0) {
+      showSnackbar("Debe ingresar un número válido.", 3);
+      numeroRef.current.focus();
+      return;
+    }
     submitReventar();
   };
 
   const fetchSorteos = async (sorteoSeleccionado) => {
     try {
       const res = await fetch(
-        `https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`,
+        `${backend_url}/api/drawCategory/user/${userData.id}`,
       );
       const data = await res.json();
 
@@ -925,11 +1070,12 @@ export default function VentaScreen({ navigation, route }) {
           return; // ⛔ No continúa si hay errores
         }
         const tiempoParaImprimir = resultado;
-        const url = `https://3jbe.tiempos.website/api/ticket/`;
+        const url = `${backend_url}/api/ticket?token=${token}`;
 
         const response = await fetch(url, {
           method: "POST",
           headers: {
+            //"x-access-token": `${token}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(tiempoParaImprimir),
@@ -973,7 +1119,7 @@ export default function VentaScreen({ navigation, route }) {
       setIsSharing(false); // Estado visual
     } catch (error) {
       console.error("Error al enviar el ticket:", error);
-      Alert.alert("Error", "No se pudo enviar el ticket.");
+      // Alert.alert("Error", "No se pudo enviar el ticket.");
       showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
       setLoaded(false);
     } finally {
@@ -1392,49 +1538,16 @@ export default function VentaScreen({ navigation, route }) {
     });
 
     if (restriccionViolada) {
-      Alert.alert(
-        "Restricción activa",
-        `El monto para el número ${numero} debe ser mínimo ₡${restriccionViolada.restrictedAmount}.`,
-      );
+      // Alert.alert(
+      //   "Restricción activa",
+      //   `El monto para el número ${numero} debe ser mínimo ₡${restriccionViolada.restrictedAmount}.`,
+      // );
       return true; // Hubo una violación
     }
     return false; // Todo bien
   };
 
-  const fetchTiemposAnteriores_insecure = async (drawCategoryId, drawDate) => {
-    const token = userData.token;
-    try {
-      if (drawCategoryId === 0 || !drawDate) {
-        return {
-          tiemposVendidos: [],
-          lastTicketNumber: 0,
-        };
-      }
-      const response = await fetch(
-        `https://3jbe.tiempos.website/api/ticket/${drawCategoryId}/${drawDate}`,
-      );
-      const data = await response.json();
-      const sortedData = data.sort((a, b) => b.id - a.id);
-      setTiemposAnteriores(sortedData);
-      const ticketNumbers = sortedData
-        .map((item) => item.id)
-        .filter((n) => typeof n === "number" && n > 0);
-
-      const lastTicketNumber =
-        ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
-
-      return {
-        tiemposVendidos: sortedData,
-        lastTicketNumber,
-      };
-    } catch (error) {
-      console.error("Error al cargar tiempos anteriores:", error);
-      return [[], 0]; // ✅ fallback seguro
-    }
-  };
-
   const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
-    const token = userData.token;
     try {
       if (drawCategoryId === 0 || !drawDate) {
         return {
@@ -1442,20 +1555,30 @@ export default function VentaScreen({ navigation, route }) {
           lastTicketNumber: 0,
         };
       }
+      console.log("TOKEN********* TIEMPOS VENDIDOS", token);
+
       const response = await fetch(
-        `https://3jbe.tiempos.website/api/ticket/${drawCategoryId}/${drawDate}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}?token=${token}`,
         {
           method: "GET",
           headers: {
-            Authorization: `Bearer ${token}`,
+            //"x-access-token": `${token}`,
             "Content-Type": "application/json",
           },
         },
       );
+      if (response.status === 403) {
+        showSnackbar("⚠️ El usuario no tiene permisos.");
+        logout();
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
 
       if (response.status !== 200) {
         console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
-        showSnackbar("⚠️ Error al obtener tiempos: Status: ", response.status);
+        showSnackbar("⚠️ Error al obtener tiempos vendidos");
         logout();
         return {
           tiemposVendidos: [],
@@ -1581,11 +1704,13 @@ export default function VentaScreen({ navigation, route }) {
       ) {
         montoDisponible =
           montoAllowed -
-          totalPorNumero_TiemposVendidos +
-          totalPorNumero_AlreadyInserted;
+          (totalPorNumero_TiemposVendidos + totalPorNumero_AlreadyInserted);
         return [false, montoDisponible];
       } else {
-        return [true, montoAllowed];
+        montoDisponible =
+          montoAllowed -
+          (totalPorNumero_TiemposVendidos + totalPorNumero_AlreadyInserted);
+        return [true, montoDisponible];
       }
     }
   }
@@ -1630,7 +1755,7 @@ export default function VentaScreen({ navigation, route }) {
 
       // Paso 1: Obtener restricciones
       const response = await fetch(
-        `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
+        `${backend_url}/api/restrictedNumbers/byUser/${userData.id}/${mSorteo.id}`,
       );
       const data = await response.json();
 
@@ -1827,7 +1952,7 @@ export default function VentaScreen({ navigation, route }) {
     if (!reventar) {
       if (numero.length === 2) {
         if (monto.trim() === "" || numero.trim() === "") {
-          Alert.alert("Error", "Debe ingresar monto y número válidos.");
+          //Alert.alert("Error", "Debe ingresar monto y número válidos.");
           return;
         }
         tiempoNumerosBackup = tiempoRef.current;
@@ -1860,7 +1985,7 @@ export default function VentaScreen({ navigation, route }) {
       } else if (numero.length > 2) {
         // Si el número tiene más de 2 dígitos, limpiamos el campo
         setNumero(""); // Limpiar número si tiene más de 2 dígitos
-        Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
+        //Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
       }
     } else {
       if (numero.length === 2 && useReventado) {
@@ -2005,7 +2130,7 @@ export default function VentaScreen({ navigation, route }) {
                     placeholder="Nombre Cliente"
                     style={styles.input}
                     value={tiempo.clientName}
-                    onChangeText={(text) => setClientName(text.toUpperCase())}
+                    onChangeText={(text) => setClientName(text)}
                     editable={!camposBloqueados}
                   />
                 </View>
@@ -2069,10 +2194,10 @@ export default function VentaScreen({ navigation, route }) {
                               setIsMontoLocked(true); // Bloquear el campo
                               numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
                             } else {
-                              Alert.alert(
-                                "Monto inválido",
-                                "Debe ser un múltiplo de 50.",
-                              );
+                              // Alert.alert(
+                              //   "Monto inválido",
+                              //   "Debe ser un múltiplo de 50.",
+                              // );
                               showSnackbar("Debe ingresar un monto válido.", 3);
                             }
                           }
@@ -2231,10 +2356,10 @@ export default function VentaScreen({ navigation, route }) {
                               isNaN(montoReventadoNum) ||
                               !validateMonto(montoReventadoNum)
                             ) {
-                              Alert.alert(
-                                "Monto inválido",
-                                "Debe ser un múltiplo de 50.",
-                              );
+                              // Alert.alert(
+                              //   "Monto inválido",
+                              //   "Debe ser un múltiplo de 50.",
+                              // );
                               showSnackbar("Debe ingresar un monto válido.", 3);
                               window.setTimeout(() => {
                                 reventarRef.current?.focus();
@@ -2304,90 +2429,50 @@ export default function VentaScreen({ navigation, route }) {
             </View>
             {/* Total */}
             <View style={styles.totalBar}>
-              <Pressable
-                onPress={() => {
-                  handleMuestraRestringidosDisponibles();
-                }}
-                onHoverIn={() => Platform.OS === "web" && setHovered(true)}
-                onHoverOut={() => Platform.OS === "web" && setHovered(false)}
-                style={styles.iconButtonRestringidos}
-              >
-                <MaterialIcons name="warning" size={20} color="red" />
-              </Pressable>
-              <RestringidosModal
-                visible={restringidosModalVisible}
-                onClose={() => setRestringidosModalVisible(false)}
-                onSelect={(sorteo) => {}}
-                data={restringidosDisponibles}
-                useReventado={mSorteo.useReventado}
-              />
-              {hovered && (
-                <View style={styles.tooltip}>
-                  <Text style={styles.tooltipText}>
-                    Ver números restingidos
-                  </Text>
+              <View style={{ flexDirection: "row", width: "100%" }}>
+                <View style={{ flex: 1 }}>
+                  {mostrarCampos && (
+                    <>
+                      <Pressable
+                        onPress={() => {
+                          handleMuestraRestringidosDisponibles();
+                        }}
+                        onHoverIn={() =>
+                          Platform.OS === "web" && setHovered(true)
+                        }
+                        onHoverOut={() =>
+                          Platform.OS === "web" && setHovered(false)
+                        }
+                        style={styles.iconButtonRestringidos}
+                      >
+                        <MaterialIcons name="warning" size={20} color="red" />
+                      </Pressable>
+                      <RestringidosModal
+                        visible={restringidosModalVisible}
+                        onClose={() => setRestringidosModalVisible(false)}
+                        onSelect={(sorteo) => {}}
+                        data={restringidosDisponibles}
+                        useReventado={mSorteo.useReventado}
+                      />
+                      {hovered && (
+                        <View style={styles.tooltip}>
+                          <Text style={styles.tooltipText}>
+                            Ver números restingidos
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )}
                 </View>
-              )}
-
-              <View style={styles.totalTextGroup}>
-                <Text style={styles.totalText}>TOTAL: </Text>
-                <Text style={styles.totalValue}>₡{total?.toFixed(2)}</Text>
+                <View style={styles.totalTextGroup}>
+                  <Text style={styles.totalText}>TOTAL: </Text>
+                  <Text style={styles.totalValue}>₡{total?.toFixed(0)}</Text>
+                </View>
               </View>
             </View>
           </View>
         </>
       </View>
-      {/* {html && (
-        <View>
-          <View
-            ref={ticketRef}
-            collapsable={false}
-            style={{
-              position: "absolute",
-              top: -1000,
-              width: 250, // 58mm aprox.
-              height: webviewHeight,
-              backgroundColor: "white",
-              opacity: 0, // siempre oculto
-              pointerEvents: "none",
-              overflow: "hidden", // evita barras de scroll
-            }}
-          >
-            <WebView
-              originWhitelist={["*"]}
-              source={{ html }}
-              onLoadEnd={() => setLoaded(true)}
-              scalesPageToFit={false}
-              onMessage={(event) => {
-                const height = parseInt(event.nativeEvent.data, 10);
-                setWebviewHeight(height);
-                setLoaded(true);
-              }}
-              injectedJavaScript={`
-          const meta = document.createElement('meta');
-          meta.setAttribute('name', 'viewport');
-          meta.setAttribute('content', 'width=250, initial-scale=1, maximum-scale=1, user-scalable=no');
-          document.head.appendChild(meta);
-          document.body.style.margin = '0';
-          document.body.style.padding = '15px';
-          document.documentElement.style.overflow = 'hidden';
-
-          setTimeout(() => {
-            const height = document.body.scrollHeight;
-            window.ReactNativeWebView.postMessage(height.toString());
-          }, 50);
-          true;
-        `}
-              style={{
-                width: 250,
-                height: webviewHeight,
-                backgroundColor: "white",
-              }}
-            />
-          </View>
-        </View>
-      )} */}
-
       <Portal>
         {/* Diálogo print */}
         <Dialog
@@ -2414,7 +2499,7 @@ export default function VentaScreen({ navigation, route }) {
             },
           ]}
         >
-          {/* Diálogo Restringido */}
+          {/* Diálogo Print */}
           <Dialog.Content>
             {html && (
               <View
@@ -2429,7 +2514,7 @@ export default function VentaScreen({ navigation, route }) {
                   ref={ticketRef}
                   collapsable={false}
                   style={{
-                    width: 245,
+                    width: 230,
                     backgroundColor: "white",
                     borderWidth: 1,
                     borderColor: "#ccc",
@@ -2456,11 +2541,11 @@ export default function VentaScreen({ navigation, route }) {
                         <head>
                           <meta name="viewport", initial-scale=1.0">
                           <style>
-                            body { margin-left: 0px; padding: 0px; box-sizing: border-box; }
+                            body { width:58mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
                             .wrapper {
                               // margin-left: 5px;
                               //justify-content: "center"
-                              //width: 58mm;
+                              //width: 60mm;
                               }
                           </style>
                           <script>
@@ -2498,6 +2583,7 @@ export default function VentaScreen({ navigation, route }) {
                     `}
                       style={{
                         width: "100%",
+                        //width: 240,
                         height: iframeHeight,
                         border: "none",
                         display: "block",
@@ -2692,88 +2778,6 @@ export default function VentaScreen({ navigation, route }) {
               }}
             >
               IMPRIMIR
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        {/* Diálogo Restringido */}
-        <Dialog
-          visible={
-            dialogRestringidoVisible &&
-            !ejecutadoPorRestringidoDialogRef.current
-          }
-          onDismiss={closeDialogRestringido}
-          style={[
-            {
-              backgroundColor: "white",
-              borderRadius: 10,
-              marginHorizontal: 20,
-            },
-            isWeb && {
-              position: "absolute",
-              right: 0,
-              top: 10,
-              width: 400,
-              maxHeight: "90%",
-              elevation: 4,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.3,
-              shadowRadius: 4,
-            },
-          ]}
-        >
-          {/* Diálogo Restringido */}
-          <Dialog.Content>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 10,
-              }}
-            >
-              <MaterialIcons name="warning" size={35} color="red" />
-              <Text
-                style={{
-                  marginLeft: 8,
-                  fontWeight: "bold",
-                  color: "#000",
-                  fontSize: 18,
-                }}
-              >
-                RESTRINGIDO
-              </Text>
-            </View>
-            <View style={{ maxHeight: height * 0.6 }}>
-              <Text>
-                El número {abiertoPorReventado && <Text>reventado </Text>}
-                <Text style={{ fontWeight: "bold" }}>
-                  ({dialogNumeroRestringido}){" "}
-                </Text>
-                es restringido y con la venta actual sobrepasaría el límite.
-                {"\n"}
-                El monto disponible es de:{" "}
-                <Text style={{ fontWeight: "bold" }}>
-                  {dialogMontoRestringidoDisponible}
-                </Text>
-              </Text>
-            </View>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button
-              textColor="red"
-              style={{
-                backgroundColor: "white", // Fondo blanco
-                marginBottom: 10,
-                borderRadius: 3,
-              }}
-              onPress={() => {
-                //setDialogRestringidoVisible(false);
-                closeDialogRestringido();
-                resolverDialogRef.current?.(); // Resuelve la promesa
-              }}
-            >
-              CERRAR
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -3150,6 +3154,7 @@ export default function VentaScreen({ navigation, route }) {
               top: 10,
               width: 400,
               maxHeight: "90%",
+              zIndex: 1,
               elevation: 4, // sombra en Android
               shadowColor: "#000", // sombra en iOS
               shadowOffset: { width: 0, height: 2 },
@@ -3284,19 +3289,90 @@ export default function VentaScreen({ navigation, route }) {
             </Button>
           </Dialog.Actions>
         </Dialog>
-      </Portal>
 
-      {/* <PreCargarModal
-        visible={modalVisiblePreCargar}
-        onClose={() => {
-          setModalVisiblePreCargar(false);
-          closeMenuHeader();
-        }}
-        onSelect={(resultado) => {
-          handlePreCargaTiempo(resultado);
-          setModalVisiblePreCargar(false);
-        }}
-      /> */}
+        {/* Diálogo Restringido */}
+        <Dialog
+          visible={
+            dialogRestringidoVisible &&
+            !ejecutadoPorRestringidoDialogRef.current
+          }
+          onDismiss={closeDialogRestringido}
+          style={[
+            {
+              backgroundColor: "white",
+              borderRadius: 10,
+              marginHorizontal: 20,
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 6,
+              zIndex: 9999,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          {/* Diálogo Restringido */}
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons name="warning" size={35} color="red" />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                RESTRINGIDO
+              </Text>
+            </View>
+            <View style={{ maxHeight: height * 0.6 }}>
+              <Text>
+                El número {abiertoPorReventado && <Text>reventado </Text>}
+                <Text style={{ fontWeight: "bold" }}>
+                  ({dialogNumeroRestringido}){" "}
+                </Text>
+                es restringido y con la venta actual sobrepasaría el límite.
+                {"\n"}
+                El monto disponible es de:{" "}
+                <Text style={{ fontWeight: "bold" }}>
+                  {dialogMontoRestringidoDisponible}
+                </Text>
+              </Text>
+            </View>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                //setDialogRestringidoVisible(false);
+                closeDialogRestringido();
+                resolverDialogRef.current?.(); // Resuelve la promesa
+              }}
+            >
+              CERRAR
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
 
       <SorteoSelectorModal
         visible={modalVisible}
@@ -3509,7 +3585,8 @@ const styles = StyleSheet.create({
   },
   totalTextGroup: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
+    flexShrink: 0,
     gap: 8, // si usas React Native >= 0.71, si no, usa marginRight
   },
   totalText: {

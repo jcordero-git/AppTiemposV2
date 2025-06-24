@@ -36,7 +36,8 @@
     "owner": "jose.cordero.brenes",
     "plugins": [
       "expo-font",
-      "react-native-ble-plx"
+      "react-native-ble-plx",
+      "expo-secure-store"
     ]
   }
 }
