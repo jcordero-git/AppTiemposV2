@@ -14,9 +14,7 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableWithoutFeedback,
-  Linking,
   Keyboard,
-  InteractionManager,
   StatusBar,
   Modal,
 } from "react-native";
@@ -27,14 +25,11 @@ import {
   Portal,
   Dialog,
   Button,
-  Snackbar,
 } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 import { WebView } from "react-native-webview";
 import JsBarcode from "jsbarcode";
 
-import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
-import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
 import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
@@ -43,33 +38,20 @@ import PrinterUtils from "../utils/print/printerUtils";
 import { useCameraPermissions } from "expo-camera";
 import { CameraView } from "expo-camera"; // ✅ import correcto del componente
 
-import RenderHTML from "react-native-render-html";
-import { captureRef } from "react-native-view-shot";
-
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
-import { format } from "date-fns";
-import { da, es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import RestringidosModal from "../components/RestringidosModal";
 import mSorteo from "../models/mSorteoSingleton.js";
-import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
-import mSorteoSingleton from "../models/mSorteoSingleton.js";
 import Constants from "expo-constants";
-import {
-  getInternetDate,
-  getUpdatedInternetDate,
-  formatDate,
-  formatHour,
-  timeStrToMilliseconds,
-} from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");

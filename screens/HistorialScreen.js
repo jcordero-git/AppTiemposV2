@@ -1,12 +1,10 @@
-import React, { useCallback, useState, useRef, useEffect } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  TouchableOpacity,
   TextInput,
-  Switch,
   FlatList,
   useWindowDimensions,
   Alert,
@@ -26,9 +24,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "../context/AuthContext";
 import mDraws from "../models/mDraws";
 import mBanking from "../models/mBanking";
-import mHistory from "../models/mHistory";
-import { convertNumero, validateMonto, toFloat } from "../utils/numeroUtils";
-import { getTotalDraw } from "../utils/historyUtils";
+import { toFloat } from "../utils/numeroUtils";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 
@@ -153,7 +149,9 @@ export default function HistorialScreen({ navigation, route }) {
         )}
         <View style={styles.itemRow}>
           <Text></Text>
-          <Text style={styles.itemSubtitle}>Subtotal: ₡{Number(item.subTotal).toFixed(0)}</Text>
+          <Text style={styles.itemSubtitle}>
+            Subtotal: ₡{Number(item.subTotal).toFixed(0)}
+          </Text>
         </View>
         <View style={styles.itemRow}>
           <Text></Text>

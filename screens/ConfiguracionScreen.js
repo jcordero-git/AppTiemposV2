@@ -7,42 +7,22 @@ import {
   TouchableOpacity,
   TextInput,
   Switch,
-  FlatList,
   useWindowDimensions,
-  Alert,
   Platform,
   ScrollView,
   ActivityIndicator,
   TouchableWithoutFeedback,
 } from "react-native";
-import {
-  Menu,
-  Divider,
-  Provider,
-  Portal,
-  Dialog,
-  Button,
-} from "react-native-paper";
+import { Menu, Provider } from "react-native-paper";
 //import { Ionicons } from "@expo/vector-icons";
-
-import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
-import { format } from "date-fns";
-import { da, de, es, tr } from "date-fns/locale"; // idioma español
-import DateTimePicker from "@react-native-community/datetimepicker";
-import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
-import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import PrinterSizeSelectorModal from "../components/PrinterSizeSelectorModal";
 import PrinterSelectorModal from "../components/PrinterSelectorModal";
-import mSorteo from "../models/mSorteoSingleton.js";
-import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
-import { convertNumero, validateMonto } from "../utils/numeroUtils";
-import { parseMessage } from "../utils/UtilParseMessageAI";
 import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
 import Constants from "expo-constants";
 

@@ -4,47 +4,27 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  TouchableOpacity,
-  TextInput,
-  Switch,
   FlatList,
   useWindowDimensions,
   Alert,
   Platform,
-  ScrollView,
   ActivityIndicator,
   TouchableWithoutFeedback,
 } from "react-native";
-import {
-  Menu,
-  Divider,
-  Provider,
-  Portal,
-  Dialog,
-  Button,
-  Snackbar,
-} from "react-native-paper";
+import { Divider, Provider } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 //import { Ionicons } from "@expo/vector-icons";
-
-import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
-import { format } from "date-fns";
-import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import mSorteo from "../models/mSorteoSingleton.js";
-import mSorteoRestringidos from "../models/mSorteoRestringidosSingleton";
 import { useTiempo } from "../models/mTiempoContext";
-import { convertNumero, validateMonto } from "../utils/numeroUtils";
-import { parseMessage } from "../utils/UtilParseMessageAI";
-import mSorteoSingleton from "../models/mSorteoSingleton.js";
 import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 
 export default function VentaGeneralScreen({ navigation, route }) {

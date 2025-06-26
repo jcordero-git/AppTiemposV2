@@ -6,14 +6,10 @@ import {
   Text,
   Switch,
   FlatList,
-  TouchableOpacity,
   TextInput,
-  ScrollView,
   useWindowDimensions,
   StyleSheet,
-  Platform,
 } from "react-native";
-import { useRoute } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { formatHourStr } from "../utils/datetimeUtils";
 

@@ -6,28 +6,13 @@ import {
   Pressable,
   TouchableOpacity,
   TextInput,
-  Switch,
-  FlatList,
   useWindowDimensions,
-  Alert,
   Platform,
   ScrollView,
   ActivityIndicator,
   TouchableWithoutFeedback,
-  Linking,
-  Keyboard,
-  InteractionManager,
-  StatusBar,
 } from "react-native";
-import {
-  Menu,
-  Divider,
-  Provider,
-  Portal,
-  Dialog,
-  Button,
-  Snackbar,
-} from "react-native-paper";
+import { Divider, Provider } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
@@ -35,13 +20,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import mSorteo from "../models/mSorteoSingleton.js";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
-import {
-  getInternetDate,
-  getUpdatedInternetDate,
-  formatDate,
-  formatHour,
-  timeStrToMilliseconds,
-} from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import { useAuth } from "../context/AuthContext";
 
 const PremiosScreen = () => {
@@ -229,7 +208,9 @@ const PremiosScreen = () => {
             >
               {/* Formulario */}
 
-              <View style={[styles.formContainer, isWeb && styles.webFormContainer]}>
+              <View
+                style={[styles.formContainer, isWeb && styles.webFormContainer]}
+              >
                 {/* <ScrollView style={{ flex: 1 }}> */}
                 <View style={styles.formRow}>
                   <Pressable

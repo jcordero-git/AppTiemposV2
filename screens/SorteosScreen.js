@@ -1,28 +1,21 @@
 import React, {
   useState,
-  useRef,
   useEffect,
   useImperativeHandle,
   forwardRef,
 } from "react";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useRoute } from "@react-navigation/native";
 
 import {
   View,
   Text,
   StyleSheet,
-  Pressable,
   TouchableOpacity,
-  TextInput,
-  Switch,
   FlatList,
   useWindowDimensions,
   Alert,
-  Platform,
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { format, parse } from "date-fns";
-import { es } from "date-fns/locale"; // idioma español
 import { useAuth } from "../context/AuthContext";
 import { formatHourStr } from "../utils/datetimeUtils";
 
@@ -70,8 +63,6 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
       ),
     });
   }, [navigation, route.params]);
-
-  
 
   // const formatHour = (timeStr) => {
   //   try {

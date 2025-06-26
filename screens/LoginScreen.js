@@ -2,9 +2,7 @@ import {
   View,
   TextInput,
   Text,
-  Button,
   StyleSheet,
-  Alert,
   Image,
   Pressable,
   ActivityIndicator,
@@ -13,13 +11,7 @@ import {
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
-import * as Device from "expo-device";
 import Constants from "expo-constants";
-import { Platform } from "react-native";
-import * as Application from "expo-application";
-import * as SecureStore from "expo-secure-store";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { v4 as uuidv4 } from "uuid";
 
 export default function LoginScreen({ navigation }) {
   const { login, saveTicketProfile } = useAuth();
