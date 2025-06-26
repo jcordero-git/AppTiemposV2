@@ -135,6 +135,8 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
         revPrizeTimes: item.userValues?.revPrizeTimes || 0,
         limitTime: item.limitTime || "",
         useReventado: item.useReventado,
+        sellerPercent: item.userValues?.sellerPercent || 0,
+        revSellerPercent: item.userValues?.revSellerPercent || 0,
       }));
       setItems(sorteosFormateados);
       console.log("Sorteos formateados:", sorteosFormateados);

@@ -65,7 +65,7 @@ export const generateHTML = async (
       });
 
     return `
-      <table style="line-height: 0.5; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
+      <table style="line-height: 0.6; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
         ${rows.join("")}
       </table>
     `;

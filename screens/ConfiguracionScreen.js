@@ -114,7 +114,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
   const closeDialogRestringido = () => {
     setNumero("");
     numeroRef.current?.focus();
-
     setDialogRestringidoVisible(false);
   };
   const openDialogTickets = () => {
@@ -414,6 +413,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
         <>
           <View style={styles.container}>
             {/* Formulario y Lista */}
+
             <ScrollView style={{ flex: 1 }}>
               <View
                 style={[styles.formAndListContainer, isWeb && styles.webLayout]}

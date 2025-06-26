@@ -26,19 +26,19 @@ export default function HomeScreen({ navigation, route }) {
   };
 
   return (
-    <View style={styles.mainContent}>
-      <View style={styles.header}>
-        {/* Botón de menú */}
-        <Pressable onPress={() => navigation.toggleDrawer()}>
-          <Ionicons name="menu" size={30} color="#000" />
-        </Pressable>
-        {/* Título de la pantalla activa */}
-        <Text style={styles.headerTitle}>{getScreenTitle()}</Text>
-      </View>
+    // <View style={styles.mainContent}>
+    //   <View style={styles.header}>
+    //     {/* Botón de menú */}
+    //     <Pressable onPress={() => navigation.toggleDrawer()}>
+    //       <Ionicons name="menu" size={30} color="#000" />
+    //     </Pressable>
+    //     {/* Título de la pantalla activa */}
+    //     <Text style={styles.headerTitle}>{getScreenTitle()}</Text>
+    //   </View>
 
-      {/* Contenido principal */}
-      <Text style={styles.content}>Pantalla Principal</Text>
-    </View>
+    //   {/* Contenido principal */}
+    //   <Text style={styles.content}>Pantalla Principal</Text>
+    // </View>
   );
 }
 

@@ -18,6 +18,7 @@ export default function DrawerNavigator() {
   const [fecha, setFecha] = useState(new Date()); // Estado para Fecha
   const { width } = useWindowDimensions();
   const isWeb = Platform.OS === "web" && width > 768;
+  const drawerWidth = Platform.OS === "web" ? "250px" : 250;
 
   return (
     <Drawer.Navigator
@@ -30,11 +31,13 @@ export default function DrawerNavigator() {
         // Cambiar el color de fondo del Drawer aquí
         drawerStyle: {
           backgroundColor: "#4CAF50", // Color de fondo del Drawer
-          width: 250, // Aquí defines el ancho del Drawer (en este caso, 250px)
+          width: drawerWidth, // Aquí defines el ancho del Drawer (en este caso, 250px)
         },
         drawerItemStyle: {
           borderRadius: 0, // Eliminando bordes redondeados
         },
+        drawerType: "slide",
+        swipeEnabled: true,
       }}
     >
       <Drawer.Screen

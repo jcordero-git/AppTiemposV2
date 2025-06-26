@@ -18,6 +18,7 @@ import {
   Keyboard,
   InteractionManager,
   StatusBar,
+  Modal,
 } from "react-native";
 import {
   Menu,
@@ -30,6 +31,7 @@ import {
 } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 import { WebView } from "react-native-webview";
+import JsBarcode from "jsbarcode";
 
 import { printTicketWeb } from "../utils/print/printTicketWeb"; // ajusta la ruta si es necesario
 import * as Print from "expo-print";
@@ -37,6 +39,9 @@ import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
 import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
 import PrinterUtils from "../utils/print/printerUtils";
+
+import { useCameraPermissions } from "expo-camera";
+import { CameraView } from "expo-camera"; // ✅ import correcto del componente
 
 import RenderHTML from "react-native-render-html";
 import { captureRef } from "react-native-view-shot";
@@ -68,6 +73,9 @@ import {
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
+
+  console.log("Camera:", CameraView);
+
   const ticketRef = useRef(null);
   const { widthRender } = useWindowDimensions();
   const [html, setHtml] = React.useState(null);
@@ -93,6 +101,7 @@ export default function VentaScreen({ navigation, route }) {
 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [categoriasMonto, setCategoriasMonto] = useState("");
+  const [categoriasMontoReventado, setCategoriasMontoReventado] = useState("");
   const [categoriasTerminaEn, setCategoriasTerminaEn] = useState("");
   const [categoriasInicianCon, setCategoriasInicianCon] = useState("");
   const [categoriasDesde, setCategoriasDesde] = useState("");
@@ -102,6 +111,12 @@ export default function VentaScreen({ navigation, route }) {
   let tiempoNumerosBackup = null;
   const ejecutadoPorRestringidoDialogRef = useRef(false);
   const [hovered, setHovered] = useState(false);
+
+  const [permission, requestPermission] = useCameraPermissions();
+  const [modalCameraVisible, setModalCameraVisible] = useState(false);
+  const [scanned, setScanned] = useState(false);
+  const [scannedData, setScannedData] = useState("");
+  const cameraRef = useRef(null);
 
   const [categoriasMontoTemporal, setCategoriasMontoTemporal] =
     useState(categoriasMonto);
@@ -219,6 +234,7 @@ export default function VentaScreen({ navigation, route }) {
     setDialogVisible(false);
     setCategoriaSeleccionada(null);
     setCategoriasMonto("");
+    setCategoriasMontoReventado("");
     setCategoriasTerminaEn("");
     setCategoriasInicianCon("");
     setCategoriasDesde("");
@@ -232,11 +248,24 @@ export default function VentaScreen({ navigation, route }) {
 
   const OKDialogCategorias = async () => {
     let montoTemp;
+    let montoRevTemp = 0;
     if (categoriaSeleccionada !== "Extraer de Texto") {
       montoTemp = parseInt(categoriasMonto);
       if (!validateMonto(montoTemp)) {
         //Alert.alert("Monto inválido", "Debe ser un múltiplo de 50.");
+        showSnackbar("Monto no permitido.", 3);
         return;
+      }
+      if (reventar) {
+        montoRevTemp = parseInt(categoriasMontoReventado);
+        if (!validateMonto(montoRevTemp)) {
+          showSnackbar("Monto reventado no permitido.", 3);
+          return;
+        }
+        if (montoTemp < montoRevTemp) {
+          showSnackbar("El monto reventado no puede ser mayor al normal.", 3);
+          return;
+        }
       }
     }
     setDialogVisible(false);
@@ -249,8 +278,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
-          false,
-          0,
+          reventar,
+          montoRevTemp,
           currentItems,
           tiemposAnteriores,
         );
@@ -263,8 +292,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
-          false,
-          0,
+          reventar,
+          montoRevTemp,
           currentItems,
           tiemposAnteriores,
         );
@@ -277,8 +306,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
-          false,
-          0,
+          reventar,
+          montoRevTemp,
           currentItems,
           tiemposAnteriores,
         );
@@ -294,8 +323,8 @@ export default function VentaScreen({ navigation, route }) {
         [currentItems] = await verificaRestringidosYAgregaNumero(
           montoTemp,
           numero,
-          false,
-          0,
+          reventar,
+          montoRevTemp,
           currentItems,
           tiemposAnteriores,
         );
@@ -351,6 +380,7 @@ export default function VentaScreen({ navigation, route }) {
     actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
     setCategoriaSeleccionada(null);
     setCategoriasMonto("");
+    setCategoriasMontoReventado("");
     setCategoriasTerminaEn("");
     setCategoriasInicianCon("");
     setCategoriasDesde("");
@@ -835,6 +865,7 @@ export default function VentaScreen({ navigation, route }) {
 
   const numeroRef = useRef(null);
   const montoRef = useRef(null);
+  const montoRevRef = useRef(null);
 
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
@@ -895,7 +926,30 @@ export default function VentaScreen({ navigation, route }) {
     setReventar(!reventar);
     if (reventar === false) {
       setMontoReventado("");
+      setIsMontoRevLocked(false);
     }
+  };
+
+  const handleOpenScanner = async () => {
+    const res = await requestPermission();
+    if (res.granted) {
+      setModalCameraVisible(true);
+      setScanned(false); // ← importante para permitir nuevo escaneo
+    } else {
+      Alert.alert(
+        "Permiso denegado",
+        "Se necesita acceso a la cámara para escanear.",
+      );
+    }
+  };
+
+  const handleBarCodeScanned = (scanningResult) => {
+    const { data } = scanningResult;
+    setScanned(true);
+    setModalCameraVisible(false);
+    setScannedData(data);
+    console.log("Código escaneado:", data);
+    setCodigo(data);
   };
 
   const handleSubmitReventar = (event) => {
@@ -1167,13 +1221,38 @@ export default function VentaScreen({ navigation, route }) {
         const container = window.document.createElement("div");
 
         container.innerHTML = html;
-        container.style.width = "58mm";
+        container.style.width = "60mm";
         container.style.padding = "10px";
         container.style.margin = "10";
         container.style.boxSizing = "border-box";
         container.style.backgroundColor = "white";
 
         window.document.body.appendChild(container);
+        await new Promise((r) => window.setTimeout(r, 100));
+
+        const svg = container.querySelector("#barcode");
+        if (tiempoSeleccionado !== null)
+          console.log("TIEMPO SELECCIONADO: ", tiempoSeleccionado.id);
+        console.log("TIEMPO A IMPRIMIR: ", tiempoAImprimirRef.current.id);
+        if (svg) {
+          JsBarcode(
+            svg,
+            tiempoSeleccionado !== null
+              ? tiempoSeleccionado.id
+              : tiempoAImprimirRef.current.id,
+            {
+              format: "CODE128",
+              lineColor: "#000",
+              width: 3,
+              height: 30,
+              displayValue: false,
+              fontSize: 14,
+              margin: 0,
+            },
+          );
+        }
+
+        // Esperar un poco más para asegurar render
         await new Promise((r) => window.setTimeout(r, 100));
 
         const canvas = await html2canvas(container, {
@@ -1187,6 +1266,28 @@ export default function VentaScreen({ navigation, route }) {
         link.href = imgDataUrl;
         link.download = `ticket_${Date.now()}.png`;
         link.click();
+
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob((b) => resolve(b), "image/png"),
+        );
+
+        if (blob) {
+          const ClipboardItem = window.ClipboardItem || window.clipboardItem;
+          const clipboardItem = new ClipboardItem({ "image/png": blob });
+          try {
+            await navigator.clipboard.write([clipboardItem]);
+            showSnackbar(
+              "✅ Imagen copiada. Ahora podés pegarla en WhatsApp Web (Ctrl+V).",
+              1,
+            );
+          } catch (error) {
+            console.error("❌ Error copiando al portapapeles:", error);
+            showSnackbar(
+              "Tu navegador no permite copiar imágenes al portapapeles.",
+              3,
+            );
+          }
+        }
 
         window.document.body.removeChild(container);
       } else {
@@ -1269,6 +1370,8 @@ export default function VentaScreen({ navigation, route }) {
       setDialogPrintVisible(false);
 
       setIsMontoLocked(false);
+      setIsMontoRevLocked(false);
+      setMontoReventado("");
       setMonto("");
       setNumero("");
     }
@@ -1277,6 +1380,7 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const [isMontoLocked, setIsMontoLocked] = useState(false);
+  const [isMontoRevLocked, setIsMontoRevLocked] = useState(false);
   const [shouldFocusMonto, setShouldFocusMonto] = useState(false);
 
   useEffect(() => {
@@ -1413,13 +1517,37 @@ export default function VentaScreen({ navigation, route }) {
     montoReventado,
   ) => {
     setNumero(""); // Limpiar número
+
     if (!isMontoLocked) {
-      setMonto(""); // Limpiar monto
-      montoRef.current?.focus(); // Volver a poner el enfoque en el monto
-    } else {
-      numeroRef.current?.focus();
+      setMonto(""); // Solo limpiar si no está bloqueado
     }
-    setMontoReventado("");
+    if (!isMontoRevLocked) {
+      setMontoReventado(""); // Solo limpiar si no está bloqueado
+    }
+
+    // Determinar el enfoque correcto según las combinaciones
+    if (!isMontoLocked && !isMontoRevLocked) {
+      montoRef.current?.focus();
+    } else if (!isMontoLocked && isMontoRevLocked) {
+      montoRef.current?.focus();
+    } else if (isMontoLocked && !isMontoRevLocked) {
+      montoRevRef.current?.focus();
+    } else {
+      numeroRef.current?.focus(); // Ambos bloqueados
+    }
+
+    // if (!isMontoLocked) {
+    //   setMonto(""); // Limpiar monto
+    //   montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+    // } else {
+    //   numeroRef.current?.focus();
+    // }
+    // if (!isMontoRevLocked) {
+    //   setMontoReventado("");
+    //   montoRef.current?.focus(); // Volver a poner el enfoque en el monto
+    // } else {
+    //   numeroRef.current?.focus();
+    // }
 
     return addNumeroToListAdapter(
       currentItems,
@@ -2011,7 +2139,35 @@ export default function VentaScreen({ navigation, route }) {
   );
 
   useEffect(() => {
-    if (monto !== "") submitNumero();
+    if (numero.length === 2) {
+      if (reventar) {
+        const montoNum = parseInt(monto, 10);
+        const montoReventadoNum = parseInt(montoReventado, 10);
+
+        if (isNaN(montoReventadoNum) || !validateMonto(montoReventadoNum)) {
+          showSnackbar("Debe ingresar un monto válido.", 3);
+          window.setTimeout(() => {
+            reventarRef.current?.focus();
+          }, 100);
+          return;
+        }
+
+        if (montoReventadoNum > montoNum) {
+          showSnackbar(
+            "El monto reventado no puede ser mayor al monto original.",
+            3,
+          );
+          window.setTimeout(() => {
+            reventarRef.current?.focus();
+          }, 100);
+          return;
+        }
+
+        handleSubmitReventar();
+      } else {
+        if (monto !== "") submitNumero();
+      }
+    }
   }, [numero, reventar]);
 
   const extractBodyFromHTML = (htmlString) => {
@@ -2181,23 +2337,12 @@ export default function VentaScreen({ navigation, route }) {
                             setIsMontoLocked(false);
                             setShouldFocusMonto(true);
                             setMonto("");
-
-                            // montoRef.current?.focus();
-                            //  window.setTimeout(() => {
-                            //   montoRef.current?.focus();
-                            // }, 100);
-                            // setMonto("e");
-                            // setIsMontoLocked(false);
                           } else {
                             const montoNum = parseInt(monto, 10);
                             if (!isNaN(montoNum) && validateMonto(montoNum)) {
                               setIsMontoLocked(true); // Bloquear el campo
                               numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
                             } else {
-                              // Alert.alert(
-                              //   "Monto inválido",
-                              //   "Debe ser un múltiplo de 50.",
-                              // );
                               showSnackbar("Debe ingresar un monto válido.", 3);
                             }
                           }
@@ -2236,20 +2381,22 @@ export default function VentaScreen({ navigation, route }) {
                         onSubmitEditing={() => {
                           const montoNum = parseInt(monto, 10);
                           if (!isNaN(montoNum) && validateMonto(montoNum)) {
-                            numeroRef.current?.focus();
-                            // window.setTimeout(() => {
-                            //   numeroRef.current?.focus();
-                            // }, 100);
+                            if (reventar) {
+                              const montoRevNum = parseInt(montoReventado, 10);
+                              if (
+                                !isNaN(montoRevNum) &&
+                                validateMonto(montoRevNum)
+                              ) {
+                                numeroRef.current?.focus();
+                              } else {
+                                montoRevRef.current?.focus();
+                              }
+                            } else {
+                              numeroRef.current?.focus();
+                            }
                           } else {
-                            // Alert.alert(
-                            //   "Monto inválido",
-                            //   "Debe ser un múltiplo de 50.",
-                            // );
                             showSnackbar("Debe ingresar un monto válido.", 3);
-                            //montoRef.current?.blur();
-                            // window.setTimeout(() => {
-                            //   montoRef.current?.focus();
-                            // }, 100);
+                            montoRef.current?.focus();
                           }
                         }}
                       />
@@ -2267,16 +2414,6 @@ export default function VentaScreen({ navigation, route }) {
                             .replace(/[^0-9]/g, "")
                             .slice(0, 2);
                           setNumero(cleaned);
-
-                          // if (cleaned.length === 2) {
-                          //   if (reventar) {
-                          //     window.setTimeout(() => {
-                          //       reventarRef.current?.focus();
-                          //     });
-                          //   } else {
-                          //     submitNumero();
-                          //   }
-                          // }
                         }}
                         keyboardType="number-pad"
                         returnKeyType="done"
@@ -2291,14 +2428,63 @@ export default function VentaScreen({ navigation, route }) {
                           ) {
                             montoRef.current?.focus();
                             showSnackbar("Debe ingresar un monto válido.", 3);
+                            return;
+                          }
+
+                          if (reventar) {
+                            const montoRevNum = parseInt(montoReventado, 10);
+                            if (
+                              !monto ||
+                              monto.trim() === "" ||
+                              isNaN(montoRevNum) ||
+                              !validateMonto(montoRevNum)
+                            ) {
+                              montoRevRef.current?.focus();
+                              showSnackbar(
+                                "Debe ingresar un monto reventado válido.",
+                                3,
+                              );
+                              return;
+                            }
                           }
                         }}
                         onSubmitEditing={() => {
                           if (numero.length === 2) {
                             if (reventar) {
-                              reventarRef.current?.focus();
+                              const montoNum = parseInt(monto, 10);
+                              const montoReventadoNum = parseInt(
+                                montoReventado,
+                                10,
+                              );
+
+                              if (
+                                isNaN(montoReventadoNum) ||
+                                !validateMonto(montoReventadoNum)
+                              ) {
+                                showSnackbar(
+                                  "Debe ingresar un monto válido.",
+                                  3,
+                                );
+                                window.setTimeout(() => {
+                                  reventarRef.current?.focus();
+                                }, 100);
+                                return;
+                              }
+
+                              if (montoReventadoNum > montoNum) {
+                                showSnackbar(
+                                  "El monto reventado no puede ser mayor al monto original.",
+                                  3,
+                                );
+                                window.setTimeout(() => {
+                                  reventarRef.current?.focus();
+                                }, 100);
+                                return;
+                              }
+
+                              handleSubmitReventar();
                             } else {
-                              submitNumero();
+                              if (monto !== "") submitNumero();
                             }
                           } else {
                             showSnackbar(
@@ -2306,6 +2492,19 @@ export default function VentaScreen({ navigation, route }) {
                               3,
                             );
                           }
+
+                          // if (numero.length === 2) {
+                          //   if (reventar) {
+                          //     reventarRef.current?.focus();
+                          //   } else {
+                          //     submitNumero();
+                          //   }
+                          // } else {
+                          //   showSnackbar(
+                          //     "Debe ingresar un número de 2 dígitos.",
+                          //     3,
+                          //   );
+                          // }
 
                           // if (numero.length !== 2) {
                           //   window.setTimeout(() => {
@@ -2327,10 +2526,40 @@ export default function VentaScreen({ navigation, route }) {
                     </View>
                     {useReventado && reventar && (
                       <View style={styles.row}>
-                        <View style={styles.iconButtonInvisible} />
+                        <TouchableOpacity
+                          style={styles.iconButton}
+                          onPress={() => {
+                            if (isMontoRevLocked) {
+                              setIsMontoRevLocked(false);
+                              setShouldFocusMonto(true);
+                              setMontoReventado("");
+                            } else {
+                              const montoNum = parseInt(montoReventado, 10);
+                              if (
+                                !montoReventado ||
+                                (isNaN(montoNum) && !validateMonto(montoNum))
+                              ) {
+                                showSnackbar(
+                                  "Debe ingresar un monto reventado válido.",
+                                  3,
+                                );
+                                return;
+                              } else {
+                                setIsMontoRevLocked(true);
+                                numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+                              }
+                            }
+                          }}
+                        >
+                          <MaterialIcons
+                            name={isMontoRevLocked ? "lock" : "lock-open"}
+                            size={20}
+                            color="gray"
+                          />
+                        </TouchableOpacity>
 
                         <TextInput
-                          ref={reventarRef}
+                          ref={montoRevRef}
                           placeholder="Reventar"
                           style={[styles.inputSmall, { marginLeft: 8 }]}
                           value={montoReventado}
@@ -2344,6 +2573,7 @@ export default function VentaScreen({ navigation, route }) {
                           }}
                           keyboardType="number-pad"
                           returnKeyType="done"
+                          editable={!isMontoRevLocked}
                           blurOnSubmit={false}
                           onSubmitEditing={() => {
                             const montoNum = parseInt(monto, 10);
@@ -2356,10 +2586,6 @@ export default function VentaScreen({ navigation, route }) {
                               isNaN(montoReventadoNum) ||
                               !validateMonto(montoReventadoNum)
                             ) {
-                              // Alert.alert(
-                              //   "Monto inválido",
-                              //   "Debe ser un múltiplo de 50.",
-                              // );
                               showSnackbar("Debe ingresar un monto válido.", 3);
                               window.setTimeout(() => {
                                 reventarRef.current?.focus();
@@ -2375,6 +2601,10 @@ export default function VentaScreen({ navigation, route }) {
                               window.setTimeout(() => {
                                 reventarRef.current?.focus();
                               }, 100);
+                              return;
+                            }
+                            if (isNaN(numero) || numero.length !== 2) {
+                              numeroRef.current?.focus();
                               return;
                             }
 
@@ -2393,14 +2623,14 @@ export default function VentaScreen({ navigation, route }) {
                               return;
                             }
 
-                            if (!numero || numero.length < 2) {
-                              numeroRef.current?.focus();
-                              showSnackbar(
-                                "Debe ingresar un número de 2 dígitos.",
-                                3,
-                              );
-                              return;
-                            }
+                            // if (!numero || numero.length < 2) {
+                            //   numeroRef.current?.focus();
+                            //   showSnackbar(
+                            //     "Debe ingresar un número de 2 dígitos.",
+                            //     3,
+                            //   );
+                            //   return;
+                            // }
                           }}
                         />
                         <View
@@ -2927,13 +3157,38 @@ export default function VentaScreen({ navigation, route }) {
               </Text>
             </Pressable>
             {categoriaSeleccionada !== "Extraer de Texto" && (
-              <TextInput
-                placeholder="Monto"
-                style={styles.input}
-                defaultValue={categoriasMonto}
-                onChangeText={setCategoriasMonto}
-                keyboardType="number-pad"
-              />
+              <>
+                <TextInput
+                  placeholder="Monto"
+                  style={styles.input}
+                  defaultValue={categoriasMonto}
+                  onChangeText={setCategoriasMonto}
+                  keyboardType="number-pad"
+                />
+                {mSorteo.useReventado && (
+                  <View style={styles.reventarHeader}>
+                    <View style={[styles.line, { flex: 0.5 }]} />
+                    <Text style={styles.reventarTitle}>Reventar</Text>
+                    <View style={[styles.line, { flex: 2 }]} />
+                    <Switch
+                      value={reventar}
+                      onValueChange={() => {
+                        handleReventarChange();
+                        setCategoriasMontoReventado("");
+                      }}
+                    />
+                  </View>
+                )}
+                {reventar && (
+                  <TextInput
+                    placeholder="Monto Reventado"
+                    style={styles.input}
+                    defaultValue={categoriasMontoReventado}
+                    onChangeText={setCategoriasMontoReventado}
+                    keyboardType="number-pad"
+                  />
+                )}
+              </>
             )}
             {categoriaSeleccionada === "Terminan en..." && (
               <TextInput
@@ -3200,7 +3455,9 @@ export default function VentaScreen({ navigation, route }) {
                 >
                   <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={() => {}}
+                    onPress={() => {
+                      handleOpenScanner();
+                    }}
                   >
                     <MaterialIcons
                       name={"camera-alt"}
@@ -3208,6 +3465,67 @@ export default function VentaScreen({ navigation, route }) {
                       color="black"
                     />
                   </TouchableOpacity>
+                  <Modal visible={modalCameraVisible} animationType="slide">
+                    <View style={{ flex: 1 }}>
+                      {permission === null ? (
+                        <Text>
+                          Solicitando permiso para acceder a la cámara...
+                        </Text>
+                      ) : !permission.granted ? (
+                        <Text>No se tiene acceso a la cámara.</Text>
+                      ) : (
+                        <>
+                          {/* 🎯 Marco de enfoque */}
+                          <View
+                            style={{
+                              position: "absolute",
+                              top: "30%",
+                              left: "15%",
+                              width: "70%",
+                              height: "30%",
+                              borderWidth: 2,
+                              borderColor: "#00FF00",
+                              borderRadius: 8,
+                              zIndex: 10,
+                            }}
+                          />
+                          <CameraView
+                            ref={cameraRef}
+                            style={{ flex: 1 }}
+                            onBarcodeScanned={
+                              scanned ? undefined : handleBarCodeScanned
+                            }
+                            barCodeScannerSettings={{
+                              barCodeTypes: [
+                                "code128",
+                                "ean13",
+                                "ean8",
+                                "qr",
+                                "upc_a",
+                                "upc_e",
+                              ],
+                            }}
+                          />
+                          <TouchableOpacity
+                            onPress={() => setModalCameraVisible(false)}
+                            style={{
+                              position: "absolute",
+                              top: 40,
+                              right: 20,
+                              backgroundColor: "rgba(0,0,0,0.6)",
+                              padding: 10,
+                              borderRadius: 8,
+                              zIndex: 10,
+                            }}
+                          >
+                            <Text style={{ color: "red", fontSize: 16 }}>
+                              Cancelar
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  </Modal>
                 </View>
               )}
             </View>
@@ -3623,5 +3941,22 @@ const styles = StyleSheet.create({
   tooltipText: {
     color: "white",
     fontSize: 12,
+  },
+  reventarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 10,
+  },
+  line: {
+    height: 2,
+    backgroundColor: "#999",
+    marginLeft: 1,
+    marginRight: 1,
+    marginTop: 1,
+    marginBottom: 1,
+  },
+  reventarTitle: {
+    marginHorizontal: 14,
+    color: "#999",
   },
 });
