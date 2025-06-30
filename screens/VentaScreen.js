@@ -1046,10 +1046,17 @@ export default function VentaScreen({ navigation, route }) {
           limpiarDespuesDeImprimir();
         }
         await PrinterUtils.disconnect();
+        setDialogPrintVisible(false);
       } else if (Platform.OS === "web") {
         const iframeWindow = iframeRef.current.contentWindow;
-        iframeWindow.focus();
-        iframeWindow.print();
+
+        if (iframeWindow) {
+          iframeWindow.focus();
+          iframeWindow.print();
+        }
+        window.setTimeout(() => {
+          setDialogPrintVisible(false);
+        }, 500);
       }
     } catch (e) {
       console.error("Error al imprimir:", e);
@@ -1257,11 +1264,11 @@ export default function VentaScreen({ navigation, route }) {
           backgroundColor: "#ffffff",
         });
 
-        const imgDataUrl = canvas.toDataURL("image/png");
-        const link = window.document.createElement("a");
-        link.href = imgDataUrl;
-        link.download = `ticket_${Date.now()}.png`;
-        link.click();
+        // const imgDataUrl = canvas.toDataURL("image/png");
+        // const link = window.document.createElement("a");
+        // link.href = imgDataUrl;
+        // link.download = `ticket_${Date.now()}.png`;
+        // link.click();
 
         const blob = await new Promise((resolve) =>
           canvas.toBlob((b) => resolve(b), "image/png"),
@@ -1276,6 +1283,7 @@ export default function VentaScreen({ navigation, route }) {
               "✅ Imagen copiada. Ahora podés pegarla en WhatsApp Web (Ctrl+V).",
               1,
             );
+            setDialogPrintVisible(false);
           } catch (error) {
             console.error("❌ Error copiando al portapapeles:", error);
             showSnackbar(
@@ -3011,6 +3019,7 @@ export default function VentaScreen({ navigation, route }) {
                                 }
 
                                 setGenerateImage(false);
+                                setDialogPrintVisible(false);
                               }}
                               style={{
                                 width: "100%",
@@ -3147,30 +3156,46 @@ export default function VentaScreen({ navigation, route }) {
             </View>
             <View style={{ maxHeight: height * 0.6 }}>
               <ScrollView contentContainerStyle={{ paddingHorizontal: 10 }}>
-                {tiemposAnteriores.map((item, index) => (
-                  <Pressable
-                    key={item.id || index}
-                    onPress={() => {
-                      cargarTiempoSeleccionado(item);
-                      closeDialogTickets(); // cerrar el diálogo
-                    }}
-                    style={{
-                      paddingVertical: 10,
-                      borderBottomWidth: 1,
-                      borderBottomColor: "#eee",
-                    }}
-                  >
-                    <Text style={{ fontWeight: "bold" }}>
-                      Código: # {item.id || ""}
-                    </Text>
-                    <Text style={{ fontWeight: "bold" }}>
-                      Cliente: {item.clientName || "Sin nombre"}
-                    </Text>
-                    <Text style={{ color: "#555" }}>
-                      Fecha: {new Date(item.updatedAt).toLocaleString()}
-                    </Text>
-                  </Pressable>
-                ))}
+                {tiemposAnteriores.map((item, index) => {
+                  const esSeleccionado = tiempoSeleccionado?.id === item.id;
+
+                  return (
+                    <Pressable
+                      key={item.id || index}
+                      onPress={() => {
+                        cargarTiempoSeleccionado(item);
+                        closeDialogTickets(); // cerrar el diálogo
+                      }}
+                      style={{
+                        paddingVertical: 10,
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#eee",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: "bold" }}>
+                          Código: # {item.id || ""}
+                        </Text>
+                        <Text style={{ fontWeight: "bold" }}>
+                          Cliente: {item.clientName || "Sin nombre"}
+                        </Text>
+                        <Text style={{ color: "#555" }}>
+                          Fecha: {new Date(item.updatedAt).toLocaleString()}
+                        </Text>
+                      </View>
+                      {esSeleccionado && (
+                        <MaterialIcons
+                          name="check-circle"
+                          size={24}
+                          color="green"
+                        />
+                      )}
+                    </Pressable>
+                  );
+                })}
               </ScrollView>
             </View>
           </Dialog.Content>
