@@ -17,6 +17,7 @@ import {
   Keyboard,
   StatusBar,
   Modal,
+  Dimensions,
 } from "react-native";
 import {
   Menu,
@@ -47,16 +48,16 @@ import { useAuth } from "../context/AuthContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import RestringidosModal from "../components/RestringidosModal";
 import mSorteo from "../models/mSorteoSingleton.js";
+import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton";
 import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
 import Constants from "expo-constants";
 import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import { useIsFocused } from "@react-navigation/native";
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
-
-  console.log("Camera:", CameraView);
 
   const ticketRef = useRef(null);
   const { widthRender } = useWindowDimensions();
@@ -194,6 +195,11 @@ export default function VentaScreen({ navigation, route }) {
 
   const openDialogTickets = () => {
     const actualizaTiemposVendidos = async () => {
+      console.log(
+        "SORTEO ID OPEN DIALOG TICKET",
+        tiempoRef.current?.drawCategoryId,
+      );
+      console.log("FECHA OPEN DIALOG TICKET", tiempoRef.current?.drawDate);
       const { tiemposVendidos, lastTicketNumber } =
         await fetchTiemposAnteriores(
           tiempoRef.current?.drawCategoryId,
@@ -1076,6 +1082,14 @@ export default function VentaScreen({ navigation, route }) {
       if (tiempoSeleccionado !== null) {
         result = tiempoSeleccionado;
       } else {
+        if (tiempoRef.current.numbers.length === 0) {
+          showSnackbar(
+            "Ingrese al menos un numero con su apuesta respectiva.",
+            3,
+          );
+          return;
+        }
+
         // if (
         //   formatDate(fecha, "yyyy-MM-dd") !==
         //     formatDate(getInternetDate(), "yyyy-MM-dd") &&
@@ -1889,7 +1903,7 @@ export default function VentaScreen({ navigation, route }) {
         ...tiempo,
         ticketNumber: 1,
         userId: userData.id,
-        drawCategoryId: sorteoId,
+        drawCategoryId: mSorteo.id,
         //drawDate: format(fecha, "yyyy-MM-dd", { locale: es }),
         drawDate: formatDate(fecha, "yyyy-MM-dd"),
         numbers: [],
@@ -1899,7 +1913,7 @@ export default function VentaScreen({ navigation, route }) {
 
       // Paso 4: Fetch de tiempos anteriores
       const { tiemposVendidos, lastTicketNumber } =
-        await fetchTiemposAnteriores(sorteoId, tiempoBase.drawDate);
+        await fetchTiemposAnteriores(mSorteo.id, tiempoBase.drawDate);
 
       // const tiempoBaseActualizaTicketNummber = {
       //   ...tiempoBase,
@@ -1971,17 +1985,37 @@ export default function VentaScreen({ navigation, route }) {
 
   useEffect(() => {
     if (!fecha || !sorteoId || !userData?.id) return;
+
     async function execute() {
       ejecutadoPorRestringidoDialogRef.current = false;
+
+      // ✅ Actualiza el singleton
+      mFechaSeleccionada.setFecha(fecha);
+
       tiempoNumerosBackup = tiempoRef.current;
+
       const isAllowed = await inicializarYProcesar(tiempoNumerosBackup);
     }
+
     execute();
   }, [sorteoId, fecha]);
 
+  // useEffect(() => {
+  //   if (!fecha || !sorteoId || !userData?.id) return;
+  //   async function execute() {
+  //     ejecutadoPorRestringidoDialogRef.current = false;
+  //     tiempoNumerosBackup = tiempoRef.current;
+  //     mFechaSeleccionada.setFecha(fecha);
+  //     const isAllowed = await inicializarYProcesar(tiempoNumerosBackup);
+  //   }
+  //   execute();
+  // }, [sorteoId, fecha]);
+
   useEffect(() => {
     tiempoRef.current = tiempo;
+    console.log("TIEMPO REF FROM USE EFECT tiempo: ", tiempoRef.current);
   }, [tiempo]);
+
   useEffect(() => {
     limpiarRef.current = limpiar;
   }, [limpiar]);
@@ -2108,17 +2142,75 @@ export default function VentaScreen({ navigation, route }) {
     Object.assign(mSorteo, mSorteo); // ✅ Copia las propiedades sin reemplazar el objeto
     setSorteoNombre(mSorteo.name);
     setSorteoId(mSorteo.id);
+    setUseReventado(mSorteo.useReventado);
+
+    // setTiempo((prev) => ({
+    //   ...prev,
+    //   drawCategoryId: mSorteo.id,
+    //   // drawDate: fecha,
+    // }));
+
+    handleNuevoTiempo();
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      (async () => {
-        if (mSorteo.id !== 0) {
-          await cargaSorteoSeleccionado();
-        }
-      })();
-    }, [fecha, sorteoId]), // <--- agregá las dependencias acá
-  );
+  const isFocused = useIsFocused();
+
+  useEffect(() => {
+    if (!isFocused) return;
+
+    const fechaSelected = mFechaSeleccionada.getFecha();
+    setFecha(fechaSelected);
+
+    setTiempo((prev) => ({
+      ...prev,
+      drawDate: formatDate(fechaSelected, "yyyy-MM-dd"),
+      drawCategoryId: mSorteo.id, // ✅ siempre usa el valor actualizado de mSorteo
+    }));
+
+    if (mSorteo.id !== 0) {
+      cargaSorteoSeleccionado();
+    }
+  }, [isFocused]);
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     (async () => {
+  //       const fechaSelected = mFechaSeleccionada.getFecha();
+  //       console.log("FECHA EN CARGA SORTEO: ", fechaSelected);
+  //       setFecha(fechaSelected);
+
+  //       // ✅ Asignar el tiempo completo directamente aquí
+  //       setTiempo((prev) => ({
+  //         ...prev,
+  //         drawDate: formatDate(fechaSelected, "yyyy-MM-dd"),
+  //         drawCategoryId: mSorteo.id,
+  //       }));
+
+  //       if (mSorteo.id !== 0) {
+  //         await cargaSorteoSeleccionado(); // que ya no vuelva a hacer setTiempo
+  //       }
+  //     })();
+  //   }, []), // Dependé solo del sorteo, no de fecha ni sorteoId
+  // );
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     (async () => {
+
+  //       const fechaSelected = mFechaSeleccionada.getFecha();
+  //       console.log("FECHA EN CARGA SORTEO: ", fechaSelected);
+  //       setFecha(fechaSelected);
+  //       setTiempo((prev) => ({
+  //         ...prev,
+  //         drawDate: fechaSelected,
+  //       }));
+
+  //       if (mSorteo.id !== 0) {
+  //         await cargaSorteoSeleccionado();
+  //       }
+  //     })();
+  //   }, [fecha, sorteoId]), // <--- agregá las dependencias acá
+  // );
 
   useEffect(() => {
     if (numero.length === 2) {
@@ -2714,45 +2806,47 @@ export default function VentaScreen({ navigation, route }) {
           {/* Diálogo Print */}
           <Dialog.Content>
             {html && (
-              <View
-                style={{
-                  alignItems: "center",
-                  maxHeight: isWeb ? "75vh" : "90%", // limita el diálogo si es muy alto
-                  overflow: "auto",
-                  //maxHeight: 800,
-                }}
-              >
+              <>
                 <View
-                  ref={ticketRef}
-                  collapsable={false}
                   style={{
-                    width: 230,
-                    backgroundColor: "white",
-                    borderWidth: 1,
-                    borderColor: "#ccc",
-                    overflow: "hidden",
-                    ...(Platform.OS === "web"
-                      ? {
-                          //height: (iframeHeight || 300) + 20,
-                          height: "100%",
-                          overflow: "auto",
-                        }
-                      : {
-                          //height: webviewHeight || 300 + 20,
-                          height: "110%",
-                          overflow: "scroll",
-                        }),
+                    maxHeight: height * 0.6, // Límite del 80% altura real
+                    width: "100%",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  {Platform.OS === "web" ? (
-                    <iframe
-                      ref={iframeRef}
-                      srcDoc={`
+                  <ScrollView
+                    style={{
+                      width: "100%",
+                      backgroundColor: "white",
+                      // borderWidth: 1,
+                      // borderColor: "#ccc",
+                    }}
+                    contentContainerStyle={{
+                      alignItems: "center",
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <View
+                      ref={ticketRef}
+                      collapsable={false}
+                      style={{
+                        width: 225,
+                        borderWidth: 1,
+                        borderColor: "#ccc",
+                        overflow: "hidden", // 👈 evitar scroll innecesario
+                      }}
+                    >
+                      {Platform.OS === "web" ? (
+                        <iframe
+                          ref={iframeRef}
+                          srcDoc={`
                       <!DOCTYPE html>
                       <html>
                         <head>
                           <meta name="viewport", initial-scale=1.0">
                           <style>
+                          html { margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; width: 100%; height: auto; }
                             body { width:58mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
                             .wrapper {
                               // margin-left: 5px;
@@ -2793,56 +2887,58 @@ export default function VentaScreen({ navigation, route }) {
                          </body>
                       </html>
                     `}
-                      style={{
-                        width: "100%",
-                        //width: 240,
-                        height: iframeHeight,
-                        border: "none",
-                        display: "block",
-                      }}
-                      sandbox="allow-scripts allow-same-origin allow-modals"
-                    />
-                  ) : (
-                    <>
-                      <WebView
-                        originWhitelist={["*"]}
-                        source={{ html }}
-                        scalesPageToFit={false}
-                        onMessage={(event) => {
-                          const height = parseInt(event.nativeEvent.data, 10);
-                          setWebviewHeight(height);
-                        }}
-                        injectedJavaScript={`
+                          style={{
+                            width: "100%",
+                            //width: 240,
+                            height: iframeHeight,
+                            border: "none",
+                            display: "block",
+                          }}
+                          sandbox="allow-scripts allow-same-origin allow-modals"
+                        />
+                      ) : (
+                        <>
+                          <WebView
+                            originWhitelist={["*"]}
+                            source={{ html }}
+                            scalesPageToFit={false}
+                            onMessage={(event) => {
+                              const height = parseInt(
+                                event.nativeEvent.data,
+                                10,
+                              );
+                              setWebviewHeight(height);
+                            }}
+                            injectedJavaScript={`
                      const meta = document.createElement('meta');
                      meta.setAttribute('name', 'viewport');
                      meta.setAttribute('content', 'width=245, initial-scale=1, maximum-scale=1, user-scalable=no');
                      document.head.appendChild(meta);
                      document.body.style.margin = '0';
-                     document.body.style.overflowY = 'scroll'; // ✅ Permite scroll vertical
                      document.body.style.overflow = 'auto';
                      document.documentElement.style.overflow = 'auto';
  
                      setTimeout(() => {
                        const height = document.body.scrollHeight;
                        window.ReactNativeWebView.postMessage(height.toString());
-                     }, 100);
+                     }, 200);
                      true;
                    `}
-                        style={{
-                          width: "100%",
-                          height: webviewHeight || 300,
-                          backgroundColor: "white",
-                          //marginLeft: 8,
-                        }}
-                      />
+                            style={{
+                              width: "100%",
+                              height: webviewHeight || 100,
+                              backgroundColor: "white",
+                              //marginLeft: 8,
+                            }}
+                          />
 
-                      {/* WebView oculto para generar imagen */}
-                      {generateImage && (
-                        <WebView
-                          originWhitelist={["*"]}
-                          renderToHardwareTextureAndroid={true}
-                          source={{
-                            html: `
+                          {/* WebView oculto para generar imagen */}
+                          {generateImage && (
+                            <WebView
+                              originWhitelist={["*"]}
+                              renderToHardwareTextureAndroid={true}
+                              source={{
+                                html: `
                             <!DOCTYPE html>
                             <html>
                               <head>
@@ -2885,49 +2981,55 @@ export default function VentaScreen({ navigation, route }) {
                               </body>
                             </html>
                           `,
-                          }}
-                          javaScriptEnabled
-                          onMessage={async (event) => {
-                            //setImageToShare(event.nativeEvent.data);
+                              }}
+                              javaScriptEnabled
+                              onMessage={async (event) => {
+                                //setImageToShare(event.nativeEvent.data);
 
-                            const base64Image = event.nativeEvent.data;
-                            const path =
-                              FileSystem.documentDirectory +
-                              `ticket_${Date.now()}.png`;
+                                const base64Image = event.nativeEvent.data;
+                                const path =
+                                  FileSystem.documentDirectory +
+                                  `ticket_${Date.now()}.png`;
 
-                            await FileSystem.writeAsStringAsync(
-                              path,
-                              base64Image.replace("data:image/png;base64,", ""),
-                              { encoding: FileSystem.EncodingType.Base64 },
-                            );
+                                await FileSystem.writeAsStringAsync(
+                                  path,
+                                  base64Image.replace(
+                                    "data:image/png;base64,",
+                                    "",
+                                  ),
+                                  { encoding: FileSystem.EncodingType.Base64 },
+                                );
 
-                            const canShare = await Sharing.isAvailableAsync();
-                            if (canShare) {
-                              await Sharing.shareAsync(path, {
-                                mimeType: "image/png",
-                                dialogTitle: "Compartir ticket",
-                              });
-                              setRefreshHeader(true);
-                            }
+                                const canShare =
+                                  await Sharing.isAvailableAsync();
+                                if (canShare) {
+                                  await Sharing.shareAsync(path, {
+                                    mimeType: "image/png",
+                                    dialogTitle: "Compartir ticket",
+                                  });
+                                  setRefreshHeader(true);
+                                }
 
-                            setGenerateImage(false);
-                          }}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            opacity: 1,
-                            top: -9999,
-                            left: -9999,
-                            backgroundColor: "transparent",
-                            position: "absolute",
-                            pointerEvents: "none",
-                          }}
-                        />
+                                setGenerateImage(false);
+                              }}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                opacity: 1,
+                                top: -9999,
+                                left: -9999,
+                                backgroundColor: "transparent",
+                                position: "absolute",
+                                pointerEvents: "none",
+                              }}
+                            />
+                          )}
+                        </>
                       )}
-                    </>
-                  )}
+                    </View>
+                  </ScrollView>
                 </View>
-              </View>
+              </>
             )}
           </Dialog.Content>
           <Dialog.Actions>
@@ -2944,6 +3046,7 @@ export default function VentaScreen({ navigation, route }) {
                 setIframeHeight(100);
                 montoRef.current?.focus();
                 limpiarDespuesDeImprimir();
+                setRefreshHeader(true);
               }}
             >
               CERRAR
@@ -3687,7 +3790,7 @@ export default function VentaScreen({ navigation, route }) {
           setMontoReventado("");
           setTiempo((prev) => ({
             ...prev,
-            sorteoId: sorteo.id,
+            drawCategoryId: sorteo.id,
           }));
         }}
         leftPosition={posisionSorteoModalAlaIzquierda}

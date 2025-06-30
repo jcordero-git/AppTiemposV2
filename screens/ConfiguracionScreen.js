@@ -25,6 +25,8 @@ import PrinterSelectorModal from "../components/PrinterSelectorModal";
 import { useTiempo } from "../models/mTiempoContext";
 import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
 import Constants from "expo-constants";
+import { WebView } from "react-native-webview";
+import { ht } from "date-fns/locale";
 
 export default function ConfiguracionScreen({ navigation, route }) {
   console.log("🎯 RENDER Configuracion Screen");
@@ -37,9 +39,12 @@ export default function ConfiguracionScreen({ navigation, route }) {
     useState(false);
   const [ultimoTicket, setUltimoTicket] = useState(null);
   const [modalPrinterVisible, setModalPrinterVisible] = useState(false);
-  const [iframeHeight, setIframeHeight] = useState(100);
-  const iframeRef = useRef(null);
+
   const [html, setHtml] = React.useState(null);
+  const [iframeHeight, setIframeHeight] = useState(100);
+  const [webviewHeight, setWebviewHeight] = useState(100); // altura inicial mínima
+
+  const iframeRef = useRef(null);
 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [categoriasMonto, setCategoriasMonto] = useState("");
@@ -240,6 +245,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
 
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
+  const isLandscape = width > height;
   const handleCambiarContrasena = async () => {
     closeMenuHeader();
     const tokenCambiarContrasena = await fetchTokenCambiarContrasena();
@@ -362,6 +368,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
         userData,
         ticketProfile,
       );
+      console.log("ticket profile actualizado", htmlGenerado);
       setHtml(htmlGenerado);
     };
     compartir();
@@ -537,36 +544,162 @@ export default function ConfiguracionScreen({ navigation, route }) {
                 </View>
 
                 {/* Lista */}
-                <View
-                  style={[styles.listContainer, !isWeb && { marginTop: 0 }]}
-                >
-                  {isWeb && Platform.OS === "web" ? (
+                {html && isLandscape && (
+                  <View
+                    style={[styles.listContainer, !isWeb && { marginTop: 0 }]}
+                  >
                     <View
-                      collapsable={false}
                       style={{
+                        maxHeight: height * 0.8, // Límite del 80% altura real
                         width: "100%",
-                        backgroundColor: "white",
-                        // borderWidth: 1,
-                        // borderColor: "#ccc",
-                        overflow: "hidden",
                         alignItems: "center",
-                        justifyContent: "center", // Centra verticalmente si tiene altura fija
-                        display: "flex",
-                        ...(isWeb && Platform.OS === "web"
-                          ? {
-                              height: (iframeHeight || 300) + 20,
-                              overflow: "auto",
-                            }
-                          : {
-                              //height: webviewHeight || 300 + 20,
-                              height: "110%",
-                              overflow: "scroll",
-                            }),
+                        justifyContent: "center",
                       }}
                     >
-                      <iframe
-                        ref={iframeRef}
-                        srcDoc={`
+                      <ScrollView
+                        style={{
+                          width: 245,
+                          backgroundColor: "white",
+                          borderWidth: 1,
+                          borderColor: "#ccc",
+                        }}
+                        contentContainerStyle={{
+                          alignItems: "center",
+                          paddingVertical: 8,
+                        }}
+                      >
+                        <View
+                          collapsable={false}
+                          style={{
+                            width: 230,
+                          }}
+                        >
+                          {Platform.OS === "web" ? (
+                            <iframe
+                              ref={iframeRef}
+                              srcDoc={`
+                                         <!DOCTYPE html>
+                                         <html>
+                                           <head>
+                                             <meta name="viewport", initial-scale=1.0">
+                                             <style>
+                                               body { width:58mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
+                                               .wrapper {
+                                                 // margin-left: 5px;
+                                                 //justify-content: "center"
+                                                 //width: 60mm;
+                                                 }
+                                             </style>
+                                             <script>
+                                               function sendHeight() {
+                                                 const height = document.documentElement.scrollHeight;
+                                                 window.parent.postMessage({ type: "htmlHeight", height }, "*");
+                                               }
+                                       
+                                               window.addEventListener("load", () => {
+                                                 sendHeight();
+                                                 // Retry a couple of times in case fonts/layouts shift content
+                                                 setTimeout(sendHeight, 100);
+                                                 setTimeout(sendHeight, 300);                              
+                   
+                                               });
+                                       
+                                               // Optional: observe height changes dynamically
+                                                window.addEventListener("DOMContentLoaded", () => {
+                                                 const body = document.body;
+                                                 if (body) {
+                                                   const observer = new ResizeObserver(sendHeight);
+                                                   observer.observe(body);
+                                                 }
+                                               });
+                   
+                   
+                                             </script>
+                                           </head>
+                                           <body>
+                                             <div class="wrapper">
+                                               ${html}
+                                             </div>
+                                            </body>
+                                         </html>
+                                       `}
+                              style={{
+                                width: "100%",
+                                //width: 240,
+                                height: iframeHeight,
+                                border: "none",
+                                display: "block",
+                              }}
+                              sandbox="allow-scripts allow-same-origin allow-modals"
+                            />
+                          ) : (
+                            <>
+                              <WebView
+                                originWhitelist={["*"]}
+                                source={{ html }}
+                                scalesPageToFit={false}
+                                onMessage={(event) => {
+                                  const height = parseInt(
+                                    event.nativeEvent.data,
+                                    10,
+                                  );
+                                  setWebviewHeight(height);
+                                }}
+                                injectedJavaScript={`
+                                        const meta = document.createElement('meta');
+                                        meta.setAttribute('name', 'viewport');
+                                        meta.setAttribute('content', 'width=245, initial-scale=1, maximum-scale=1, user-scalable=no');
+                                        document.head.appendChild(meta);
+                                        document.body.style.margin = '0';
+                                        document.body.style.overflow = 'auto';
+                                        document.documentElement.style.overflow = 'auto';
+                    
+                                        setTimeout(() => {
+                                          const height = document.body.scrollHeight;
+                                          window.ReactNativeWebView.postMessage(height.toString());
+                                        }, 200);
+                                        true;
+                                      `}
+                                style={{
+                                  width: "100%",
+                                  height: webviewHeight || 300,
+                                  backgroundColor: "white",
+                                  //marginLeft: 8,
+                                }}
+                              />
+                            </>
+                          )}
+                        </View>
+                      </ScrollView>
+                    </View>
+
+                    {/* {isWeb && Platform.OS === "web" ? (
+                      <View
+                        collapsable={false}
+                        style={{
+                          width: "100%",
+                          backgroundColor: "white",
+                          // borderWidth: 1,
+                          // borderColor: "#ccc",
+                          overflow: "hidden",
+                          alignItems: "center",
+                          justifyContent: "center", // Centra verticalmente si tiene altura fija
+                          display: "flex",
+                          ...(isWeb && Platform.OS === "web"
+                            ? {
+                                height: (iframeHeight || 300) + 20,
+                                overflow: "auto",
+                              }
+                            : {
+                                //height: webviewHeight || 300 + 20,
+                                height: "110%",
+                                overflow: "scroll",
+                              }),
+                        }}
+                      >
+                        <iframe
+                          ref={iframeRef}
+                          srcDoc={`
                       <!DOCTYPE html>
                       <html>
                         <head>
@@ -611,23 +744,91 @@ export default function ConfiguracionScreen({ navigation, route }) {
                          </body>
                       </html>
                     `}
-                        style={{
-                          width: 245,
-                          height: iframeHeight,
-                          borderWidth: 1,
-                          justifyContent: "center", // Centra verticalmente si tiene altura fija
-                          display: "block",
-                          margin: "0 auto", // centrar en web puro (extra seguridad)
-                        }}
-                        sandbox="allow-scripts allow-same-origin allow-modals"
-                      />
-                    </View>
-                  ) : (
-                    <></>
-                  )}
-                </View>
+                          style={{
+                            width: 245,
+                            height: iframeHeight,
+                            borderWidth: 1,
+                            justifyContent: "center", // Centra verticalmente si tiene altura fija
+                            display: "block",
+                            margin: "0 auto", // centrar en web puro (extra seguridad)
+                          }}
+                          sandbox="allow-scripts allow-same-origin allow-modals"
+                        />
+                      </View>
+                    ) : (
+                      <>
+                        <View
+                          style={{
+                            alignItems: "center",
+                            maxHeight: isWeb ? "75vh" : "80%", // limita el diálogo si es muy alto
+                            overflow: "auto",
+                            //maxHeight: 800,
+                          }}
+                        >
+                          <View
+                            //ref={ticketRef}
+                            collapsable={false}
+                            style={{
+                              width: 230,
+                              backgroundColor: "white",
+                              borderWidth: 1,
+                              borderColor: "#ccc",
+                              overflow: "hidden",
+                              ...(Platform.OS === "web"
+                                ? {
+                                    //height: (iframeHeight || 300) + 20,
+                                    height: "100%",
+                                    overflow: "auto",
+                                  }
+                                : {
+                                    //height: webviewHeight || 300 + 20,
+                                    height: "85%",
+                                    overflow: "scroll",
+                                  }),
+                            }}
+                          >
+                            <WebView
+                              originWhitelist={["*"]}
+                              source={{ html }}
+                              scalesPageToFit={false}
+                              onMessage={(event) => {
+                                const height = parseInt(
+                                  event.nativeEvent.data,
+                                  10,
+                                );
+                                setWebviewHeight(height);
+                              }}
+                              injectedJavaScript={`
+                                         const meta = document.createElement('meta');
+                                         meta.setAttribute('name', 'viewport');
+                                         meta.setAttribute('content', 'width=245, initial-scale=1, maximum-scale=1, user-scalable=no');
+                                         document.head.appendChild(meta);
+                                         document.body.style.margin = '0';
+                                         document.body.style.overflow = 'auto';
+                                         document.documentElement.style.overflow = 'auto';
+                     
+                                         setTimeout(() => {
+                                           const height = document.body.scrollHeight;
+                                           window.ReactNativeWebView.postMessage(height.toString());
+                                         }, 100);
+                                         true;
+                                       `}
+                              style={{
+                                width: "240px",
+                                height: webviewHeight || 300,
+                                backgroundColor: "white",
+                                //marginLeft: 8,
+                              }}
+                            />
+                          </View>
+                        </View>
+                      </>
+                    )} */}
+                  </View>
+                )}
               </View>
             </ScrollView>
+
             {/* app version */}
             <View style={styles.totalBar}>
               <Text style={styles.totalText}>APP VERSION: </Text>

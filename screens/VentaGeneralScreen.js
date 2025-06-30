@@ -26,6 +26,7 @@ import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import { useTiempo } from "../models/mTiempoContext";
 import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 
 export default function VentaGeneralScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaGeneralScreen");
@@ -86,6 +87,18 @@ export default function VentaGeneralScreen({ navigation, route }) {
   const [items, setItems] = useState([]);
   const [itemsGrid, setItemsGrid] = useState([]);
   const [montoTotal, setMontoTotal] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fechaActual = mFechaSeleccionada.getFecha();
+      setFecha(fechaActual);
+      setTiempo((prev) => ({
+        ...prev,
+        drawCategoryId: mSorteo.id,
+        drawDate: formatDate(fechaActual, "yyyy-MM-dd"),
+      }));
+    }, []),
+  );
 
   const renderItem = ({ item }) => (
     <View>
@@ -203,7 +216,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
     if (selectedDate) {
-      setFecha(selectedDate);
+      setFecha(selectedDate);     
       setTiempo((prev) => ({
         ...prev,
         drawDate: selectedDate,
@@ -351,6 +364,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
   useEffect(() => {
     if (fecha || sorteoId || userData?.id) {
+      mFechaSeleccionada.setFecha(fecha);
       actualizaDesdeHeader();
     }
   }, [sorteoId, fecha]);

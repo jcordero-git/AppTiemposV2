@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Provider as PaperProvider } from "react-native-paper";
+import { useOrientationLock } from "./components/useOrientationLock";
 
 import { AuthProvider } from "./context/AuthContext";
 import { TiempoProvider } from "./models/mTiempoContext";
@@ -13,6 +14,8 @@ export default function App() {
   // useEffect(() => {
   //   syncInternetTime("America/Costa_Rica"); // también puedes usar "America/Santiago", etc.
   // }, []);
+  useOrientationLock();
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>

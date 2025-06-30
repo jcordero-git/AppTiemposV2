@@ -22,6 +22,7 @@ import mSorteo from "../models/mSorteoSingleton.js";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import { useAuth } from "../context/AuthContext";
+import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 
 const PremiosScreen = () => {
   const [loading, setLoading] = useState(false);
@@ -117,6 +118,13 @@ const PremiosScreen = () => {
     }
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      const fechaActual = mFechaSeleccionada.getFecha();
+      setFecha(fechaActual);
+    }, []),
+  );
+
   const cargaSorteoSeleccionado = async () => {
     Object.assign(mSorteo, mSorteo); // ✅ Copia las propiedades sin reemplazar el objeto
     setSorteoNombre(mSorteo.name);
@@ -137,6 +145,7 @@ const PremiosScreen = () => {
     if (!fecha || !sorteoId || !userData?.id) return;
     async function execute() {
       console.log("GETTING TIEMPOS VENDIDOS");
+      mFechaSeleccionada.setFecha(fecha);
       const isAllowed = await fetchTiemposAnteriores(
         sorteoId,
         formatDate(fecha, "yyyy-MM-dd"),
