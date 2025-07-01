@@ -2,25 +2,25 @@ import React, { useState, useEffect } from "react";
 import { ScrollView, TextInput, View, Text, StyleSheet } from "react-native";
 
 export default function TablaRestricciones({ data, useReventado }) {
-//   const [searchText, setSearchText] = useState("");
-//   const [filteredData, setFilteredData] = useState(data);
+  //   const [searchText, setSearchText] = useState("");
+  //   const [filteredData, setFilteredData] = useState(data);
 
-//   useEffect(() => {
-//     if (!searchText) {
-//       setFilteredData(data);
-//     } else {
-//       const lower = searchText.toLowerCase();
-//       setFilteredData(
-//         data.filter((item) => item.numero.toString().includes(lower)),
-//       );
-//     }
-//   }, [searchText, data]);
+  //   useEffect(() => {
+  //     if (!searchText) {
+  //       setFilteredData(data);
+  //     } else {
+  //       const lower = searchText.toLowerCase();
+  //       setFilteredData(
+  //         data.filter((item) => item.numero.toString().includes(lower)),
+  //       );
+  //     }
+  //   }, [searchText, data]);
 
-    console.log("USA REVENTADO: ", useReventado);
+  console.log("USA REVENTADO: ", useReventado);
 
   return (
     <View style={{ flex: 1 }}>
-  <ScrollView style={styles.scrollContainer}>
+      <ScrollView style={styles.scrollContainer}>
         <View style={styles.table}>
           {/* Encabezado */}
           <View style={[styles.row, styles.header]}>
@@ -35,9 +35,9 @@ export default function TablaRestricciones({ data, useReventado }) {
           {data.map((item, index) => (
             <View key={index} style={styles.row}>
               <Text style={styles.cell}>{item.numero}</Text>
-              <Text style={styles.cell}>₡{item.monto.toFixed(2)}</Text>
+              <Text style={styles.cell}>₡{item.monto.toFixed(0)}</Text>
               {useReventado && (
-                <Text style={styles.cell}>₡{item.rev_monto.toFixed(2)}</Text>
+                <Text style={styles.cell}>₡{item.rev_monto.toFixed(0)}</Text>
               )}
             </View>
           ))}

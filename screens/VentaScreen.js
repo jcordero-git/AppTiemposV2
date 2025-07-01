@@ -55,6 +55,7 @@ import { parseMessage } from "../utils/UtilParseMessageAI";
 import Constants from "expo-constants";
 import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import { useIsFocused } from "@react-navigation/native";
+import useCheckAppVersion from "../utils/versionChecker";
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
@@ -116,6 +117,8 @@ export default function VentaScreen({ navigation, route }) {
   const settingPorcentakeRevRestringido = userData.settings.find(
     (s) => s.porcentaje_reventado_restringido !== undefined,
   );
+
+  const { checking, checkVersion } = useCheckAppVersion(true);
 
   //const corsProxy = "https://cors-anywhere.herokuapp.com/";
   //const corsProxy = "";
@@ -1284,6 +1287,7 @@ export default function VentaScreen({ navigation, route }) {
               1,
             );
             setDialogPrintVisible(false);
+            limpiarDespuesDeImprimir();
           } catch (error) {
             console.error("❌ Error copiando al portapapeles:", error);
             showSnackbar(
@@ -3020,6 +3024,7 @@ export default function VentaScreen({ navigation, route }) {
 
                                 setGenerateImage(false);
                                 setDialogPrintVisible(false);
+                                limpiarDespuesDeImprimir();
                               }}
                               style={{
                                 width: "100%",

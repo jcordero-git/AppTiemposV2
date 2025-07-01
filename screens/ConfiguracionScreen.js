@@ -26,6 +26,7 @@ import { useTiempo } from "../models/mTiempoContext";
 import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
 import Constants from "expo-constants";
 import { WebView } from "react-native-webview";
+import useCheckAppVersion from "../utils/versionChecker";
 import { ht } from "date-fns/locale";
 
 export default function ConfiguracionScreen({ navigation, route }) {
@@ -45,6 +46,8 @@ export default function ConfiguracionScreen({ navigation, route }) {
   const [webviewHeight, setWebviewHeight] = useState(100); // altura inicial mínima
 
   const iframeRef = useRef(null);
+
+  const { checking, checkVersion } = useCheckAppVersion(false);
 
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null);
   const [categoriasMonto, setCategoriasMonto] = useState("");
@@ -164,6 +167,13 @@ export default function ConfiguracionScreen({ navigation, route }) {
             color="#fff" // Blanco para contraste con fondo verde
             style={{ marginRight: 20 }}
             onPress={handleSave}
+          />
+          <MaterialIcons
+            name="system-update"
+            size={24}
+            color="#fff" // Blanco para contraste con fondo verde
+            style={{ marginRight: 20 }}
+            onPress={checkVersion}
           />
           {/* <MaterialIcons
             name="download"
