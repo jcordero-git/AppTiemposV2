@@ -168,13 +168,15 @@ export default function ConfiguracionScreen({ navigation, route }) {
             style={{ marginRight: 20 }}
             onPress={handleSave}
           />
-          <MaterialIcons
-            name="system-update"
-            size={24}
-            color="#fff" // Blanco para contraste con fondo verde
-            style={{ marginRight: 20 }}
-            onPress={checkVersion}
-          />
+          {Platform.OS === "android" && (
+            <MaterialIcons
+              name="system-update"
+              size={24}
+              color="#fff" // Blanco para contraste con fondo verde
+              style={{ marginRight: 20 }}
+              onPress={checkVersion}
+            />
+          )}
           {/* <MaterialIcons
             name="download"
             size={24}

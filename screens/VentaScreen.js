@@ -117,8 +117,12 @@ export default function VentaScreen({ navigation, route }) {
   const settingPorcentakeRevRestringido = userData.settings.find(
     (s) => s.porcentaje_reventado_restringido !== undefined,
   );
-
-  const { checking, checkVersion } = useCheckAppVersion(true);
+  const { checkVersion } = useCheckAppVersion(false);
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      checkVersion();
+    }
+  }, []);
 
   //const corsProxy = "https://cors-anywhere.herokuapp.com/";
   //const corsProxy = "";
@@ -2817,7 +2821,7 @@ export default function VentaScreen({ navigation, route }) {
         >
           {/* Diálogo Print */}
           <Dialog.Content>
-            {html && (
+            {dialogPrintVisible && html && (
               <>
                 <View
                   style={{

@@ -6,7 +6,7 @@ import { NativeModules } from "react-native";
 const { ApkInstaller } = NativeModules;
 
 export default function useCheckAppVersion(autoCheck = true) {
-  const [checking, setChecking] = useState(false);
+  //const [checking, setChecking] = useState(false);
   const { userData } = useAuth();
   const token = userData?.token;
 
@@ -17,7 +17,7 @@ export default function useCheckAppVersion(autoCheck = true) {
   const APK_ENDPOINT = `${backend_url}/api/apk/last`;
 
   const checkVersion = useCallback(async () => {
-    setChecking(true);
+    //setChecking(true);
 
     try {
       const response = await fetch(APK_ENDPOINT);
@@ -35,7 +35,7 @@ export default function useCheckAppVersion(autoCheck = true) {
     } catch (e) {
       console.error("Error verificando versión", e);
     } finally {
-      setChecking(false);
+      //setChecking(false);
     }
   }, [APK_ENDPOINT]);
 
@@ -82,5 +82,5 @@ export default function useCheckAppVersion(autoCheck = true) {
   }, [checkVersion]);
 
   // ✅ Ahora también devuelves la función para usarla manualmente
-  return { checking, checkVersion };
+  return { checkVersion };
 }

@@ -22,6 +22,10 @@ import { formatHourStr } from "../utils/datetimeUtils";
 const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
   const route = useRoute();
   const { userData, logout } = useAuth();
+  const settingBackendURL = userData.settings.find(
+    (s) => s.backend_url !== undefined,
+  );
+  const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
 
   const [modalVisible, setModalVisible] = useState(false);
   const [sorteoNombre, setSorteoNombre] = useState("");
@@ -104,7 +108,7 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
   const fetchSorteos = async () => {
     try {
       const response = await fetch(
-        `https://3jbe.tiempos.website/api/drawCategory/user/${userData.id}`,
+        `${backend_url}/api/drawCategory/user/${userData.id}`,
       );
       const data = await response.json();
       // Asegúrate de mapear los datos al formato que esperas en FlatList
