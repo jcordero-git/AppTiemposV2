@@ -56,6 +56,7 @@ import Constants from "expo-constants";
 import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import { useIsFocused } from "@react-navigation/native";
 import useCheckAppVersion from "../utils/versionChecker";
+import html2canvas from "html2canvas";
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
@@ -564,8 +565,11 @@ export default function VentaScreen({ navigation, route }) {
             tiempoRef.current.drawCategoryId > 0 &&
             !!tiempoRef.current.drawDate &&
             Array.isArray(tiempoRef.current.numbers) &&
-            tiempoRef.current.numbers.length > 0) ||
-            (tiempoSeleccionado && tiempoSeleccionado.id > 0)) && (
+            tiempoRef.current.numbers.length > 0 &&
+            !dialogPrintVisible) ||
+            (tiempoSeleccionado &&
+              tiempoSeleccionado.id > 0 &&
+              !dialogPrintVisible)) && (
             <>
               <TouchableOpacity
                 disabled={isSharingRef.current}
@@ -639,6 +643,7 @@ export default function VentaScreen({ navigation, route }) {
     refreshHeader,
     ticketProfile,
     isSharing,
+    dialogPrintVisible,
   ]);
 
   const handleNuevoTiempo = async (id) => {
@@ -1227,7 +1232,7 @@ export default function VentaScreen({ navigation, route }) {
 
     const compartir = async () => {
       if (Platform.OS === "web") {
-        const html2canvas = (await import("html2canvas")).default;
+        //const html2canvas = (await import("html2canvas")).default;
         const container = window.document.createElement("div");
 
         container.innerHTML = html;

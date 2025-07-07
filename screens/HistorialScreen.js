@@ -278,7 +278,7 @@ export default function HistorialScreen({ navigation, route }) {
       }
 
       const bankingResponse = await fetch(
-        `http://147.182.248.177:3001/api/banking/byUser/${userData.id}/${desde}/${hasta}`,
+        `${backend_url}/api/banking/byUser/${userData.id}/${desde}/${hasta}`,
       );
       const dataBanking = await bankingResponse.json();
       console.log("dataBanking api: ", dataBanking);

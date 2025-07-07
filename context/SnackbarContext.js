@@ -1,5 +1,11 @@
 // context/SnackbarContext.js
-import React, { createContext, useContext, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useRef,
+  useEffect,
+} from "react";
 import { useWindowDimensions } from "react-native";
 import { Snackbar, Dialog, Portal, Button, Text } from "react-native-paper";
 
@@ -14,29 +20,47 @@ const typeColors = {
 };
 
 export const SnackbarProvider = ({ children }) => {
+  const [queue, setQueue] = useState([]);
+  const [current, setCurrent] = useState(null);
   const [visible, setVisible] = useState(false);
-  const [message, setMessage] = useState("");
-  const [duration, setDuration] = useState(3000);
-  const [type, setType] = useState(1); // Por defecto success
+  const timerRef = useRef(null);
 
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState("");
   const [onConfirm, setOnConfirm] = useState(null);
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const isWeb = width > 710;
 
-  const showSnackbar = (msg, typeValue = 1, time = 3000) => {
-    setMessage(msg);
-    setType(typeValue);
-    setDuration(time);
-    setVisible(true);
+  const showSnackbar = (msg, type = 1, duration = 3000) => {
+    setQueue((q) => [...q, { msg, type, duration }]);
   };
 
-  const hideSnackbar = () => setVisible(false);
+  // Maneja el siguiente snackbar si no hay visible y hay en cola
+  useEffect(() => {
+    if (!visible && !current && queue.length > 0) {
+      const next = queue[0];
+      setCurrent(next);
+      setQueue((q) => q.slice(1));
+      setVisible(true);
+
+      timerRef.current = window.setTimeout(() => {
+        setVisible(false);
+        setCurrent(null);
+      }, next.duration);
+    }
+  }, [queue, visible, current]);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
 
   const showConfirm = ({ message, onConfirm }) => {
     setConfirmMessage(message);
-    setOnConfirm(() => onConfirm); // guardar callback
+    setOnConfirm(() => onConfirm);
     setConfirmVisible(true);
   };
 
@@ -54,17 +78,20 @@ export const SnackbarProvider = ({ children }) => {
       {children}
       <Snackbar
         visible={visible}
-        onDismiss={hideSnackbar}
-        duration={duration}
-        style={{ backgroundColor: typeColors[type] || typeColors[1] }}
+        onDismiss={() => {
+          setVisible(false);
+          setCurrent(null);
+        }}
+        duration={current?.duration || 3000}
+        style={{ backgroundColor: typeColors[current?.type] || typeColors[1] }}
       >
-        {message}
+        {current?.msg}
       </Snackbar>
 
       <Portal>
         <Dialog
           visible={confirmVisible}
-          onDismiss={() => {}} // Evita cerrar al tocar fuera
+          onDismiss={() => {}}
           style={[
             {
               backgroundColor: "white",
@@ -86,15 +113,15 @@ export const SnackbarProvider = ({ children }) => {
             },
           ]}
         >
-          <Dialog.Title style={[{ color: "black" }]}>Confirmación</Dialog.Title>
+          <Dialog.Title style={{ color: "black" }}>Confirmación</Dialog.Title>
           <Dialog.Content>
-            <Text style={[{ color: "black" }]}>{confirmMessage}</Text>
+            <Text style={{ color: "black" }}>{confirmMessage}</Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button
               textColor="red"
               style={{
-                backgroundColor: "white", // Fondo blanco
+                backgroundColor: "white",
                 marginBottom: 10,
                 borderRadius: 3,
               }}
@@ -105,7 +132,7 @@ export const SnackbarProvider = ({ children }) => {
             <Button
               textColor="green"
               style={{
-                backgroundColor: "white", // Fondo blanco
+                backgroundColor: "white",
                 marginBottom: 10,
                 borderRadius: 3,
               }}
