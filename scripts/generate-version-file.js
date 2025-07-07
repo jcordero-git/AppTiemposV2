@@ -1,5 +1,5 @@
-import fs from "fs";
-import appJson from "../app.json";
+const fs = require("fs");
+const appJson = require("../app.json");
 
 const versionName = appJson.expo.version;
 const versionCode = appJson.expo.android?.versionCode || 1;

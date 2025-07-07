@@ -56,7 +56,7 @@ import Constants from "expo-constants";
 import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import { useIsFocused } from "@react-navigation/native";
 import useCheckAppVersion from "../utils/versionChecker";
-import html2canvas from "html2canvas";
+import getHtml2Canvas from "../utils/getHtml2Canvas";
 
 export default function VentaScreen({ navigation, route }) {
   console.log("🎯 RENDER VentaScreen");
@@ -119,6 +119,7 @@ export default function VentaScreen({ navigation, route }) {
     (s) => s.porcentaje_reventado_restringido !== undefined,
   );
   const { checkVersion } = useCheckAppVersion(false);
+  //let html2canvas;
   useEffect(() => {
     if (Platform.OS === "android") {
       checkVersion();
@@ -1232,7 +1233,12 @@ export default function VentaScreen({ navigation, route }) {
 
     const compartir = async () => {
       if (Platform.OS === "web") {
-        //const html2canvas = (await import("html2canvas")).default;
+        const html2canvas = getHtml2Canvas();
+        if (!html2canvas) {
+          showSnackbar("html2canvas no disponible en esta plataforma.", 3);
+          return;
+        }
+
         const container = window.document.createElement("div");
 
         container.innerHTML = html;

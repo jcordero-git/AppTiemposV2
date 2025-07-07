@@ -26,8 +26,7 @@
       "package": "com.jose.cordero.brenes.AppTiemposV2"
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "webpack"
+      "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
