@@ -211,20 +211,20 @@ export default function ConfiguracionScreen({ navigation, route }) {
               title="Acerca..."
               titleStyle={{ color: "#000" }} // Texto negro opcional
             /> */}
-            <Menu.Item
+            {/* <Menu.Item
               onPress={() => {
                 handleCambiarContrasena();
               }}
               title="Cambiar contraseña"
               titleStyle={{ color: "#000" }} // Texto negro opcional
-            />
+            /> */}
             <Menu.Item
               onPress={() => {
                 closeMenuHeader();
                 logout();
               }}
               title="Cerrar Sesión"
-              titleStyle={{ color: "#000" }} // Texto negro opcional
+              titleStyle={{ color: "red" }} // Texto negro opcional
             />
           </Menu>
         </>

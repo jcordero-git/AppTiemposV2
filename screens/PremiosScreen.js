@@ -59,12 +59,12 @@ export default function PremiosScreen({ navigation, route }) {
       headerTintColor: "#fff",
       headerRight: () => (
         <>
-          <MaterialIcons
+          {/* <MaterialIcons
             name="save"
             size={24}
             color="#fff" // Blanco para contraste con fondo verde
             style={{ marginRight: 20 }}
-          />
+          /> */}
         </>
       ),
     });
@@ -155,6 +155,12 @@ export default function PremiosScreen({ navigation, route }) {
       (async () => {
         if (mSorteo.id !== 0) {
           await cargaSorteoSeleccionado();
+
+          mFechaSeleccionada.setFecha(fecha);
+          const isAllowed = await fetchTiemposAnteriores(
+            sorteoId,
+            formatDate(fecha, "yyyy-MM-dd"),
+          );
         }
       })();
     }, [fecha, sorteoId]), // <--- agregá las dependencias acá
@@ -194,14 +200,10 @@ export default function PremiosScreen({ navigation, route }) {
             const numeroCoincidente = item.numbers.find(
               (n) => n.numero === numero.trim(),
             );
-            console.log("userValues: ", mSorteo?.userValues);
-            console.log("numeroCoincidente: ", numeroCoincidente);
             const monto = numeroCoincidente?.monto || 0;
             const prizeTimes = mSorteo?.userValues.prizeTimes || 0;
             const premio = monto * prizeTimes;
-
             const isReventado = currentColor === "red";
-
             const montoReventado = isReventado
               ? numeroCoincidente?.montoReventado || 0
               : 0;
@@ -341,18 +343,22 @@ export default function PremiosScreen({ navigation, route }) {
                       returnKeyType="done"
                       blurOnSubmit={false}
                     />
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => {
-                        toggleColor();
-                      }}
-                    >
-                      <MaterialIcons
-                        name="circle"
-                        size={20}
-                        color={colors[colorIndex]}
-                      />
-                    </TouchableOpacity>
+                    {mSorteo.useReventado && (
+                      <>
+                        <TouchableOpacity
+                          style={styles.iconButton}
+                          onPress={() => {
+                            toggleColor();
+                          }}
+                        >
+                          <MaterialIcons
+                            name="circle"
+                            size={20}
+                            color={colors[colorIndex]}
+                          />
+                        </TouchableOpacity>
+                      </>
+                    )}
                   </View>
                 </>
                 {/* </ScrollView> */}

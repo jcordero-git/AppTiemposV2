@@ -31,7 +31,7 @@ export const SnackbarProvider = ({ children }) => {
   const { width } = useWindowDimensions();
   const isWeb = width > 710;
 
-  const showSnackbar = (msg, type = 1, duration = 3000) => {
+  const showSnackbar = (msg, type = 1, duration = 2000) => {
     setQueue((q) => [...q, { msg, type, duration }]);
   };
 

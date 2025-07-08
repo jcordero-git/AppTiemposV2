@@ -2775,7 +2775,7 @@ export default function VentaScreen({ navigation, route }) {
                         }
                         style={styles.iconButtonRestringidos}
                       >
-                        <MaterialIcons name="warning" size={20} color="red" />
+                        <MaterialIcons name="warning" size={20} color="green" />
                       </Pressable>
                       <RestringidosModal
                         visible={restringidosModalVisible}
