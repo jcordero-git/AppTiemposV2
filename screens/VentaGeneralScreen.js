@@ -144,7 +144,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
             <Text
               style={{
                 fontWeight: "bold",
-                fontFamily: "monospace",
+                fontFamily: "RobotoMono",
                 textAlign: "left",
                 minWidth: 15,
                 flexShrink: 1,
@@ -156,14 +156,14 @@ export default function VentaGeneralScreen({ navigation, route }) {
             </Text>
             <Text
               style={{
-                fontFamily: "monospace",
+                fontFamily: "RobotoMono",
                 textAlign: "right",
                 minWidth: 40,
                 flexShrink: 1,
                 display: "block",
               }}
             >
-              ₡{item.monto}
+              {"\u20A1"}{item.monto}
             </Text>
           </View>
 
@@ -181,7 +181,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
                 style={{
                   color: "red",
                   fontWeight: "bold",
-                  fontFamily: "monospace",
+                  fontFamily: "RobotoMono",
                   textAlign: "left",
                   minWidth: 20,
                   flexShrink: 1,
@@ -193,14 +193,14 @@ export default function VentaGeneralScreen({ navigation, route }) {
               <Text
                 style={{
                   color: "red",
-                  fontFamily: "monospace",
+                  fontFamily: "RobotoMono",
                   textAlign: "right",
                   minWidth: 40,
                   flexShrink: 1,
                   display: "block",
                 }}
               >
-                ₡{item.montoReventado}
+                {"\u20A1"}{item.montoReventado}
               </Text>
             </View>
           )}

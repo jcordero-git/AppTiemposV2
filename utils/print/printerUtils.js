@@ -164,6 +164,7 @@ class PrinterUtils {
       //this.disconnect();
     } catch (error) {
       console.error("❌ Error al imprimir en fragmentos:", error);
+      throw new Error("Error al imprimir en fragmentos:");
     }
   }
 
@@ -469,6 +470,7 @@ class PrinterUtils {
       //this.disconnect();
     } catch (err) {
       console.error("❌ Error al imprimir:", err);
+      throw new Error("Error al imprimir");
     }
   }
 }

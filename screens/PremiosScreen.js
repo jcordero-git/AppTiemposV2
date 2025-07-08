@@ -24,7 +24,8 @@ import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es nec
 import { useAuth } from "../context/AuthContext";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 
-const PremiosScreen = () => {
+export default function PremiosScreen({ navigation, route }) {
+  console.log("🎯 RENDER Premios Screen");
   const [loading, setLoading] = useState(false);
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
@@ -50,6 +51,24 @@ const PremiosScreen = () => {
 
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
   const [items, setItems] = useState([]);
+
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      title: "PREMIOS",
+      headerStyle: { backgroundColor: "#4CAF50" },
+      headerTintColor: "#fff",
+      headerRight: () => (
+        <>
+          <MaterialIcons
+            name="save"
+            size={24}
+            color="#fff" // Blanco para contraste con fondo verde
+            style={{ marginRight: 20 }}
+          />
+        </>
+      ),
+    });
+  }, [navigation]);
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
@@ -154,6 +173,17 @@ const PremiosScreen = () => {
     execute();
   }, [sorteoId, fecha]);
 
+  const [colorIndex, setColorIndex] = useState(0);
+
+  //const colors = ["white", "gray", "red"];
+  const colors = ["white", "red"];
+
+  const toggleColor = () => {
+    setColorIndex((prev) => (prev + 1) % colors.length);
+  };
+
+  const currentColor = colors[colorIndex];
+
   const tiemposFiltrados =
     numero.trim().length === 2
       ? tiemposAnteriores
@@ -164,24 +194,43 @@ const PremiosScreen = () => {
             const numeroCoincidente = item.numbers.find(
               (n) => n.numero === numero.trim(),
             );
-
+            console.log("userValues: ", mSorteo?.userValues);
+            console.log("numeroCoincidente: ", numeroCoincidente);
             const monto = numeroCoincidente?.monto || 0;
             const prizeTimes = mSorteo?.userValues.prizeTimes || 0;
             const premio = monto * prizeTimes;
+
+            const isReventado = currentColor === "red";
+
+            const montoReventado = isReventado
+              ? numeroCoincidente?.montoReventado || 0
+              : 0;
+
+            const revPrizeTimes = isReventado
+              ? mSorteo?.userValues.revPrizeTimes || 0
+              : 0;
+
+            const revPremio = montoReventado * revPrizeTimes;
 
             return {
               ...item,
               monto,
               prizeTimes,
               premio,
+              montoReventado,
+              revPrizeTimes,
+              revPremio,
             };
           })
       : [];
 
   // Calcular total
   const total = tiemposFiltrados?.reduce((sum, item) => {
-    const premio = parseFloat(item.premio);
-    return sum + (!isNaN(premio) ? premio : 0);
+    //const premio = parseFloat(item.premio);
+    const premio = parseFloat(item.premio) || 0;
+    const revPremio = parseFloat(item.revPremio) || 0;
+    //return sum + (!isNaN(premio) ? premio : 0);
+    return sum + (currentColor === "red" ? premio + revPremio : premio);
   }, 0);
 
   return (
@@ -266,18 +315,12 @@ const PremiosScreen = () => {
                 <>
                   {/* Botón, Monto y Número en una fila */}
                   <View style={styles.row}>
-                    <TouchableOpacity
-                      style={styles.iconButton}
-                      onPress={() => {}}
-                    >
-                      <MaterialIcons name={"circle"} size={20} color="gray" />
-                    </TouchableOpacity>
                     <TextInput
                       ref={numeroRef}
                       placeholder="Número"
                       style={[
                         styles.inputSmall,
-                        { marginLeft: 8, minWidth: 70 },
+                        { marginRight: 8, minWidth: 70 },
                       ]}
                       value={numero}
                       onChangeText={(text) => {
@@ -298,6 +341,18 @@ const PremiosScreen = () => {
                       returnKeyType="done"
                       blurOnSubmit={false}
                     />
+                    <TouchableOpacity
+                      style={styles.iconButton}
+                      onPress={() => {
+                        toggleColor();
+                      }}
+                    >
+                      <MaterialIcons
+                        name="circle"
+                        size={20}
+                        color={colors[colorIndex]}
+                      />
+                    </TouchableOpacity>
                   </View>
                 </>
                 {/* </ScrollView> */}
@@ -329,13 +384,32 @@ const PremiosScreen = () => {
                         Fecha: {new Date(item.updatedAt).toLocaleString()}
                       </Text>
                       <Text style={{ fontWeight: "bold" }}>
-                        Monto jugado: ₡{item.monto}
+                        Premio: ₡{item.monto} x {item.prizeTimes} = ₡
+                        {item.premio}
                       </Text>
-                      <Text style={{ fontWeight: "bold" }}>
+                      {/* <Text style={{ fontWeight: "bold" }}>
                         Multiplicador: {item.prizeTimes} Veces
                       </Text>
                       <Text style={{ color: "#090" }}>
                         Premio a pagar: ₡{item.premio}
+                      </Text> */}
+
+                      {currentColor === "red" && item.montoReventado > 0 && (
+                        <>
+                          <Text style={{ fontWeight: "bold" }}>
+                            Premio Reventado: ₡{item.montoReventado} x{" "}
+                            {item.revPrizeTimes} = ₡{item.revPremio}
+                          </Text>
+                          {/* <Text style={{ fontWeight: "bold" }}>
+                            Multiplicador Rev: {item.revPrizeTimes} Veces
+                          </Text>
+                          <Text style={{ color: "#090" }}>
+                            Premio Rev a pagar: ₡{item.revPremio}
+                          </Text> */}
+                        </>
+                      )}
+                      <Text style={{ color: "#090" }}>
+                        Premio Total a pagar: ₡{item.premio + item.revPremio}
                       </Text>
                     </Pressable>
                   ))}
@@ -366,7 +440,7 @@ const PremiosScreen = () => {
       />
     </Provider>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -552,7 +626,7 @@ const styles = StyleSheet.create({
   totalBar: {
     marginTop: 10,
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     paddingTop: 10,
     borderTopWidth: 1,
     borderColor: "#ccc",
@@ -598,5 +672,3 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 });
-
-export default PremiosScreen;

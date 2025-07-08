@@ -119,15 +119,11 @@ export default function VentaScreen({ navigation, route }) {
     (s) => s.porcentaje_reventado_restringido !== undefined,
   );
   const { checkVersion } = useCheckAppVersion(false);
-  //let html2canvas;
   useEffect(() => {
     if (Platform.OS === "android") {
       checkVersion();
     }
   }, []);
-
-  //const corsProxy = "https://cors-anywhere.herokuapp.com/";
-  //const corsProxy = "";
 
   useFocusEffect(
     useCallback(() => {
@@ -1072,7 +1068,7 @@ export default function VentaScreen({ navigation, route }) {
         }, 500);
       }
     } catch (e) {
-      console.error("Error al imprimir:", e);
+      console.error("Error al imprimir 4:", e);
       showSnackbar(
         "Hubo un error al imprimir. Revisa la conexión con la impresora.",
         3,
@@ -1178,9 +1174,9 @@ export default function VentaScreen({ navigation, route }) {
       setDialogPrintVisible(true);
       Keyboard.dismiss(); // Oculta el teclado
 
-      if (Platform.OS === "web") {
-        window.location.href = "whatsapp://";
-      }
+      // if (Platform.OS === "web") {
+      //   window.location.href = "whatsapp://";
+      // }
 
       if (limpiarRef.current && !tiempoSeleccionado) {
         //limpiarDespuesDeImprimir();//TODO: revisar esta linea, hay que limmpiar el tiemmpo.ref
@@ -1301,6 +1297,9 @@ export default function VentaScreen({ navigation, route }) {
               "✅ Imagen copiada. Ahora podés pegarla en WhatsApp Web (Ctrl+V).",
               1,
             );
+            // if (Platform.OS === "web") {
+            window.location.href = "whatsapp://";
+            // }
             setDialogPrintVisible(false);
             limpiarDespuesDeImprimir();
           } catch (error) {
