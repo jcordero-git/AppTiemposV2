@@ -23,6 +23,7 @@ import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import { useAuth } from "../context/AuthContext";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
+import PrinterUtils from "../utils/print/printerUtils";
 
 export default function PremiosScreen({ navigation, route }) {
   console.log("🎯 RENDER Premios Screen");
@@ -52,6 +53,62 @@ export default function PremiosScreen({ navigation, route }) {
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
   const [items, setItems] = useState([]);
 
+  const [colorIndex, setColorIndex] = useState(0);
+
+  //const colors = ["white", "gray", "red"];
+  const colors = ["white", "red"];
+
+  const toggleColor = () => {
+    setColorIndex((prev) => (prev + 1) % colors.length);
+  };
+
+  const currentColor = colors[colorIndex];
+
+  const tiemposFiltrados =
+    numero.trim().length === 2
+      ? tiemposAnteriores
+          .filter((item) =>
+            item.numbers?.some((n) => n.numero === numero.trim()),
+          )
+          .map((item) => {
+            const numeroCoincidente = item.numbers.find(
+              (n) => n.numero === numero.trim(),
+            );
+            const monto = numeroCoincidente?.monto || 0;
+            const prizeTimes = mSorteo?.userValues.prizeTimes || 0;
+            const premio = monto * prizeTimes;
+            const isReventado = currentColor === "red";
+            const montoReventado = isReventado
+              ? numeroCoincidente?.montoReventado || 0
+              : 0;
+
+            const revPrizeTimes = isReventado
+              ? mSorteo?.userValues.revPrizeTimes || 0
+              : 0;
+
+            const revPremio = montoReventado * revPrizeTimes;
+
+            return {
+              ...item,
+              monto,
+              prizeTimes,
+              premio,
+              montoReventado,
+              revPrizeTimes,
+              revPremio,
+            };
+          })
+      : [];
+
+  // Calcular total
+  const total = tiemposFiltrados?.reduce((sum, item) => {
+    //const premio = parseFloat(item.premio);
+    const premio = parseFloat(item.premio) || 0;
+    const revPremio = parseFloat(item.revPremio) || 0;
+    //return sum + (!isNaN(premio) ? premio : 0);
+    return sum + (currentColor === "red" ? premio + revPremio : premio);
+  }, 0);
+
   React.useLayoutEffect(() => {
     navigation.setOptions({
       title: "PREMIOS",
@@ -65,10 +122,83 @@ export default function PremiosScreen({ navigation, route }) {
             color="#fff" // Blanco para contraste con fondo verde
             style={{ marginRight: 20 }}
           /> */}
+          <TouchableOpacity onPress={handlePrintBt} style={{ marginRight: 16 }}>
+            <MaterialIcons name="print" size={24} color="#fff" />
+          </TouchableOpacity>
         </>
       ),
     });
-  }, [navigation]);
+  }, [
+    navigation,
+    tiemposFiltrados,
+    total,
+    mSorteo,
+    userData,
+    ticketProfile,
+    numero,
+    currentColor,
+  ]);
+
+  const handlePrintBt = async () => {
+    try {
+      if (Platform.OS === "android") {
+        const mac = ticketProfile.lastPrinterMacAddress;
+        try {
+          await PrinterUtils.connectToDevice(mac);
+        } catch (error) {
+          console.warn("No se pudo conectar al MAC guardado. Escaneando...");
+          const dispositivos = [];
+          await new Promise((resolve, reject) => {
+            PrinterUtils.scanDevices((device) => {
+              dispositivos.push(device);
+              if (device.id === mac) {
+                resolve();
+              }
+            });
+            window.setTimeout(() => {
+              reject(new Error("Tiempo de escaneo agotado"));
+            }, 10000);
+          });
+          const found = dispositivos.find((d) => d.id === mac);
+          if (!found) {
+            showSnackbar(
+              "Impresora no encontrada. Por favor empareje desde ajustes.",
+              3,
+            );
+            return;
+          }
+          await PrinterUtils.connectToDevice(found.id);
+        }
+        console.log("ITEMS: ", tiemposFiltrados);
+        await PrinterUtils.printPremios({
+          items: tiemposFiltrados,
+          total: total,
+          sorteoSeleccionado: mSorteo,
+          vendedorData: userData,
+          ticketProfile: ticketProfile,
+          numeroPremiado: numero,
+          reventado: currentColor === "red",
+        });
+
+        await PrinterUtils.disconnect();
+      } else if (Platform.OS === "web") {
+        // const iframeWindow = iframeRef.current.contentWindow;
+        // if (iframeWindow) {
+        //   iframeWindow.focus();
+        //   iframeWindow.print();
+        // }
+        // window.setTimeout(() => {
+        //   setDialogPrintVisible(false);
+        // }, 500);
+      }
+    } catch (e) {
+      console.error("Error al imprimir 4:", e);
+      showSnackbar(
+        "Hubo un error al imprimir. Revisa la conexión con la impresora.",
+        3,
+      );
+    }
+  };
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
@@ -178,62 +308,6 @@ export default function PremiosScreen({ navigation, route }) {
     }
     execute();
   }, [sorteoId, fecha]);
-
-  const [colorIndex, setColorIndex] = useState(0);
-
-  //const colors = ["white", "gray", "red"];
-  const colors = ["white", "red"];
-
-  const toggleColor = () => {
-    setColorIndex((prev) => (prev + 1) % colors.length);
-  };
-
-  const currentColor = colors[colorIndex];
-
-  const tiemposFiltrados =
-    numero.trim().length === 2
-      ? tiemposAnteriores
-          .filter((item) =>
-            item.numbers?.some((n) => n.numero === numero.trim()),
-          )
-          .map((item) => {
-            const numeroCoincidente = item.numbers.find(
-              (n) => n.numero === numero.trim(),
-            );
-            const monto = numeroCoincidente?.monto || 0;
-            const prizeTimes = mSorteo?.userValues.prizeTimes || 0;
-            const premio = monto * prizeTimes;
-            const isReventado = currentColor === "red";
-            const montoReventado = isReventado
-              ? numeroCoincidente?.montoReventado || 0
-              : 0;
-
-            const revPrizeTimes = isReventado
-              ? mSorteo?.userValues.revPrizeTimes || 0
-              : 0;
-
-            const revPremio = montoReventado * revPrizeTimes;
-
-            return {
-              ...item,
-              monto,
-              prizeTimes,
-              premio,
-              montoReventado,
-              revPrizeTimes,
-              revPremio,
-            };
-          })
-      : [];
-
-  // Calcular total
-  const total = tiemposFiltrados?.reduce((sum, item) => {
-    //const premio = parseFloat(item.premio);
-    const premio = parseFloat(item.premio) || 0;
-    const revPremio = parseFloat(item.revPremio) || 0;
-    //return sum + (!isNaN(premio) ? premio : 0);
-    return sum + (currentColor === "red" ? premio + revPremio : premio);
-  }, 0);
 
   return (
     <Provider>

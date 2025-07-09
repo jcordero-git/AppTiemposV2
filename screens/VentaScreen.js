@@ -33,7 +33,7 @@ import JsBarcode from "jsbarcode";
 
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
-import { generateHTML } from "../utils/share/generateHTML"; // Ajusta según tu estructura
+import { generateHTML } from "../utils/share/generateHTML";
 import PrinterUtils from "../utils/print/printerUtils";
 
 import { useCameraPermissions } from "expo-camera";

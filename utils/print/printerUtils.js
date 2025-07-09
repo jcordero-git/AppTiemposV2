@@ -221,8 +221,6 @@ class PrinterUtils {
     const { phoneNumber, printBarCode, sellerName, ticketFooter, ticketTitle } =
       ticketProfile;
 
-    console.log("ticket footer: ", ticketFooter);
-
     const normalNumbers = numbers.filter((n) => parseFloat(n.monto) > 0);
     const reventados = numbers.filter((n) => parseFloat(n.montoReventado) > 0);
 
@@ -423,6 +421,121 @@ class PrinterUtils {
     parts.push(Buffer.from([0x1b, 0x61, 0x00])); // Alinear a la izquierda
     parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
     parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
+
+    const bufferFinal = Buffer.concat(parts);
+    await this.safePrint(bufferFinal);
+    //await this.sendInChunks("SG9sYQo=");
+  }
+
+  async printPremios({
+    items,
+    total,
+    sorteoSeleccionado,
+    vendedorData,
+    ticketProfile,
+    numeroPremiado,
+    reventado,
+  }) {
+    //const { id: codigo, clientName, drawDate, numbers = [] } = items;
+    const { phoneNumber, printBarCode, sellerName, ticketFooter, ticketTitle } =
+      ticketProfile;
+
+    console.log("ITEMS: ", items);
+
+    // const total = items.reduce(
+    //   (sum, n) => sum + parseInt(n.premio || 0) + parseInt(n.revPremio || 0),
+    //   0,
+    // );
+
+    const vendedorNombre =
+      sellerName?.trim() !== "" ? sellerName : vendedorData.name || "";
+    const vendedorCodigo = vendedorData.userCode || "";
+    const telefono =
+      phoneNumber?.trim() !== "" ? phoneNumber : vendedorData.phone || "N/A";
+    const prizeTimes =
+      sorteoSeleccionado.userValues?.prizeTimes ??
+      vendedorData.prizeTimes ??
+      "";
+    const revPrizeTimes =
+      sorteoSeleccionado.userValues?.revPrizeTimes ??
+      vendedorData.revPrizeTimes ??
+      "";
+
+    const parts = [];
+    parts.push(Buffer.from([0x1b, 0x40])); // reset
+    parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
+    parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
+    parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
+    parts.push(Buffer.from(`PREMIOS\n`, "ascii"));
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
+    parts.push(Buffer.from(`${sorteoSeleccionado.name}`, "ascii"));
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
+    parts.push(
+      Buffer.from(alignLeftRight("PREMIADO: ", `#${numeroPremiado}`), "ascii"),
+    );
+
+    parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
+    parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
+    parts.push(Buffer.from([0x1b, 0x61, 0x00])); // Alinear a la izquierda
+
+    parts.push(Buffer.from("--------------------------------\n", "ascii"));
+    items.forEach((item) => {
+      parts.push(Buffer.from(`Codigo:    #${item.id}\n`, "ascii"));
+      parts.push(
+        Buffer.from(
+          `Fecha:     ${formatDate(item.createdAt, "dd/MM/yyyy hh:mm:a")}\n`,
+          "ascii",
+        ),
+      );
+      parts.push(
+        Buffer.from(`Cliente:   ${item.clientName || "Sin Nombre"}\n`, "ascii"),
+      );
+      parts.push(
+        Buffer.from(
+          alignLeftRight(
+            `Premio:    ${item.monto} x ${item.prizeTimes} =`,
+            `${item.premio}\n`,
+            33,
+          ),
+          "ascii",
+        ),
+      );
+      if (item.montoReventado > 0) {
+        parts.push(
+          Buffer.from(
+            alignLeftRight(
+              `Reventado: ${item.montoReventado} x ${item.revPrizeTimes} =`,
+              `${item.revPremio}\n`,
+              33,
+            ),
+            "ascii",
+          ),
+        );
+      }
+      parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
+      parts.push(
+        Buffer.from(
+          alignLeftRight(`TOTAL:`, `${item.premio + item.revPremio}\n`, 33),
+          "ascii",
+        ),
+      );
+      parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
+      parts.push(Buffer.from("--------------------------------\n", "ascii"));
+    });
+
+    parts.push(Buffer.from([0x1b, 0x61, 0x00])); // Alinear a la izquierda
+    parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
+    parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
+    parts.push(
+      Buffer.from(alignLeftRight("TOTAL:", total.toString()), "ascii"),
+    );
+    parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
+    parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
+    parts.push(Buffer.from("--------------------------------\n", "ascii"));
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
 
     const bufferFinal = Buffer.concat(parts);
     await this.safePrint(bufferFinal);
