@@ -395,7 +395,7 @@ class PrinterUtils {
     parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
     parts.push(Buffer.from(`${ticketTitle}`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
+    //parts.push(Buffer.from([0x0a])); // Salto de Linea
 
     if (re_impresion) {
       parts.push(Buffer.from([0x1b, 0x21, 0x30])); // Doble ancho y alto
@@ -410,12 +410,19 @@ class PrinterUtils {
     parts.push(Buffer.from(`${ticketFooter}`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
+
     if (printBarCode) {
-      parts.push(generarCodigoBarrasBuffer(barcodeValue));
+      //parts.push(generarCodigoBarrasBuffer(barcodeValue));
+      let buffer = null;
+
+      try {
+        buffer = generarCodigoBarrasBuffer(barcodeValue, "CODE128");
+      } catch (e) {
+        console.warn("Fallo con CODE128, intentando CODE39", e);
+        buffer = generarCodigoBarrasBuffer(barcodeValue, "CODE39");
+      }
+      parts.push(buffer);
     }
-    // parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
-    // parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
-    // parts.push(Buffer.from(`${barcodeValue}\n\n`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x1b, 0x61, 0x00])); // Alinear a la izquierda
@@ -588,32 +595,36 @@ class PrinterUtils {
   }
 }
 
-function generarCodigoBarrasBuffer(barcodeValue) {
+function generarCodigoBarrasBuffer(barcodeValue, preferido = "CODE128") {
   const comandos = [];
 
   // Centrar texto
   comandos.push(Buffer.from([0x1b, 0x61, 0x01]));
 
-  // Altura del código de barras
-  comandos.push(Buffer.from([0x1d, 0x68, 50]));
-
-  // Ancho del código de barras
-  comandos.push(Buffer.from([0x1d, 0x77, 5.8]));
+  // Altura y ancho
+  comandos.push(Buffer.from([0x1d, 0x68, 50])); // altura
+  comandos.push(Buffer.from([0x1d, 0x77, 4])); // ancho
 
   // No mostrar texto debajo
   comandos.push(Buffer.from([0x1d, 0x48, 0x00]));
 
-  // Comando CODE128 con longitud explícita
-  comandos.push(Buffer.from([0x1d, 0x6b, 0x49]));
-  comandos.push(Buffer.from([barcodeValue.length]));
+  const valueAscii = Buffer.from(barcodeValue, "ascii");
 
-  // Contenido del código de barras
-  comandos.push(Buffer.from(barcodeValue, "ascii"));
+  if (preferido === "CODE128") {
+    // CODE128 (0x49)
+    // [GS k m n d1..dn]
+    // m=73 (0x49), n=longitud, dn=data
+    comandos.push(Buffer.from([0x1d, 0x6b, 0x49, valueAscii.length]));
+    comandos.push(valueAscii);
+  } else if (preferido === "CODE39") {
+    // CODE39 requiere terminación NULL (\0)
+    // [GS k m d1..dn NUL]
+    comandos.push(Buffer.from([0x1d, 0x6b, 0x04])); // m=4 => CODE39
+    comandos.push(Buffer.from(barcodeValue + "\0", "ascii"));
+  }
 
-  // Salto de línea
+  // Salto de línea y reset de alineación
   comandos.push(Buffer.from("\n", "ascii"));
-
-  // Alineación a la izquierda
   comandos.push(Buffer.from([0x1b, 0x61, 0x00]));
 
   return Buffer.concat(comandos);

@@ -53,7 +53,7 @@ import { useTiempo } from "../models/mTiempoContext";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
 import Constants from "expo-constants";
-import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import { formatDate, formatDateLocal } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import { useIsFocused } from "@react-navigation/native";
 import useCheckAppVersion from "../utils/versionChecker";
 import getHtml2Canvas from "../utils/getHtml2Canvas";
@@ -1135,6 +1135,7 @@ export default function VentaScreen({ navigation, route }) {
         if (!resultado) {
           return; // ⛔ No continúa si hay errores
         }
+        setLoading(true);
         const tiempoParaImprimir = resultado;
         const url = `${backend_url}/api/ticket?token=${token}`;
 
@@ -1147,11 +1148,59 @@ export default function VentaScreen({ navigation, route }) {
           body: JSON.stringify(tiempoParaImprimir),
         });
 
-        if (!response.ok) {
-          showSnackbar("Error al registrar el ticket, intente nuevamente.", 3);
-          throw new Error(`Error en el envío: ${response.status}`);
-        }
         result = await response.json();
+        console.log("RESPONSE: ", result);
+        if (!response.ok) {
+          showSnackbar(`El sorteo se encuentra cerrado`, 3);
+          return;
+          //throw new Error(`Error en el envío: ${response.ok}`);
+        }
+
+        // const tiempoSeleccionado = await fetchTiempoByID(result.id);
+        // console.log("RESPONSE tiempoSeleccionado: ", tiempoSeleccionado);
+        // if (tiempoSeleccionado.queueStatus === "CRT") {
+        //   showSnackbar("El ticket se esta procesando", 2);
+        // }
+        // Reintentar hasta 3 veces si queueStatus sigue en "CRT"
+        const sleep = (ms) =>
+          new Promise((resolve) => window.setTimeout(resolve, ms));
+        let tiempoSeleccionado;
+        let intentos = 0;
+        const maxIntentos = 5;
+        let procesadoCorrectamente = false;
+
+        do {
+          tiempoSeleccionado = await fetchTiempoByID(result.id);
+          const status = tiempoSeleccionado.queueStatus;
+          console.log(`Intento ${intentos + 1}: queueStatus =`, status);
+
+          if (status === "FNS") {
+            procesadoCorrectamente = true;
+            break;
+          }
+
+          if (status === "ERR") {
+            showSnackbar(
+              "El ticket no fue procesado correctamente. Intente nuevamente.",
+              3,
+            );
+            setLoading(false);
+            return;
+          }
+
+          intentos++;
+          if (intentos < maxIntentos) await sleep(300);
+        } while (intentos < maxIntentos);
+
+        if (!procesadoCorrectamente) {
+          showSnackbar(
+            "El ticket no fue procesado correctamente. Intente nuevamente.",
+            3,
+          );
+          setLoading(false);
+          return;
+        }
+
         const { tiemposVendidos, lastTicketNumber } =
           await fetchTiemposAnteriores(
             tiempoParaImprimir.drawCategoryId,
@@ -1718,7 +1767,7 @@ export default function VentaScreen({ navigation, route }) {
         },
       );
       if (response.status === 403) {
-        showSnackbar("⚠️ El usuario no tiene permisos.");
+        showSnackbar("⚠️ El usuario no tiene permisos.", 3);
         logout();
         return {
           tiemposVendidos: [],
@@ -1728,7 +1777,7 @@ export default function VentaScreen({ navigation, route }) {
 
       if (response.status !== 200) {
         console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
-        showSnackbar("⚠️ Error al obtener tiempos vendidos");
+        showSnackbar("⚠️ Error al obtener tiempos vendidos", 3);
         logout();
         return {
           tiemposVendidos: [],
@@ -2192,6 +2241,8 @@ export default function VentaScreen({ navigation, route }) {
       drawDate: formatDate(fechaSelected, "yyyy-MM-dd"),
       drawCategoryId: mSorteo.id, // ✅ siempre usa el valor actualizado de mSorteo
     }));
+
+    console.log("SORTEO SELECCIONADO ID", mSorteo.id);
 
     if (mSorteo.id !== 0) {
       cargaSorteoSeleccionado();
@@ -2775,7 +2826,7 @@ export default function VentaScreen({ navigation, route }) {
                         }
                         style={styles.iconButtonRestringidos}
                       >
-                        <MaterialIcons name="warning" size={20} color="green" />
+                        <MaterialIcons name="warning" size={24} color="green" />
                       </Pressable>
                       <RestringidosModal
                         visible={restringidosModalVisible}
@@ -2873,7 +2924,7 @@ export default function VentaScreen({ navigation, route }) {
                           <meta name="viewport", initial-scale=1.0">
                           <style>
                           html { margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; width: 100%; height: auto; }
-                            body { width:58mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
+                            body { width:59mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
                             .wrapper {
                               // margin-left: 5px;
                               //justify-content: "center"
@@ -3202,7 +3253,12 @@ export default function VentaScreen({ navigation, route }) {
                           Cliente: {item.clientName || "Sin nombre"}
                         </Text>
                         <Text style={{ color: "#555" }}>
-                          Fecha: {new Date(item.updatedAt).toLocaleString()}
+                          {/* Fecha: {new Date(item.updatedAt).toLocaleString()} */}
+                          Fecha:{" "}
+                          {formatDateLocal(
+                            item.updatedAt,
+                            "dd/MM/yyy hh:mm:ss a",
+                          )}
                         </Text>
                       </View>
                       {esSeleccionado && (

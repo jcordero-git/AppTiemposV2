@@ -60,6 +60,12 @@ export function formatHourStr(timeStr) {
   }
 }
 
+export function formatDateLocal(fecha, formatStr) {
+  if (!fecha) return "";
+  const dateObj = typeof fecha === "string" ? new Date(fecha) : fecha;
+  return format(dateObj, formatStr, { locale: es });
+}
+
 export function formatDate(fecha, formatStr) {
   if (!fecha) return "";
   const dateObj = typeof fecha === "string" ? parseDateUTC(fecha) : fecha;

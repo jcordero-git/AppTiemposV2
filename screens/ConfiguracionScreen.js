@@ -28,6 +28,8 @@ import Constants from "expo-constants";
 import { WebView } from "react-native-webview";
 import useCheckAppVersion from "../utils/versionChecker";
 import { ht } from "date-fns/locale";
+import mSorteo from "../models/mSorteoSingleton.js";
+import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton";
 
 export default function ConfiguracionScreen({ navigation, route }) {
   console.log("🎯 RENDER Configuracion Screen");
@@ -221,6 +223,8 @@ export default function ConfiguracionScreen({ navigation, route }) {
             <Menu.Item
               onPress={() => {
                 closeMenuHeader();
+                mSorteo.id = 0;
+                mFechaSeleccionada.resetFecha();
                 logout();
               }}
               title="Cerrar Sesión"
@@ -570,10 +574,10 @@ export default function ConfiguracionScreen({ navigation, route }) {
                     >
                       <ScrollView
                         style={{
-                          width: 245,
+                          width: "100%",
                           backgroundColor: "white",
-                          borderWidth: 1,
-                          borderColor: "#ccc",
+                          //borderWidth: 1,
+                          //borderColor: "#ccc",
                         }}
                         contentContainerStyle={{
                           alignItems: "center",
@@ -583,7 +587,10 @@ export default function ConfiguracionScreen({ navigation, route }) {
                         <View
                           collapsable={false}
                           style={{
-                            width: 230,
+                            width: 225,
+                            borderWidth: 1,
+                            borderColor: "#ccc",
+                            overflow: "hidden", // 👈 evitar scroll innecesario
                           }}
                         >
                           {Platform.OS === "web" ? (
@@ -595,7 +602,8 @@ export default function ConfiguracionScreen({ navigation, route }) {
                                            <head>
                                              <meta name="viewport", initial-scale=1.0">
                                              <style>
-                                               body { width:58mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
+                                              html { margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; width: 100%; height: auto; }
+                                               body { width:59mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
                                                .wrapper {
                                                  // margin-left: 5px;
                                                  //justify-content: "center"

@@ -550,15 +550,66 @@ export default function HistorialScreen({ navigation, route }) {
 
         {/* Total */}
         <View style={styles.totalBar}>
-          <Text style={styles.totalText}>TOTAL: </Text>
-          <Text
-            style={[
-              styles.totalValue,
-              { color: total < 0 ? "red" : total > 0 ? "green" : "black" },
-            ]}
-          >
-            ₡{total.toFixed(0)}
-          </Text>
+          <View style={{ flexDirection: "row", width: "100%" }}>
+            <View style={{ flex: 1 }}>
+              {total > 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      backgroundColor: "green",
+                      borderRadius: 4,
+                    }}
+                  />
+                  <Text style={{ marginLeft: 4, fontSize: 20 }}>DEBO</Text>
+                </View>
+              )}
+              {total < 0 && (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    borderRadius: 4,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      backgroundColor: "red",
+                      borderRadius: 4,
+                    }}
+                  />
+                  <Text style={{ marginLeft: 4, fontSize: 20 }}>ME DEBEN</Text>
+                </View>
+              )}
+              {total === 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      backgroundColor: "black",
+                      borderRadius: 4,
+                    }}
+                  />
+                  <Text style={{ marginLeft: 4, fontSize: 20 }}>SIN DEUDA</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.totalTextGroup}>
+              <Text style={styles.totalText}>TOTAL: </Text>
+              <Text
+                style={[
+                  styles.totalValue,
+                  { color: total < 0 ? "red" : total > 0 ? "green" : "black" },
+                ]}
+              >
+                ₡{total.toFixed(0)}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
 
@@ -872,10 +923,16 @@ const styles = StyleSheet.create({
   totalBar: {
     marginTop: 10,
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     paddingTop: 10,
     borderTopWidth: 1,
     borderColor: "#ccc",
+  },
+  totalTextGroup: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    flexShrink: 0,
+    gap: 8, // si usas React Native >= 0.71, si no, usa marginRight
   },
   totalText: {
     fontWeight: "bold",
