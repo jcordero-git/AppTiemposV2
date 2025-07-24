@@ -355,7 +355,7 @@ class PrinterUtils {
       parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
       parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
       parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
-      parts.push(Buffer.from(`\n***********REVENTADOS***********\n`, "ascii"));
+      parts.push(Buffer.from(`***********REVENTADOS***********`, "ascii"));
       parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
       parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
       parts.push(Buffer.from([0x1b, 0x61, 0x00])); // Alinear a la izquierda
@@ -375,7 +375,7 @@ class PrinterUtils {
     );
     parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
     parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
-    parts.push(Buffer.from("--------------------------------\n", "ascii"));
+    parts.push(Buffer.from("--------------------------------", "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
     parts.push(
@@ -390,25 +390,21 @@ class PrinterUtils {
       );
     }
     parts.push(Buffer.from([0x0a])); // Salto de Linea
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
     parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
     parts.push(Buffer.from(`${ticketTitle}`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
-    //parts.push(Buffer.from([0x0a])); // Salto de Linea
 
     if (re_impresion) {
       parts.push(Buffer.from([0x1b, 0x21, 0x30])); // Doble ancho y alto
       parts.push(Buffer.from(`RE-IMPRESION`, "ascii"));
       parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
       parts.push(Buffer.from([0x0a])); // Salto de Linea
-      parts.push(Buffer.from([0x0a])); // Salto de Linea
     }
 
     parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
     parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
     parts.push(Buffer.from(`${ticketFooter}`, "ascii"));
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
 
     if (printBarCode) {

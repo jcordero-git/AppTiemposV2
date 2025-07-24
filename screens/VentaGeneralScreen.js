@@ -236,7 +236,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
       );
       console.log("obteniendo tiempos vendidos: drawDate: ", drawDate);
       const response = await fetch(
-        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}?token=${token}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
       );
       const data = await response.json();
       console.log("tiempos obtenidos: ", data);

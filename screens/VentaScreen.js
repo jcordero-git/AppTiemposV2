@@ -925,6 +925,7 @@ export default function VentaScreen({ navigation, route }) {
       setMontoReventado("");
       setIsMontoRevLocked(false);
     }
+    montoRef?.current?.focus();
   };
 
   const handleOpenScanner = async () => {
@@ -1073,6 +1074,8 @@ export default function VentaScreen({ navigation, route }) {
         "Hubo un error al imprimir. Revisa la conexión con la impresora.",
         3,
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1151,7 +1154,17 @@ export default function VentaScreen({ navigation, route }) {
         result = await response.json();
         console.log("RESPONSE: ", result);
         if (!response.ok) {
+          if (response.status === 403) {
+            showSnackbar("⚠️ El usuario no tiene permisos.", 3);
+            logout();
+            return {
+              tiemposVendidos: [],
+              lastTicketNumber: 0,
+            };
+          }
+
           showSnackbar(`El sorteo se encuentra cerrado`, 3);
+          setLoading(false);
           return;
           //throw new Error(`Error en el envío: ${response.ok}`);
         }
@@ -1206,6 +1219,7 @@ export default function VentaScreen({ navigation, route }) {
             tiempoParaImprimir.drawCategoryId,
             tiempoParaImprimir.drawDate,
           );
+        setLoading(false);
         showSnackbar("El ticket fue registrado correctamente.", 1);
         tiempoRef.current = tiempoParaImprimir;
         tiempoAImprimirRef.current = result;
@@ -1754,10 +1768,12 @@ export default function VentaScreen({ navigation, route }) {
           lastTicketNumber: 0,
         };
       }
-      console.log("TOKEN********* TIEMPOS VENDIDOS", token);
-
+      console.log(
+        "endpoint url: ",
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
+      );
       const response = await fetch(
-        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}?token=${token}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
         {
           method: "GET",
           headers: {
@@ -1794,6 +1810,8 @@ export default function VentaScreen({ navigation, route }) {
 
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
+
+      console.log("TOKEN********* TIEMPOS VENDIDOS", sortedData);
 
       return {
         tiemposVendidos: sortedData,
@@ -2492,9 +2510,15 @@ export default function VentaScreen({ navigation, route }) {
                             const montoNum = parseInt(monto, 10);
                             if (!isNaN(montoNum) && validateMonto(montoNum)) {
                               setIsMontoLocked(true); // Bloquear el campo
-                              numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+
+                              if (reventar) {
+                                montoRevRef?.current?.focus();
+                              } else {
+                                numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+                              }
                             } else {
                               showSnackbar("Debe ingresar un monto válido.", 3);
+                              montoRef?.current?.focus();
                             }
                           }
                         }}
@@ -2529,6 +2553,11 @@ export default function VentaScreen({ navigation, route }) {
                         returnKeyType="done"
                         editable={!isMontoLocked}
                         blurOnSubmit={false}
+                        onKeyPress={({ nativeEvent }) => {
+                          if (nativeEvent.key === "Tab") {
+                            nativeEvent.preventDefault(); // evita el tabulador nativo
+                          }
+                        }}
                         onSubmitEditing={() => {
                           const montoNum = parseInt(monto, 10);
                           if (!isNaN(montoNum) && validateMonto(montoNum)) {
@@ -2597,6 +2626,11 @@ export default function VentaScreen({ navigation, route }) {
                               );
                               return;
                             }
+                          }
+                        }}
+                        onKeyPress={({ nativeEvent }) => {
+                          if (nativeEvent.key === "Tab") {
+                            nativeEvent.preventDefault(); // evita el tabulador nativo
                           }
                         }}
                         onSubmitEditing={() => {
@@ -2684,21 +2718,52 @@ export default function VentaScreen({ navigation, route }) {
                               setIsMontoRevLocked(false);
                               setShouldFocusMonto(true);
                               setMontoReventado("");
+                              montoRevRef?.current?.focus();
                             } else {
-                              const montoNum = parseInt(montoReventado, 10);
+                              const montoNum = parseInt(monto, 10);
+                              const montoReventadoNum = parseInt(
+                                montoReventado,
+                                10,
+                              );
+
                               if (
-                                !montoReventado ||
-                                (isNaN(montoNum) && !validateMonto(montoNum))
+                                !isNaN(montoReventadoNum) &&
+                                validateMonto(montoReventadoNum)
                               ) {
+                                if (montoReventadoNum > montoNum) {
+                                  showSnackbar(
+                                    "El monto reventado no puede ser mayor al monto original.",
+                                    3,
+                                  );
+                                  window.setTimeout(() => {
+                                    montoRevRef.current?.focus();
+                                  }, 200);
+                                  return;
+                                }
+
+                                setIsMontoRevLocked(true);
+                                numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+                              } else {
                                 showSnackbar(
                                   "Debe ingresar un monto reventado válido.",
                                   3,
                                 );
-                                return;
-                              } else {
-                                setIsMontoRevLocked(true);
-                                numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+                                montoRevRef?.current?.focus();
                               }
+
+                              // if (!isNaN(montoNum) || !validateMonto(montoNum)) {
+                              //   showSnackbar(
+                              //     "Debe ingresar un monto reventado válido.",
+                              //     3,
+                              //   );
+
+                              //   montoRevRef?.current?.focus();
+                              //   return;
+                              // } else {
+                              //   showSnackbar("entro al.", 3);
+                              //   setIsMontoRevLocked(true);
+                              //   numeroRef.current?.focus(); // Volver a poner el enfoque en el numero
+                              // }
                             }
                           }}
                         >
@@ -2726,6 +2791,11 @@ export default function VentaScreen({ navigation, route }) {
                           returnKeyType="done"
                           editable={!isMontoRevLocked}
                           blurOnSubmit={false}
+                          onKeyPress={({ nativeEvent }) => {
+                            if (nativeEvent.key === "Tab") {
+                              nativeEvent.preventDefault(); // evita el tabulador nativo
+                            }
+                          }}
                           onSubmitEditing={() => {
                             const montoNum = parseInt(monto, 10);
                             const montoReventadoNum = parseInt(
@@ -3892,6 +3962,9 @@ export default function VentaScreen({ navigation, route }) {
             ...prev,
             drawCategoryId: sorteo.id,
           }));
+          window.setTimeout(() => {
+            montoRef?.current?.focus();
+          }, 500); // 100 ms suele ser suficiente
         }}
         leftPosition={posisionSorteoModalAlaIzquierda}
       />
