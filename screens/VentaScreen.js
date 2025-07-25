@@ -1202,7 +1202,7 @@ export default function VentaScreen({ navigation, route }) {
           }
 
           intentos++;
-          if (intentos < maxIntentos) await sleep(300);
+          if (intentos < maxIntentos) await sleep(500);
         } while (intentos < maxIntentos);
 
         if (!procesadoCorrectamente) {

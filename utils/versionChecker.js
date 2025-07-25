@@ -14,7 +14,7 @@ export default function useCheckAppVersion(autoCheck = true) {
     (s) => s.backend_url !== undefined,
   );
   const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
-  const APK_ENDPOINT = `${backend_url}/api/apk/last`;
+  const APK_ENDPOINT = `${backend_url}/api/apk/last?isReact=true`;
 
   const checkVersion = useCallback(async () => {
     //setChecking(true);
