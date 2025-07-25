@@ -29,7 +29,6 @@ import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta 
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 
 export default function VentaGeneralScreen({ navigation, route }) {
-  console.log("🎯 RENDER VentaGeneralScreen");
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -163,7 +162,8 @@ export default function VentaGeneralScreen({ navigation, route }) {
                 display: "block",
               }}
             >
-              {"\u20A1"}{item.monto}
+              {"\u20A1"}
+              {item.monto}
             </Text>
           </View>
 
@@ -200,7 +200,8 @@ export default function VentaGeneralScreen({ navigation, route }) {
                   display: "block",
                 }}
               >
-                {"\u20A1"}{item.montoReventado}
+                {"\u20A1"}
+                {item.montoReventado}
               </Text>
             </View>
           )}
@@ -216,7 +217,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
     if (selectedDate) {
-      setFecha(selectedDate);     
+      setFecha(selectedDate);
       setTiempo((prev) => ({
         ...prev,
         drawDate: selectedDate,
@@ -230,18 +231,10 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
   const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
     try {
-      console.log(
-        "obteniendo tiempos vendidos: drawCategoryID: ",
-        drawCategoryId,
-      );
-      console.log("obteniendo tiempos vendidos: drawDate: ", drawDate);
       const response = await fetch(
         `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
       );
       const data = await response.json();
-      console.log("tiempos obtenidos: ", data);
-
-      console.log("Tiempos anteriores:", data);
       setTiemposAnteriores(data);
 
       const ticketNumbers = data
@@ -270,7 +263,6 @@ export default function VentaGeneralScreen({ navigation, route }) {
           formatDate(fecha, "yyyy-MM-dd"),
           //format(fecha, "yyyy-MM-dd", { locale: es }),
         );
-      console.log("TIEMPOS VENDIDOS: ", tiemposVendidos);
 
       const agrupados = {};
 
@@ -345,7 +337,6 @@ export default function VentaGeneralScreen({ navigation, route }) {
   const cargaSorteoSeleccionado = async () => {
     setSorteoNombre(mSorteo.name);
     setSorteoId(mSorteo.id);
-    console.log("sorteo cargado: ", mSorteo.name);
   };
 
   useFocusEffect(
@@ -373,12 +364,10 @@ export default function VentaGeneralScreen({ navigation, route }) {
     async function execute() {
       if (!fecha || !sorteoId || !userData?.id) return;
       const updated = await actualizaGrid(fecha, sorteoId, userData);
-      console.log("Actualizada?: ", updated);
       if (updated) {
-        console.log("Lista Actualizada Correctamente.");
         showSnackbar("Lista Actualizada Correctamente.", 1);
       } else {
-        console.log("Error al intentar actualizar la lista.");
+        console.warn("Error al intentar actualizar la lista.");
         showSnackbar("Error al intentar actualizar la lista.", 3);
       }
     }
@@ -387,7 +376,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
         setLoading(true);
         await execute();
       } catch (err) {
-        console.log("Error al intentar actualizar la lista.");
+        console.warn("Error al intentar actualizar la lista.");
         showSnackbar("Error al intentar actualizar la lista.", 3);
       } finally {
         setLoading(false);

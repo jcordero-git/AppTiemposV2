@@ -27,11 +27,6 @@ export default function LoginScreen({ navigation }) {
 
   const loginUser = async ({ username, password, imei, apkVersion }) => {
     try {
-      console.log(
-        "body:",
-        JSON.stringify({ username, password, imei, apkVersion }),
-      );
-
       const response = await fetch("https://auth.tiempos.website/auth/login", {
         method: "POST",
         headers: {
@@ -42,7 +37,6 @@ export default function LoginScreen({ navigation }) {
       });
 
       const data = await response.json();
-      console.log("SUCCESS: ", data.success);
       if (data.success === false) {
         console.warn("Usuario no encontrado.", data.message);
         return null;
@@ -50,10 +44,9 @@ export default function LoginScreen({ navigation }) {
 
       // Verifica si hay datos válidos
       if (response.ok && data && Object.keys(data).length > 0) {
-        //console.log("Login exitoso:", data);
         return data;
       } else {
-        console.log("Credenciales incorrectas o sin respuesta");
+        console.warn("Credenciales incorrectas o sin respuesta");
         return null;
       }
     } catch (error) {
@@ -63,14 +56,11 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleLogin = async () => {
-    console.log("Email:", username); // 🔍 Imprime el resultado en la consola
-    console.log("password:", password); // 🔍 Imprime el resultado en la consola
     setLoading(true); // Mostrar loader
 
     const apkVersion =
       Constants.manifest?.version || Constants.expoConfig?.version;
     const imei = await getStoredUUID();
-    console.log("IMEI: ------------------", imei);
 
     const result = await loginUser({
       username: username,
@@ -80,12 +70,7 @@ export default function LoginScreen({ navigation }) {
     });
 
     if (result) {
-      // console.log("Respuesta del login data:", result); // 🔍 Imprime el resultado en la consola
-      //  console.log("Respuesta del login user id:", result.id); // 🔍 Imprime el resultado en la consola
       await login(result, username, password); // guarda los datos globalmente
-
-      console.log("RESULT********* TIEMPOS LOGIN", result);
-      console.log("TOKEN********* TIEMPOS LOGIN", result.token);
 
       // ✅ Obtener ticketProfile usando el ID del usuario
       const userId = result.id || result.userId; // depende del nombre exacto en la respuesta
@@ -115,10 +100,9 @@ export default function LoginScreen({ navigation }) {
               printBarCode: true,
             };
 
-            console.log("Creando ticketProfile por defecto:", defaultProfile);
             await saveTicketProfile(defaultProfile);
           } else {
-            console.log("Ticket Profile encontrado:", profileData);
+            console.warn("Ticket Profile encontrado:", profileData);
             await saveTicketProfile(profileData);
           }
         } else {

@@ -16,8 +16,6 @@ export default function TablaRestricciones({ data, useReventado }) {
   //     }
   //   }, [searchText, data]);
 
-  console.log("USA REVENTADO: ", useReventado);
-
   return (
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.scrollContainer}>

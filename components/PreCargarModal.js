@@ -179,7 +179,6 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
             visible={modalVisible}
             onClose={() => setModalVisible(false)}
             onSelect={(sorteo) => {
-              console.log("Sorteo Seleccionado: ", sorteo);
               //setSorteoId(sorteo.id);
               setSorteoNombre(sorteo.name);
               setSorteoSeleccionado(sorteo);

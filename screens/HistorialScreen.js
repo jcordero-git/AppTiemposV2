@@ -30,7 +30,6 @@ import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta 
 
 export default function HistorialScreen({ navigation, route }) {
   const { showSnackbar } = useSnackbar();
-  console.log("🎯 RENDER Historial Screen");
   const { userData } = useAuth();
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
@@ -83,7 +82,6 @@ export default function HistorialScreen({ navigation, route }) {
     return date.toISOString().split("T")[0]; // "2025-04-29"
   };
   const handleFechaDesdeChange = (event, selectedDate) => {
-    console.log("day", selectedDate);
     setShowPickerDesde(false);
     if (selectedDate) {
       setfechaDesde(selectedDate);
@@ -178,7 +176,6 @@ export default function HistorialScreen({ navigation, route }) {
 
   // 🔹 MÉTODOS DEL DIÁLOGO
   const openDialog = () => {
-    console.log("Abriendo diálogo");
     setDialogVisible(true);
   };
 
@@ -232,22 +229,18 @@ export default function HistorialScreen({ navigation, route }) {
     async function execute() {
       if (!fechaDesde || !fechaHasta || !userData?.id) return;
       const updated = await fetchDraws();
-      console.log("Actualizada?: ", updated);
       if (updated) {
-        console.log("Historial Actualizado Correctamente.");
         showSnackbar("Historial Actualizado Correctamente.", 1);
       } else {
-        console.log("Error al intentar actualizar el historial.");
         showSnackbar("Error al intentar actualizar el historial.", 3);
       }
     }
     (async () => {
       try {
         setLoading(true);
-        console.log("muestra loading.");
         await execute();
       } catch (err) {
-        console.log("Error al intentar actualizar el historial.");
+        console.error("Error al intentar actualizar el historial.");
         showSnackbar("Error al intentar actualizar el historial.", 3);
       } finally {
         setLoading(false);
@@ -259,15 +252,11 @@ export default function HistorialScreen({ navigation, route }) {
     const desde = formatDateForAPI(fechaDesde);
     const hasta = formatDateHastaForAPI(fechaHasta);
 
-    console.log(
-      `fetchDraws for userId: ${userData.id} fecha desde ${desde} a fecha hasta ${hasta}`,
-    );
     try {
       const drawsResponse = await fetch(
         `${backend_url}/api/draw/consolidated/${desde}/${hasta}?userId=${userData.id}`,
       );
       const dataDraws = await drawsResponse.json();
-      console.log("dataDraws api: ", dataDraws);
 
       let draws_history = [];
 
@@ -281,7 +270,6 @@ export default function HistorialScreen({ navigation, route }) {
         `${backend_url}/api/banking/byUser/${userData.id}/${desde}/${hasta}`,
       );
       const dataBanking = await bankingResponse.json();
-      console.log("dataBanking api: ", dataBanking);
 
       let banking_history = [];
 
@@ -298,8 +286,6 @@ export default function HistorialScreen({ navigation, route }) {
 
       if (draws_history && Array.isArray(draws_history)) {
         draws_history.forEach((draw) => {
-          console.log("SORTEO: ", draw);
-          console.log("MOVIMIENTO revPrice: ", draw.revPrice);
           if (draw.consolidated && draw.priceNumber != null) {
             const history = {
               id: draw.id,
@@ -317,7 +303,6 @@ export default function HistorialScreen({ navigation, route }) {
               revSellerPercent: draw.revSellerPercent,
               isPrizeRev: draw.isPrizeRev,
             };
-            console.log("SORTEO FORMATED : ", history);
             history_history.push(history);
           }
         });
@@ -325,7 +310,6 @@ export default function HistorialScreen({ navigation, route }) {
 
       if (banking_history && Array.isArray(banking_history)) {
         banking_history.forEach((banking) => {
-          console.log("MOVIMIENTO: ", banking);
           const history = {
             id: banking.id,
             isDraw: false,
@@ -374,14 +358,6 @@ export default function HistorialScreen({ navigation, route }) {
               history.revPrice;
             history.subTotal = subtotal;
 
-            console.log("MOVIMIENTO amount: ", history.amount);
-            console.log("MOVIMIENTO revAmount: ", history.revAmount);
-            console.log("MOVIMIENTO comision: ", history.comision);
-            console.log("MOVIMIENTO price: ", history.price);
-            console.log("MOVIMIENTO revPrice: ", history.revPrice);
-
-            console.log("MOVIMIENTO SUB TOTAL: ", history.subTotal);
-
             // Actualizar totales
             //ventaTotalFloat += history.amount + history.revAmount;
             setVentaTotalFloat(
@@ -391,8 +367,6 @@ export default function HistorialScreen({ navigation, route }) {
               (prev) => prev + history.price + history.revPrice,
             );
             setcomisionTotalFloat((prev) => prev + history.comision);
-
-            console.log("VENTA TOTAL: ", ventaTotalFloat);
 
             total += subtotal;
           } else {
@@ -414,9 +388,6 @@ export default function HistorialScreen({ navigation, route }) {
           frezeTotalAmount = true;
         }
       }
-
-      console.log("History Ordenado con calculos:", history_history);
-      console.log("History Total:", total);
 
       setTotal(total);
 

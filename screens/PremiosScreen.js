@@ -26,7 +26,6 @@ import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 import PrinterUtils from "../utils/print/printerUtils";
 
 export default function PremiosScreen({ navigation, route }) {
-  console.log("🎯 RENDER Premios Screen");
   const [loading, setLoading] = useState(false);
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
@@ -169,7 +168,6 @@ export default function PremiosScreen({ navigation, route }) {
           }
           await PrinterUtils.connectToDevice(found.id);
         }
-        console.log("ITEMS: ", tiemposFiltrados);
         await PrinterUtils.printPremios({
           items: tiemposFiltrados,
           total: total,
@@ -215,7 +213,6 @@ export default function PremiosScreen({ navigation, route }) {
           lastTicketNumber: 0,
         };
       }
-      console.log("TOKEN********* TIEMPOS VENDIDOS", token);
 
       const response = await fetch(
         `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}?token=${token}`,
@@ -248,7 +245,6 @@ export default function PremiosScreen({ navigation, route }) {
 
       const data = await response.json();
       const sortedData = data.sort((a, b) => b.id - a.id);
-      console.log("TIEMPOS VENDIDOS: ", sortedData);
       setTiemposAnteriores(sortedData);
       const ticketNumbers = sortedData
         .map((item) => item.id)
@@ -299,7 +295,6 @@ export default function PremiosScreen({ navigation, route }) {
   useEffect(() => {
     if (!fecha || !sorteoId || !userData?.id) return;
     async function execute() {
-      console.log("GETTING TIEMPOS VENDIDOS");
       mFechaSeleccionada.setFecha(fecha);
       const isAllowed = await fetchTiemposAnteriores(
         sorteoId,

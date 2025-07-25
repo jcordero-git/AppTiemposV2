@@ -32,7 +32,6 @@ import mSorteo from "../models/mSorteoSingleton.js";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton";
 
 export default function ConfiguracionScreen({ navigation, route }) {
-  console.log("🎯 RENDER Configuracion Screen");
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -84,13 +83,11 @@ export default function ConfiguracionScreen({ navigation, route }) {
     setDialogMontoRestringidoDisponible,
   ] = useState("");
   function esperarConfirmacionDialog(numero, montoDisponible) {
-    console.log("entra a esperar confirmacion 1");
     return new Promise((resolve) => {
       setDialogNumeroRestringido(numero);
       setDialogMontoRestringidoDisponible(montoDisponible);
       setDialogRestringidoVisible(true); // mostrar el Dialog
       // Guardamos el resolver para llamarlo después
-      console.log("entra a esperar confirmacion 2");
 
       resolverDialogRef.current = resolve;
     });
@@ -274,7 +271,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
     setLoading(true);
     const getTokenBody = { generatedBy: 0 };
     if (userData) {
-      console.log("USUARIO A CAMBIAR CONTRASENA: ", userData.name);
       let result;
       try {
         const url = `https://auth.tiempos.website/token/${userData.email}`;
@@ -291,7 +287,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
           throw new Error(`Error al generar toen: ${response.status}`);
         }
         result = await response.json();
-        console.log("RESULT GET TOKEN: ", result);
         showSnackbar("Token generado correctamente.", 1);
         setLoading(false);
         return result;
@@ -307,7 +302,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
   const handleSave = async () => {
     setLoading(true);
     if (ticketProfile) {
-      console.log("TICKET PROFILE A GUARDAR: ", ticketProfile);
       let result;
       try {
         const url = `${backend_url}/api/ticketProfile/${ticketProfile?.userId}`;
@@ -324,7 +318,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
           throw new Error(`Error en el envío: ${response.status}`);
         }
         result = await response.json();
-        console.log("RESULT DEL SAVE CONFIG: ", result);
         showSnackbar("La configuración fue guardada correctamente.", 1);
         await saveTicketProfile(ticketProfile);
         setLoading(false);
@@ -347,8 +340,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
       ) {
         const newHeight = parseInt(event.data.height, 10);
         setIframeHeight((prev) => (newHeight > prev ? newHeight : prev));
-
-        console.log("entra a calcular htmlHeight", newHeight);
       }
     };
 
@@ -384,7 +375,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
         userData,
         ticketProfile,
       );
-      console.log("ticket profile actualizado", htmlGenerado);
       setHtml(htmlGenerado);
     };
     compartir();

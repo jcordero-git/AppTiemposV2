@@ -90,7 +90,6 @@ export default function SorteoSelectorModal({
               <TouchableOpacity
                 style={styles.item}
                 onPress={() => {
-                  console.log("ITEM: ", item);
                   onSelect(item);
                   onClose();
                 }}

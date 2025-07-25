@@ -29,8 +29,6 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
   const handleResetPassword = async () => {
     try {
-      console.log("token: ", token);
-      console.log("password: ", JSON.stringify({ password }));
       const response = await fetch(
         `https://auth.tiempos.website/token/changePassword/${token}`,
         {

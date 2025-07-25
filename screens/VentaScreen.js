@@ -59,8 +59,6 @@ import useCheckAppVersion from "../utils/versionChecker";
 import getHtml2Canvas from "../utils/getHtml2Canvas";
 
 export default function VentaScreen({ navigation, route }) {
-  console.log("🎯 RENDER VentaScreen");
-
   const ticketRef = useRef(null);
   const { widthRender } = useWindowDimensions();
   const [html, setHtml] = React.useState(null);
@@ -200,11 +198,6 @@ export default function VentaScreen({ navigation, route }) {
 
   const openDialogTickets = () => {
     const actualizaTiemposVendidos = async () => {
-      console.log(
-        "SORTEO ID OPEN DIALOG TICKET",
-        tiempoRef.current?.drawCategoryId,
-      );
-      console.log("FECHA OPEN DIALOG TICKET", tiempoRef.current?.drawDate);
       const { tiemposVendidos, lastTicketNumber } =
         await fetchTiemposAnteriores(
           tiempoRef.current?.drawCategoryId,
@@ -384,11 +377,6 @@ export default function VentaScreen({ navigation, route }) {
 
   const loginUser = async ({ username, password, imei, apkVersion }) => {
     try {
-      console.log(
-        "body:",
-        JSON.stringify({ username, password, imei, apkVersion }),
-      );
-
       const response = await fetch("https://auth.tiempos.website/auth/login", {
         method: "POST",
         headers: {
@@ -399,7 +387,6 @@ export default function VentaScreen({ navigation, route }) {
       });
 
       const data = await response.json();
-      console.log("SUCCESS: ", data.success);
       if (data.success === false) {
         console.warn("Usuario no encontrado.", data.message);
         return null;
@@ -429,7 +416,6 @@ export default function VentaScreen({ navigation, route }) {
     const apkVersion =
       Constants.manifest?.version || Constants.expoConfig?.version;
     const imei = await getStoredUUID();
-    console.log("IMEI: ------------------", imei);
 
     const result = await loginUser({
       username: userData.username,
@@ -465,7 +451,6 @@ export default function VentaScreen({ navigation, route }) {
               printBarCode: true,
             };
 
-            console.log("Creando ticketProfile por defecto:", defaultProfile);
             await saveTicketProfile(defaultProfile);
           } else {
             console.log("Ticket Profile encontrado:", profileData);
@@ -693,9 +678,7 @@ export default function VentaScreen({ navigation, route }) {
     const nuevoArray = [];
     const numerosAgregados = new Set();
 
-    console.log("RESTRINGIDOS SIN ACTUALIZAR: ", mSorteo.restringidos);
     await fetchRestringidosBySorteoID();
-    console.log("RESTRINGIDOS ACTUALIZADOS: ", mSorteo.restringidos);
 
     for (const restriccion of mSorteo.restringidos) {
       const numeros = restriccion.restricted.split(",");
@@ -770,8 +753,6 @@ export default function VentaScreen({ navigation, route }) {
           },
         },
       );
-
-      console.log("RESPONSE DEL FETCH TIEMPO: ", response.status);
 
       if (response.status !== 200) {
         console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
@@ -946,7 +927,6 @@ export default function VentaScreen({ navigation, route }) {
     setScanned(true);
     setModalCameraVisible(false);
     setScannedData(data);
-    console.log("Código escaneado:", data);
     setCodigo(data);
   };
 
@@ -1152,7 +1132,6 @@ export default function VentaScreen({ navigation, route }) {
         });
 
         result = await response.json();
-        console.log("RESPONSE: ", result);
         if (!response.ok) {
           if (response.status === 403) {
             showSnackbar("⚠️ El usuario no tiene permisos.", 3);
@@ -1311,9 +1290,6 @@ export default function VentaScreen({ navigation, route }) {
         await new Promise((r) => window.setTimeout(r, 100));
 
         const svg = container.querySelector("#barcode");
-        if (tiempoSeleccionado !== null)
-          console.log("TIEMPO SELECCIONADO: ", tiempoSeleccionado.id);
-        console.log("TIEMPO A IMPRIMIR: ", tiempoAImprimirRef.current.id);
         if (svg) {
           JsBarcode(
             svg,
@@ -1768,10 +1744,6 @@ export default function VentaScreen({ navigation, route }) {
           lastTicketNumber: 0,
         };
       }
-      console.log(
-        "endpoint url: ",
-        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
-      );
       const response = await fetch(
         `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
         {
@@ -1810,8 +1782,6 @@ export default function VentaScreen({ navigation, route }) {
 
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
-
-      console.log("TOKEN********* TIEMPOS VENDIDOS", sortedData);
 
       return {
         tiemposVendidos: sortedData,
@@ -2106,7 +2076,6 @@ export default function VentaScreen({ navigation, route }) {
 
   useEffect(() => {
     tiempoRef.current = tiempo;
-    console.log("TIEMPO REF FROM USE EFECT tiempo: ", tiempoRef.current);
   }, [tiempo]);
 
   useEffect(() => {
@@ -2259,8 +2228,6 @@ export default function VentaScreen({ navigation, route }) {
       drawDate: formatDate(fechaSelected, "yyyy-MM-dd"),
       drawCategoryId: mSorteo.id, // ✅ siempre usa el valor actualizado de mSorteo
     }));
-
-    console.log("SORTEO SELECCIONADO ID", mSorteo.id);
 
     if (mSorteo.id !== 0) {
       cargaSorteoSeleccionado();

@@ -112,15 +112,12 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
       );
       const data = await response.json();
       // Asegúrate de mapear los datos al formato que esperas en FlatList
-      console.log("Sorteos:", data);
       // Ordenar por limitTime (hora) - más temprano primero
       const sorteosOrdenados = data.sort((a, b) => {
         const horaA = new Date(`1970-01-01T${a.limitTime}Z`);
         const horaB = new Date(`1970-01-01T${b.limitTime}Z`);
         return horaA - horaB;
       });
-
-      console.log("Sorteos ordenados:", sorteosOrdenados);
 
       const sorteosFormateados = sorteosOrdenados.map((item, index) => ({
         key: item.id.toString(), // necesario para FlatList
@@ -134,7 +131,6 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
         revSellerPercent: item.userValues?.revSellerPercent || 0,
       }));
       setItems(sorteosFormateados);
-      console.log("Sorteos formateados:", sorteosFormateados);
     } catch (error) {
       console.error("Error al obtener sorteos", error);
       Alert.alert("Error", "No se pudieron cargar los sorteos.");
