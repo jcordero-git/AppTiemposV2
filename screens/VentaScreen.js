@@ -39,6 +39,7 @@ import PrinterUtils from "../utils/print/printerUtils";
 import { useCameraPermissions } from "expo-camera";
 import { CameraView } from "expo-camera"; // ✅ import correcto del componente
 
+import Octicons from "@expo/vector-icons/Octicons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
@@ -604,16 +605,18 @@ export default function VentaScreen({ navigation, route }) {
                 titleStyle={{ color: "#000" }}
               />
             )}
-            {tiempoSeleccionado && tiempoSeleccionado.id > 0 && (
-              <Menu.Item
-                onPress={() => {
-                  closeMenuHeader();
-                  handleBorrarTiempo(tiempoSeleccionado.id);
-                }}
-                title="Borrar Tiempo"
-                titleStyle={{ color: "red" }}
-              />
-            )}
+            {tiempoSeleccionado &&
+              tiempoSeleccionado.id > 0 &&
+              tiempoSeleccionado.status === 201 && (
+                <Menu.Item
+                  onPress={() => {
+                    closeMenuHeader();
+                    handleBorrarTiempo(tiempoSeleccionado.id);
+                  }}
+                  title="Borrar Tiempo"
+                  titleStyle={{ color: "red" }}
+                />
+              )}
           </Menu>
         </>
       ),
@@ -781,12 +784,67 @@ export default function VentaScreen({ navigation, route }) {
         },
         // body: JSON.stringify(tiempoParaImprimir),
       });
-      if (!response.ok) {
-        showSnackbar("Error al eliminar el ticket.", 3);
-        throw new Error(`Error en el envío: ${response.status}`);
-      }
       const result = await response.json();
-      if (result.message === "Success") {
+      if (!response.ok) {
+        // showSnackbar("Error al eliminar el ticket.", 3);
+        // throw new Error(`Error en el envío: ${response.status}`);
+        if (response.status === 403) {
+          showSnackbar("⚠️ El usuario no tiene permisos.", 3);
+          logout();
+        }
+        showSnackbar(`El sorteo se encuentra cerrado`, 3);
+        setLoading(false);
+        return;
+      }
+
+      const sleep = (ms) =>
+        new Promise((resolve) => window.setTimeout(resolve, ms));
+      let tiempoSeleccionado;
+      let intentos = 0;
+      const maxIntentos = 5;
+      let procesadoCorrectamente = false;
+
+      do {
+        tiempoSeleccionado = await fetchTiempoByID(id);
+        const queueStatus = tiempoSeleccionado.queueStatus;
+        const status = tiempoSeleccionado.status;
+        console.log(`Intento ${intentos + 1}: queueStatus =`, queueStatus);
+        console.log(`Intento ${intentos + 1}: Status =`, status);
+
+        if (queueStatus === "FNS") {
+          if (status === 202) {
+            procesadoCorrectamente = true;
+            break;
+          }
+          if (status === 400) {
+            showSnackbar(`El sorteo se encuentra cerrado`, 3);
+            break;
+          }
+        }
+
+        if (queueStatus === "ERR") {
+          showSnackbar(
+            "El ticket no fue procesado correctamente. Intente nuevamente.",
+            3,
+          );
+          setLoading(false);
+          return;
+        }
+
+        intentos++;
+        if (intentos < maxIntentos) await sleep(500);
+      } while (intentos < maxIntentos);
+
+      if (!procesadoCorrectamente) {
+        showSnackbar(
+          "El ticket no fue procesado correctamente. Intente nuevamente.",
+          3,
+        );
+        setLoading(false);
+        return;
+      }
+
+      if (procesadoCorrectamente) {
         showSnackbar("Ticket eliminado correctamente.", 1);
       }
       //setTiempo(null);
@@ -1163,15 +1221,23 @@ export default function VentaScreen({ navigation, route }) {
 
         do {
           tiempoSeleccionado = await fetchTiempoByID(result.id);
-          const status = tiempoSeleccionado.queueStatus;
-          console.log(`Intento ${intentos + 1}: queueStatus =`, status);
+          const queueStatus = tiempoSeleccionado.queueStatus;
+          const status = tiempoSeleccionado.status;
+          console.log(`Intento ${intentos + 1}: queueStatus =`, queueStatus);
+          console.log(`Intento ${intentos + 1}: Status =`, status);
 
-          if (status === "FNS") {
-            procesadoCorrectamente = true;
-            break;
+          if (queueStatus === "FNS") {
+            if (status === 201) {
+              procesadoCorrectamente = true;
+              break;
+            }
+            if (status === 400) {
+              showSnackbar(`El sorteo se encuentra cerrado`, 3);
+              break;
+            }
           }
 
-          if (status === "ERR") {
+          if (queueStatus === "ERR") {
             showSnackbar(
               "El ticket no fue procesado correctamente. Intente nuevamente.",
               3,
@@ -1782,6 +1848,8 @@ export default function VentaScreen({ navigation, route }) {
 
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
+
+      console.log("tiempos vendidos", sortedData);
 
       return {
         tiemposVendidos: sortedData,
@@ -3267,11 +3335,62 @@ export default function VentaScreen({ navigation, route }) {
                   const esSeleccionado = tiempoSeleccionado?.id === item.id;
 
                   return (
+                    // <Pressable
+                    //   key={item.id || index}
+                    //   onPress={() => {
+                    //     cargarTiempoSeleccionado(item);
+                    //     closeDialogTickets(); // cerrar el diálogo
+                    //   }}
+                    //   style={{
+                    //     paddingVertical: 10,
+                    //     borderBottomWidth: 1,
+                    //     borderBottomColor: "#eee",
+                    //     flexDirection: "row",
+                    //     alignItems: "center",
+                    //     justifyContent: "space-between",
+                    //   }}
+                    // >
+                    //   <View style={{ flex: 1 }}>
+                    //     <View
+                    //       style={{
+                    //         flexDirection: "row",
+                    //         justifyContent: "space-between",
+                    //         alignItems: "center",
+                    //       }}
+                    //     >
+                    //       <Text style={{ fontWeight: "bold" }}>
+                    //         Código: # {item.id || ""}
+                    //       </Text>
+                    //       {item.status === 202 && (
+                    //         <Text style={{ fontWeight: "bold" }}>ANULADO</Text>
+                    //       )}
+                    //     </View>
+
+                    //     <Text style={{ fontWeight: "bold" }}>
+                    //       Cliente: {item.clientName || "Sin nombre"}
+                    //     </Text>
+                    //     <Text style={{ color: "#555" }}>
+                    //       {/* Fecha: {new Date(item.updatedAt).toLocaleString()} */}
+                    //       Fecha:{" "}
+                    //       {formatDateLocal(
+                    //         item.updatedAt,
+                    //         "dd/MM/yyy hh:mm:ss a",
+                    //       )}
+                    //     </Text>
+                    //   </View>
+                    //   {esSeleccionado && (
+                    //     <MaterialIcons
+                    //       name="check-circle"
+                    //       size={24}
+                    //       color="green"
+                    //     />
+                    //   )}
+                    // </Pressable>
                     <Pressable
                       key={item.id || index}
                       onPress={() => {
                         cargarTiempoSeleccionado(item);
-                        closeDialogTickets(); // cerrar el diálogo
+                        closeDialogTickets();
                       }}
                       style={{
                         paddingVertical: 10,
@@ -3280,17 +3399,27 @@ export default function VentaScreen({ navigation, route }) {
                         flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "space-between",
+                        position: "relative", // Necesario para que el sello se posicione sobre este contenedor
+                        overflow: "hidden",
                       }}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: "bold" }}>
-                          Código: # {item.id || ""}
-                        </Text>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text style={{ fontWeight: "bold" }}>
+                            Código: # {item.id || ""}
+                          </Text>
+                        </View>
+
                         <Text style={{ fontWeight: "bold" }}>
                           Cliente: {item.clientName || "Sin nombre"}
                         </Text>
                         <Text style={{ color: "#555" }}>
-                          {/* Fecha: {new Date(item.updatedAt).toLocaleString()} */}
                           Fecha:{" "}
                           {formatDateLocal(
                             item.updatedAt,
@@ -3298,12 +3427,41 @@ export default function VentaScreen({ navigation, route }) {
                           )}
                         </Text>
                       </View>
+
                       {esSeleccionado && (
                         <MaterialIcons
                           name="check-circle"
                           size={24}
                           color="green"
                         />
+                      )}
+
+                      {/* Sello ANULADO diagonal */}
+                      {item.status === 202 && (
+                        <View
+                          style={{
+                            position: "absolute",
+                            top: "28%",
+                            right: "-5%",
+                            transform: [{ rotate: "-30deg" }],
+                            backgroundColor: "rgba(255, 0, 0, 0.2)",
+                            paddingHorizontal: 55,
+                            paddingVertical: 5,
+                            zIndex: 10,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: "red",
+                              fontWeight: "bold",
+                              fontSize: 18,
+                              letterSpacing: 2,
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            ANULADO
+                          </Text>
+                        </View>
                       )}
                     </Pressable>
                   );

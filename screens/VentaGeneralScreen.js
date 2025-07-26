@@ -235,9 +235,13 @@ export default function VentaGeneralScreen({ navigation, route }) {
         `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
       );
       const data = await response.json();
-      setTiemposAnteriores(data);
 
-      const ticketNumbers = data
+      // 🔸 Filtrar solo los tickets con status 201
+      const ticketsFiltrados = data.filter((item) => item.status === 201);
+
+      setTiemposAnteriores(ticketsFiltrados);
+
+      const ticketNumbers = ticketsFiltrados
         .map((item) => item.id)
         .filter((n) => typeof n === "number" && n > 0);
 
@@ -245,7 +249,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
 
       return {
-        tiemposVendidos: data,
+        tiemposVendidos: ticketsFiltrados,
         lastTicketNumber,
       };
     } catch (error) {
