@@ -32,8 +32,13 @@ export default function useCheckAppVersion(autoCheck = true) {
 
         if (compareVersions(currentVersion, lastVersion) === -1) {
           showUpdateDialog(currentVersion, lastVersion, apkUrl, lastVersion);
+        } else if (compareVersions(currentVersion, lastVersion) === 0) {
+          showSnackbar("La versión de la app está actualizada.", 1);
         } else {
-          showSnackbar("Error al generar token.", 3);
+          showSnackbar(
+            "Verificar la versión de la app (contacte a un admin).",
+            3,
+          );
         }
       }
     } catch (e) {

@@ -58,6 +58,7 @@ import { formatDate, formatDateLocal } from "../utils/datetimeUtils"; // ajusta 
 import { useIsFocused } from "@react-navigation/native";
 import useCheckAppVersion from "../utils/versionChecker";
 import getHtml2Canvas from "../utils/getHtml2Canvas";
+import { el } from "date-fns/locale";
 
 export default function VentaScreen({ navigation, route }) {
   const ticketRef = useRef(null);
@@ -118,6 +119,9 @@ export default function VentaScreen({ navigation, route }) {
     (s) => s.porcentaje_reventado_restringido !== undefined,
   );
   const { checkVersion } = useCheckAppVersion(false);
+
+  const cerrarButtonRef = useRef(null);
+
   useEffect(() => {
     if (Platform.OS === "android") {
       checkVersion();
@@ -153,6 +157,26 @@ export default function VentaScreen({ navigation, route }) {
       resolverDialogRef.current = resolve;
     });
   }
+
+  const dialogAbierto = dialogRestringidoVisible || dialogPrecargarVisible;
+
+  useEffect(() => {
+    if (Platform.OS === "web" && dialogAbierto) {
+      const timeout = window.setTimeout(() => {
+        const boton = window.document.querySelector(
+          '[aria-label="cerrar-boton"]',
+        );
+        if (boton) {
+          boton.focus();
+          console.log("Botón CANCELAR enfocado");
+        } else {
+          console.log("Botón CANCELAR no encontrado");
+        }
+      }, 100);
+
+      return () => window.clearTimeout(timeout);
+    }
+  }, [dialogAbierto]);
 
   // 🔹 MÉTODOS DEL DIÁLOGO
 
@@ -593,7 +617,7 @@ export default function VentaScreen({ navigation, route }) {
                 setDialogPrecargarVisible(true);
                 handleNuevoTiempo();
                 if (tiempoSeleccionado !== null) {
-                  setCodigo(tiempoSeleccionado.id);
+                  setCodigo(String(tiempoSeleccionado.id));
                 }
               }}
               title="Pre Cargar"
@@ -733,17 +757,23 @@ export default function VentaScreen({ navigation, route }) {
   const handlePreCargaTiempo = async (codigo) => {
     const codigoPreCargaInt = parseInt(codigo, 10);
     const tiempoSeleccionado = await fetchTiempoByID(codigoPreCargaInt);
-    tiempoRef.current = {
-      ...tiempoRef.current,
-      numbers: [...tiempoSeleccionado.numbers],
-      clientName: tiempoSeleccionado.clientName,
-    };
-    tiempoNumerosBackup = tiempoSeleccionado;
-    const resultado = await inicializarYProcesar(tiempoRef.current);
-    if (!resultado) {
-      return; // ⛔ No continúa si hay errores
+    console.log("tiempoSeleccionado precargar", tiempoSeleccionado);
+
+    if (tiempoSeleccionado != null) {
+      tiempoRef.current = {
+        ...tiempoRef.current,
+        numbers: [...tiempoSeleccionado.numbers],
+        clientName: tiempoSeleccionado.clientName,
+      };
+      tiempoNumerosBackup = tiempoSeleccionado;
+      const resultado = await inicializarYProcesar(tiempoRef.current);
+      if (!resultado) {
+        return; // ⛔ No continúa si hay errores
+      }
+      setDialogPrecargarVisible(false);
+    } else {
+      showSnackbar("⚠️ Tiempo a precargar no encontrado.", 3);
     }
-    setDialogPrecargarVisible(false);
   };
 
   const fetchTiempoByID = async (code) => {
@@ -763,18 +793,18 @@ export default function VentaScreen({ navigation, route }) {
           },
         },
       );
+      const data = await response.json();
 
+      console.log("response", data);
       if (response.status !== 200) {
         console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
-        showSnackbar("⚠️ Error al obtener tiempos: Status: ", response.status);
-        logout();
+        //showSnackbar("⚠️ Error al obtener tiempos: Status: ");
         return null;
       }
-      const data = await response.json();
       return data;
     } catch (error) {
-      console.error("Error al cargar el tiempos:", error);
-      showSnackbar("⚠️ Tiempo no encontrado.", 2);
+      console.error("Error al cargar el tiempo:", error);
+      //showSnackbar("⚠️ Tiempo no encontrado.", 2);
       return null; // ✅ fallback seguro
     }
   };
@@ -2176,7 +2206,9 @@ export default function VentaScreen({ navigation, route }) {
     currentItems,
     tiemposVendidosExternos,
   ) {
-    const tiemposVendidos = tiemposVendidosExternos ?? tiemposAnteriores; // fallback al estado
+    let tiemposVendidos = tiemposVendidosExternos ?? tiemposAnteriores; // fallback al estado
+    tiemposVendidos = tiemposVendidos.filter((item) => item.status === 201);
+
     const setting = userData.settings.find(
       (s) => s.porcentaje_reventado_restringido !== undefined,
     );
@@ -3980,6 +4012,7 @@ export default function VentaScreen({ navigation, route }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button
+              accessibilityLabel="cerrar-boton"
               textColor="red"
               style={{
                 backgroundColor: "white", // Fondo blanco
@@ -3998,7 +4031,11 @@ export default function VentaScreen({ navigation, route }) {
                 borderRadius: 3,
               }}
               onPress={() => {
-                handlePreCargaTiempo(codigo);
+                if (codigo.trim() !== "") {
+                  handlePreCargaTiempo(codigo);
+                } else {
+                  showSnackbar("Debe llenar el campo código.", 3);
+                }
               }}
             >
               OK
@@ -4072,16 +4109,16 @@ export default function VentaScreen({ navigation, route }) {
           </Dialog.Content>
           <Dialog.Actions>
             <Button
+              accessibilityLabel="cerrar-boton"
               textColor="red"
               style={{
-                backgroundColor: "white", // Fondo blanco
+                backgroundColor: "white",
                 marginBottom: 10,
                 borderRadius: 3,
               }}
               onPress={() => {
-                //setDialogRestringidoVisible(false);
                 closeDialogRestringido();
-                resolverDialogRef.current?.(); // Resuelve la promesa
+                resolverDialogRef.current?.();
               }}
             >
               CERRAR
