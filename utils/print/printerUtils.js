@@ -390,9 +390,11 @@ class PrinterUtils {
       );
     }
     parts.push(Buffer.from([0x0a])); // Salto de Linea
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
     parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
     parts.push(Buffer.from(`${ticketTitle}`, "ascii"));
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
 
     if (re_impresion) {

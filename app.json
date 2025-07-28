@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "AppTiemposV2",
-    "slug": "AppTiemposV2",
+    "name": "TIEMPOS",
+    "slug": "TIEMPOS",
     "version": "3.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

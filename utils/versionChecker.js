@@ -4,11 +4,13 @@ import * as Application from "expo-application";
 import { useAuth } from "../context/AuthContext";
 import { NativeModules } from "react-native";
 const { ApkInstaller } = NativeModules;
+import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 export default function useCheckAppVersion(autoCheck = true) {
   //const [checking, setChecking] = useState(false);
   const { userData } = useAuth();
   const token = userData?.token;
+  const { showSnackbar } = useSnackbar();
 
   const settingBackendURL = userData?.settings?.find(
     (s) => s.backend_url !== undefined,
@@ -30,6 +32,8 @@ export default function useCheckAppVersion(autoCheck = true) {
 
         if (compareVersions(currentVersion, lastVersion) === -1) {
           showUpdateDialog(currentVersion, lastVersion, apkUrl, lastVersion);
+        } else {
+          showSnackbar("Error al generar token.", 3);
         }
       }
     } catch (e) {

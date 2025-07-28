@@ -234,6 +234,26 @@ export default function VentaGeneralScreen({ navigation, route }) {
       const response = await fetch(
         `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
       );
+
+      if (response.status === 403) {
+        showSnackbar("⚠️ El usuario no tiene permisos.", 3);
+        logout();
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+
+      if (response.status !== 200) {
+        console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
+        showSnackbar("⚠️ Error al obtener tiempos vendidos", 3);
+        logout();
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+
       const data = await response.json();
 
       // 🔸 Filtrar solo los tickets con status 201

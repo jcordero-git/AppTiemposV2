@@ -244,7 +244,11 @@ export default function PremiosScreen({ navigation, route }) {
       }
 
       const data = await response.json();
-      const sortedData = data.sort((a, b) => b.id - a.id);
+
+      const ticketsFiltrados = data.filter((item) => item.status === 201);
+
+
+      const sortedData = ticketsFiltrados.sort((a, b) => b.id - a.id);
       setTiemposAnteriores(sortedData);
       const ticketNumbers = sortedData
         .map((item) => item.id)

@@ -198,6 +198,7 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const openDialogTickets = () => {
+    Keyboard.dismiss(); // Oculta el teclado
     const actualizaTiemposVendidos = async () => {
       const { tiemposVendidos, lastTicketNumber } =
         await fetchTiemposAnteriores(
@@ -552,6 +553,7 @@ export default function VentaScreen({ navigation, route }) {
             !dialogPrintVisible) ||
             (tiempoSeleccionado &&
               tiempoSeleccionado.id > 0 &&
+              tiempoSeleccionado.status === 201 &&
               !dialogPrintVisible)) && (
             <>
               <TouchableOpacity
@@ -670,7 +672,12 @@ export default function VentaScreen({ navigation, route }) {
 
   const [restringidosDisponibles, setRestrigosDisponibles] = useState([]);
   const handleMuestraRestringidosDisponibles = async (resultado) => {
-    const tiemposVendidos = tiemposAnteriores; // fallback al estado
+    //const tiemposVendidos = tiemposAnteriores; // fallback al estado
+
+    const tiemposVendidos = tiemposAnteriores.filter(
+      (item) => item.status === 201,
+    );
+
     const setting = userData.settings.find(
       (s) => s.porcentaje_reventado_restringido !== undefined,
     );
@@ -774,7 +781,7 @@ export default function VentaScreen({ navigation, route }) {
 
   const fetchDeleteTiempo = async (id) => {
     const url = `${backend_url}/api/ticket/${id}?token=${token}`;
-
+    setLoading(true);
     try {
       const response = await fetch(url, {
         method: "DELETE",
@@ -808,8 +815,8 @@ export default function VentaScreen({ navigation, route }) {
         tiempoSeleccionado = await fetchTiempoByID(id);
         const queueStatus = tiempoSeleccionado.queueStatus;
         const status = tiempoSeleccionado.status;
-        console.log(`Intento ${intentos + 1}: queueStatus =`, queueStatus);
-        console.log(`Intento ${intentos + 1}: Status =`, status);
+        //console.log(`Intento ${intentos + 1}: queueStatus =`, queueStatus);
+        //console.log(`Intento ${intentos + 1}: Status =`, status);
 
         if (queueStatus === "FNS") {
           if (status === 202) {
@@ -865,6 +872,7 @@ export default function VentaScreen({ navigation, route }) {
       console.error("Error al enviar el ticket:", error);
       //Alert.alert("Error", "No se pudo eliminar el ticket.");
       showSnackbar("Error al eliminar el ticket.", 3);
+      setLoading(false);
     }
   };
 
@@ -1048,6 +1056,13 @@ export default function VentaScreen({ navigation, route }) {
     }
   };
 
+  const isWebMobile = () => {
+    if (typeof navigator === "undefined") return false;
+    return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(
+      navigator.userAgent,
+    );
+  };
+
   const handlePrintBt = async () => {
     try {
       let tiempoAImprimir =
@@ -1096,18 +1111,23 @@ export default function VentaScreen({ navigation, route }) {
         await PrinterUtils.disconnect();
         setDialogPrintVisible(false);
       } else if (Platform.OS === "web") {
-        const iframeWindow = iframeRef.current.contentWindow;
-
+        const iframeWindow = iframeRef?.current?.contentWindow;
         if (iframeWindow) {
           iframeWindow.focus();
           iframeWindow.print();
         }
-        window.setTimeout(() => {
-          setDialogPrintVisible(false);
-        }, 500);
+
+        if (!isWebMobile()) {
+          window.setTimeout(() => {
+            setDialogPrintVisible(false);
+          }, 100);
+        }
+        if (limpiarRef.current && !tiempoSeleccionado) {
+          limpiarDespuesDeImprimir();
+        }
       }
     } catch (e) {
-      console.error("Error al imprimir 4:", e);
+      console.error("Error al imprimir:", e);
       showSnackbar(
         "Hubo un error al imprimir. Revisa la conexión con la impresora.",
         3,
@@ -1223,8 +1243,8 @@ export default function VentaScreen({ navigation, route }) {
           tiempoSeleccionado = await fetchTiempoByID(result.id);
           const queueStatus = tiempoSeleccionado.queueStatus;
           const status = tiempoSeleccionado.status;
-          console.log(`Intento ${intentos + 1}: queueStatus =`, queueStatus);
-          console.log(`Intento ${intentos + 1}: Status =`, status);
+          //console.log(`Intento ${intentos + 1}: queueStatus =`, queueStatus);
+          //console.log(`Intento ${intentos + 1}: Status =`, status);
 
           if (queueStatus === "FNS") {
             if (status === 201) {
@@ -1494,7 +1514,7 @@ export default function VentaScreen({ navigation, route }) {
       setItems([]);
       tiempoRef.current = tiempoLimpio;
       setIdTicketSeleccionado(0);
-      setDialogPrintVisible(false);
+      //setDialogPrintVisible(false);
 
       setIsMontoLocked(false);
       setIsMontoRevLocked(false);
@@ -1848,8 +1868,6 @@ export default function VentaScreen({ navigation, route }) {
 
       const lastTicketNumber =
         ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
-
-      console.log("tiempos vendidos", sortedData);
 
       return {
         tiemposVendidos: sortedData,
@@ -3442,10 +3460,10 @@ export default function VentaScreen({ navigation, route }) {
                           style={{
                             position: "absolute",
                             top: "28%",
-                            right: "-5%",
+                            right: "-15%",
                             transform: [{ rotate: "-30deg" }],
                             backgroundColor: "rgba(255, 0, 0, 0.2)",
-                            paddingHorizontal: 55,
+                            paddingHorizontal: 65,
                             paddingVertical: 5,
                             zIndex: 10,
                           }}
