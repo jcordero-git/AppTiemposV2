@@ -248,7 +248,7 @@ export default function HistorialScreen({ navigation, route }) {
     })();
   }, [fechaDesde, fechaHasta, userData]);
 
-  const fetchDraws = async () => {
+  const fetchDraws_old = async () => {
     const desde = formatDateForAPI(fechaDesde);
     const hasta = formatDateHastaForAPI(fechaHasta);
 
@@ -394,6 +394,141 @@ export default function HistorialScreen({ navigation, route }) {
       history_history.reverse();
 
       setItems(history_history);
+      return true;
+    } catch (error) {
+      console.error("Error al obtener draws", error);
+      Alert.alert("Error", "No se pudieron cargar los draws.");
+      return false;
+    }
+  };
+
+  const fetchDraws = async () => {
+    const desde = formatDateForAPI(fechaDesde);
+    const hasta = formatDateHastaForAPI(fechaHasta);
+
+    try {
+      const drawsResponse = await fetch(
+        `${backend_url}/api/draw/consolidated/${desde}/${hasta}?userId=${userData.id}`,
+      );
+      const dataDraws = await drawsResponse.json();
+
+      let draws_history = [];
+
+      if (Array.isArray(dataDraws)) {
+        draws_history = dataDraws.map((drawData) => new mDraws(drawData));
+      } else {
+        console.warn("⚠️ 'data draws' no es un array válido:", dataDraws);
+      }
+
+      const bankingResponse = await fetch(
+        `${backend_url}/api/banking/byUser/${userData.id}/${desde}/${hasta}`,
+      );
+      const dataBanking = await bankingResponse.json();
+
+      let banking_history = [];
+
+      if (Array.isArray(dataBanking)) {
+        banking_history = dataBanking.map(
+          (banckingData) => new mBanking(banckingData),
+        );
+      } else {
+        console.warn("⚠️ 'data banking' no es un array válido:", dataBanking);
+      }
+
+      const history_history = [];
+
+      for (const draw of draws_history) {
+        if (draw.consolidated && draw.priceNumber != null) {
+          history_history.push({
+            id: draw.id,
+            isDraw: true,
+            description: draw.name,
+            date: draw.consolidatedDate,
+            amount: toFloat(draw.getTotalDraw()) || 0,
+            price: toFloat(draw.price) || 0,
+            priceNumber: draw.priceNumber,
+            subTotal: 0,
+            cancelDebt: false,
+            sellerPercent: toFloat(draw.sellerPercent) || 0,
+            revAmount: toFloat(draw.getTotalRevDraw()) || 0,
+            revPrice: toFloat(draw.revPrice) || 0,
+            revSellerPercent: toFloat(draw.revSellerPercent) || 0,
+            isPrizeRev: draw.isPrizeRev,
+          });
+        }
+      }
+
+      for (const banking of banking_history) {
+        history_history.push({
+          id: banking.id,
+          isDraw: false,
+          description: banking.description,
+          date: banking.date,
+          amount: toFloat(banking.amount) || 0,
+          price: 0,
+          priceNumber: 0,
+          subTotal: 0,
+          cancelDebt: banking.cancelDebt,
+          sellerPercent: 0,
+          revAmount: 0,
+          revPrice: 0,
+          revSellerPercent: 0,
+          isPrizeRev: false,
+        });
+      }
+
+      history_history.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      let ventaTotal = 0;
+      let premiosTotal = 0;
+      let comisionTotal = 0;
+      let total = 0;
+      let acumulado = 0;
+
+      for (const history of history_history) {
+        if (!history.cancelDebt) {
+          const amount = Number(history.amount) || 0;
+          const revAmount = Number(history.revAmount) || 0;
+          const price = Number(history.price) || 0;
+          const revPrice = Number(history.revPrice) || 0;
+          const sellerPercent = Number(history.sellerPercent) || 0;
+          const revSellerPercent = Number(history.revSellerPercent) || 0;
+
+          if (history.isDraw) {
+            const comision =
+              amount * (sellerPercent / 100) +
+              revAmount * (revSellerPercent / 100);
+
+            const subtotal = amount + revAmount - comision - price - revPrice;
+
+            history.comision = comision;
+            history.subTotal = subtotal;
+
+            ventaTotal += amount + revAmount;
+            premiosTotal += price + revPrice;
+            comisionTotal += comision;
+            total += subtotal;
+          } else {
+            const subtotal = amount + revAmount;
+            history.subTotal = subtotal;
+            total += subtotal;
+          }
+
+          acumulado += history.subTotal;
+          history.acumulado = acumulado;
+        } else {
+          history.subTotal = 0;
+          acumulado = 0;
+          total = 0;
+        }
+      }
+
+      setVentaTotalFloat(ventaTotal);
+      setpremiosTotalFloat(premiosTotal);
+      setcomisionTotalFloat(comisionTotal);
+      setTotal(Number(total) || 0);
+      setItems([...history_history].reverse());
+
       return true;
     } catch (error) {
       console.error("Error al obtener draws", error);
