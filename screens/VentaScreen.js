@@ -4279,7 +4279,7 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     padding: 8,
     minHeight: 40, // importante para móviles
-    minWidth: 120,
+    minWidth: 80,
   },
   inputSmallInvisible: {
     flex: 1,

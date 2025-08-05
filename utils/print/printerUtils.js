@@ -145,7 +145,7 @@ class PrinterUtils {
     }
   }
 
-  async sendInChunks(dataBuffer, chunkSize = 100) {
+  async sendInChunks_old(dataBuffer, chunkSize = 100) {
     try {
       const base64Data = dataBuffer.toString("base64");
       console.log("base64Data", base64Data);
@@ -157,7 +157,7 @@ class PrinterUtils {
           this.characteristicUUID,
           chunk,
         );
-        await new Promise((resolve) => window.setTimeout(resolve, 50));
+        await new Promise((resolve) => window.setTimeout(resolve, 1000));
       }
       console.log("✅ Impresión completada.");
       await new Promise((resolve) => window.setTimeout(resolve, 1000));
@@ -165,6 +165,67 @@ class PrinterUtils {
     } catch (error) {
       console.error("❌ Error al imprimir en fragmentos:", error);
       throw new Error("Error al imprimir en fragmentos:");
+    }
+  }
+
+  async sendInChunks(dataBuffer, defaultChunkSize = 100) {
+    try {
+      const { Platform } = require("react-native");
+      const Device = require("expo-device");
+      // Detección de Android 7.1 o inferior
+      let isOldAndroid = false;
+
+      if (Platform.OS === "android" && Device.osVersion) {
+        const [major, minor] = Device.osVersion.split(".").map(Number);
+        if (major < 8 || (major === 7 && minor <= 1)) {
+          isOldAndroid = true;
+          console.warn(
+            "⚠️ Dispositivo con Android 7.1 o menor detectado. Enviando todo el contenido sin fragmentar.",
+          );
+        }
+      }
+
+      const base64Data = dataBuffer.toString("base64");
+
+      if (isOldAndroid) {
+        // ENVÍO COMPLETO SIN FRAGMENTAR
+        this.device.writeCharacteristicWithoutResponseForService(
+          this.serviceUUID,
+          this.characteristicUUID,
+          base64Data,
+        );
+        console.log("✅ Impresión completa sin fragmentación.");
+      } else {
+        // ENVÍO EN FRAGMENTOS
+        const chunkSize = defaultChunkSize;
+        const delay = 200;
+        const totalLength = base64Data.length;
+
+        for (let i = 0; i < totalLength; i += chunkSize) {
+          const chunk = base64Data.slice(i, i + chunkSize);
+
+          await this.device.writeCharacteristicWithResponseForService(
+            this.serviceUUID,
+            this.characteristicUUID,
+            chunk,
+          );
+
+          await new Promise((resolve) => window.setTimeout(resolve, delay));
+        }
+
+        console.log("✅ Impresión completada en fragmentos.");
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 1000));
+    } catch (error) {
+      if (error.message?.includes("timed out")) {
+        console.warn(
+          "⚠️ BLE timeout después de enviar datos. Probablemente la impresora respondió lento.",
+        );
+      } else {
+        console.error("❌ Error al imprimir:", error);
+        throw new Error("Error al imprimir:");
+      }
     }
   }
 
@@ -423,6 +484,7 @@ class PrinterUtils {
     }
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x1b, 0x61, 0x00])); // Alinear a la izquierda
     parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
     parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
@@ -539,6 +601,7 @@ class PrinterUtils {
     parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
     parts.push(Buffer.from([0x1b, 0x45, 0x00])); // Desactivar negrita
     parts.push(Buffer.from("--------------------------------\n", "ascii"));
+    parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from([0x0a])); // Salto de Linea
 

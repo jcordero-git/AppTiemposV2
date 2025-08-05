@@ -14,6 +14,8 @@ import {
   FlatList,
   useWindowDimensions,
   Alert,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useAuth } from "../context/AuthContext";
@@ -35,6 +37,7 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
 
   const toggleMenu = () => setMenuVisible(!menuVisible);
   const [showPicker, setShowPicker] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const { width } = useWindowDimensions();
   const isWeb = width > 768;
@@ -106,6 +109,7 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
   // });
 
   const fetchSorteos = async () => {
+    setLoading(true);
     try {
       const response = await fetch(
         `${backend_url}/api/drawCategory/user/${userData.id}`,
@@ -134,6 +138,8 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
     } catch (error) {
       console.error("Error al obtener sorteos", error);
       Alert.alert("Error", "No se pudieron cargar los sorteos.");
+    } finally {
+      setLoading(false); // Ocultar el loading
     }
   };
 
@@ -149,6 +155,26 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
 
   return (
     <View style={styles.container}>
+      {loading && (
+        <TouchableWithoutFeedback onPress={() => {}}>
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+              justifyContent: "center",
+              alignItems: "center",
+              zIndex: 9999, // asegurarse de que esté encima de todo
+            }}
+          >
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
+        </TouchableWithoutFeedback>
+      )}
+
       {/* Formulario y Lista */}
       <View style={[styles.formAndListContainer, isWeb && styles.webLayout]}>
         {/* Lista */}
