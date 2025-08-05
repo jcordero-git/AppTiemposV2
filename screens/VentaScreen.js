@@ -108,7 +108,7 @@ export default function VentaScreen({ navigation, route }) {
   const { tiempo, setTiempo, resetTiempo, setClientName } = useTiempo();
   const { userData, logout, ticketProfile, login, saveTicketProfile } =
     useAuth();
-  const token = userData.token;
+  //const token = userData.token;
 
   const menuAnchorRef = useRef(null);
   const settingBackendURL = userData.settings.find(
@@ -347,6 +347,7 @@ export default function VentaScreen({ navigation, route }) {
 
       try {
         const userDataUpdated = await handleLogin();
+        userData.token = userDataUpdated.token;
 
         const runGeminiExample = async () => {
           const setting = userDataUpdated.settings.find(
@@ -442,6 +443,8 @@ export default function VentaScreen({ navigation, route }) {
     const apkVersion =
       Constants.manifest?.version || Constants.expoConfig?.version;
     const imei = await getStoredUUID();
+
+    console.log("apkVersion", apkVersion);
 
     const result = await loginUser({
       username: userData.username,
@@ -783,7 +786,7 @@ export default function VentaScreen({ navigation, route }) {
       }
       const response = await fetch(
         //`https://3jbe.tiempos.website/api/ticket/${code}`,
-        `${backend_url}/api/ticket/${code}?token=${token}`,
+        `${backend_url}/api/ticket/${code}?token=${userData.token}`,
 
         {
           method: "GET",
@@ -810,7 +813,7 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const fetchDeleteTiempo = async (id) => {
-    const url = `${backend_url}/api/ticket/${id}?token=${token}`;
+    const url = `${backend_url}/api/ticket/${id}?token=${userData.token}`;
     setLoading(true);
     try {
       const response = await fetch(url, {
@@ -1104,6 +1107,7 @@ export default function VentaScreen({ navigation, route }) {
         try {
           await PrinterUtils.connectToDevice(mac);
         } catch (error) {
+          //await PrinterUtils.disconnect();// LINEA DE CODIGO PARA SER HABILITADA EN CASO DE QUE SIGA FALLANDO EN LAS MAQUINAS SUNMI
           console.warn("No se pudo conectar al MAC guardado. Escaneando...");
           const dispositivos = [];
           await new Promise((resolve, reject) => {
@@ -1220,6 +1224,9 @@ export default function VentaScreen({ navigation, route }) {
         //     return;
         //   }
         // }
+        const userDataUpdated = await handleLogin();
+        userData.token = userDataUpdated.token;
+        
         ejecutadoPorRestringidoDialogRef.current = false;
         tiempoNumerosBackup = tiempoRef.current;
         const resultado = await inicializarYProcesar(tiempoNumerosBackup);
@@ -1228,7 +1235,7 @@ export default function VentaScreen({ navigation, route }) {
         }
         setLoading(true);
         const tiempoParaImprimir = resultado;
-        const url = `${backend_url}/api/ticket?token=${token}`;
+        const url = `${backend_url}/api/ticket?token=${userData.token}`;
 
         const response = await fetch(url, {
           method: "POST",
@@ -1861,7 +1868,7 @@ export default function VentaScreen({ navigation, route }) {
         };
       }
       const response = await fetch(
-        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${userData.token}`,
         {
           method: "GET",
           headers: {

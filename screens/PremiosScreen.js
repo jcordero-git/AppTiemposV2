@@ -215,7 +215,7 @@ export default function PremiosScreen({ navigation, route }) {
       }
 
       const response = await fetch(
-        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}?token=${token}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
         {
           method: "GET",
           headers: {
