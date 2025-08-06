@@ -96,79 +96,170 @@ export default function HistorialScreen({ navigation, route }) {
   const renderItem = ({ item }) => {
     const itemBackgroundColor = item.cancelDebt ? "#ffe5e5" : "white"; // Rojo pálido si hay deuda cancelada
 
-    return (
-      <View
-        style={[
-          styles.item,
-          {
-            backgroundColor: itemBackgroundColor,
-            borderRadius: 5,
-            margin: 2,
-            padding: 3,
-          },
-        ]}
-      >
-        <View style={styles.itemRow}>
-          <Text style={styles.itemTitle}>{item.description}</Text>
-          <Text style={styles.itemSubtitle}>
-            Monto: ₡{Number(item.amount + item.revAmount).toFixed(0)}
-          </Text>
-        </View>
-        <View style={styles.itemRow}>
-          <Text style={styles.itemSubtitle}>
-            Fecha: {format(new Date(item.date), "dd/MM/yyyy", { locale: es })}
-          </Text>
-          {item.isDraw && (
-            <Text style={styles.itemSubtitle}>
-              Comisión: ₡{item.comision || 0}
-            </Text>
-          )}
-        </View>
-        {item.isDraw && (
-          <View style={styles.itemRow}>
-            <Text></Text>
+    // return (
+    //   <View
+    //     style={[
+    //       styles.item,
+    //       {
+    //         backgroundColor: itemBackgroundColor,
+    //         borderRadius: 5,
+    //         margin: 2,
+    //         padding: 3,
+    //       },
+    //     ]}
+    //   >
+    //     <View style={styles.itemRow}>
+    //       <Text style={styles.itemTitle}>{item.description}</Text>
+    //       <Text style={styles.itemSubtitle}>
+    //         Monto: ₡{Number(item.amount + item.revAmount).toFixed(0)}
+    //       </Text>
+    //     </View>
+    //     <View style={styles.itemRow}>
+    //       <Text style={styles.itemSubtitle}>
+    //         Fecha: {format(new Date(item.date), "dd/MM/yyyy", { locale: es })}
+    //       </Text>
+    //       {item.isDraw && (
+    //         <Text style={styles.itemSubtitle}>
+    //           Comisión: ₡{item.comision || 0}
+    //         </Text>
+    //       )}
+    //     </View>
+    //     {item.isDraw && (
+    //       <View style={styles.itemRow}>
+    //         <Text></Text>
 
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View
-                style={[
-                  styles.circle,
-                  {
-                    backgroundColor: item.isPrizeRev ? "#e53935" : "white", // Rojo o blanco
-                  },
-                ]}
-              >
-                <Text style={styles.circleText}>#{item.priceNumber}</Text>
+    //         <View style={{ flexDirection: "row", alignItems: "center" }}>
+    //           <View
+    //             style={[
+    //               styles.circle,
+    //               {
+    //                 backgroundColor: item.isPrizeRev ? "#e53935" : "white", // Rojo o blanco
+    //               },
+    //             ]}
+    //           >
+    //             <Text style={styles.circleText}>#{item.priceNumber}</Text>
+    //           </View>
+    //           <Text style={styles.itemSubtitle}>
+    //             Premios: ₡{Number(item.price + item.revPrice).toFixed(0)}
+    //           </Text>
+    //         </View>
+    //       </View>
+    //     )}
+    //     <View style={styles.itemRow}>
+    //       <Text></Text>
+    //       <Text style={styles.itemSubtitle}>
+    //         Subtotal: ₡{Number(item.subTotal).toFixed(0)}
+    //       </Text>
+    //     </View>
+    //     <View style={styles.itemRow}>
+    //       <Text></Text>
+    //       <Text style={styles.itemSubtitle}>
+    //         Acumulado: ₡{item.acumulado || 0}
+    //       </Text>
+    //     </View>
+    //     <View style={styles.itemRow}>
+    //       <Text></Text>
+    //       {item.cancelDebt && (
+    //         <Text
+    //           style={[
+    //             styles.itemSubtitle,
+    //             { color: "red", fontWeight: "bold" },
+    //           ]}
+    //         >
+    //           DEUDA CANCELADA
+    //         </Text>
+    //       )}
+    //     </View>
+    //   </View>
+    // );
+    return (
+      <View style={styles.rowContainer}>
+        {/* Columna izquierda */}
+        <View style={styles.leftColumn}>
+          <Text style={styles.titleText}>{item.description}</Text>
+          <Text style={styles.dateText}>
+            {format(new Date(item.date), "E dd/MM/yyyy", { locale: es })}
+          </Text>
+        </View>
+
+        {/* Columna derecha */}
+        <View style={styles.rightColumn}>
+          <View style={styles.line}>
+            <Text style={styles.label}>Monto:</Text>
+            <Text style={styles.value}>
+              ₡{Number(item.amount + item.revAmount).toFixed(0)}
+            </Text>
+          </View>
+
+          {item.isDraw && (
+            <View style={styles.line}>
+              <Text style={styles.label}>Comisión:</Text>
+              <Text style={styles.value}>₡{item.comision || 0}</Text>
+            </View>
+          )}
+
+          {item.isDraw && (
+            <View style={styles.line}>
+              <Text style={styles.label}>Premios:</Text>
+
+              <View style={styles.circleContainer}>
+                <View
+                  style={[
+                    styles.circle,
+                    { backgroundColor: item.isPrizeRev ? "#e53935" : "white" },
+                  ]}
+                >
+                  <Text style={styles.circleText}>#{item.priceNumber}</Text>
+                </View>
               </View>
-              <Text style={styles.itemSubtitle}>
-                Premios: ₡{Number(item.price + item.revPrice).toFixed(0)}
+
+              <Text style={styles.value}>
+                ₡{Number(item.price + item.revPrice).toFixed(0)}
               </Text>
             </View>
-          </View>
-        )}
-        <View style={styles.itemRow}>
-          <Text></Text>
-          <Text style={styles.itemSubtitle}>
-            Subtotal: ₡{Number(item.subTotal).toFixed(0)}
-          </Text>
-        </View>
-        <View style={styles.itemRow}>
-          <Text></Text>
-          <Text style={styles.itemSubtitle}>
-            Acumulado: ₡{item.acumulado || 0}
-          </Text>
-        </View>
-        <View style={styles.itemRow}>
-          <Text></Text>
-          {item.cancelDebt && (
+          )}
+
+          <View style={styles.line}>
+            <Text style={styles.label}>Subtotal:</Text>
             <Text
               style={[
-                styles.itemSubtitle,
-                { color: "red", fontWeight: "bold" },
+                styles.value,
+                {
+                  color: Number(item.subTotal) < 0 ? "red" : "green",
+                },
+              ]}
+            >
+              ₡{Number(item.subTotal).toFixed(0)}
+            </Text>
+          </View>
+
+          <View style={styles.line}>
+            <Text style={styles.label}>Acumulado:</Text>
+            <Text
+              style={[
+                styles.value,
+                {
+                  color: Number(item.acumulado) < 0 ? "red" : "green",
+                },
+              ]}
+            >
+              ₡
+              {isNaN(Number(item.acumulado))
+                ? 0
+                : Number(item.acumulado).toFixed(0)}
+            </Text>
+          </View>
+
+          {/* {item.cancelDebt && (
+            <Text
+              style={[
+                styles.value,
+                { color: "red", fontWeight: "bold", marginTop: 4 },
               ]}
             >
               DEUDA CANCELADA
             </Text>
-          )}
+          )} */}
         </View>
       </View>
     );
@@ -650,6 +741,7 @@ export default function HistorialScreen({ navigation, route }) {
               renderItem={renderItem}
               keyExtractor={(item) => item.id}
               style={{ marginTop: 0 }}
+              ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             />
           </View>
         </View>
@@ -964,15 +1056,15 @@ const styles = StyleSheet.create({
     padding: 8,
     marginBottom: 10,
   },
-  label: {
-    padding: 8,
-    marginBottom: 10,
-    fontWeight: "bold",
-    minWidth: 140,
-    marginTop: 0,
-    textAlign: "center",
-    width: 140,
-  },
+  // label: {
+  //   padding: 8,
+  //   marginBottom: 10,
+  //   fontWeight: "bold",
+  //   minWidth: 140,
+  //   marginTop: 0,
+  //   textAlign: "center",
+  //   width: 140,
+  // },
   labelLeft: {
     padding: 8,
     marginBottom: 10,
@@ -1025,7 +1117,7 @@ const styles = StyleSheet.create({
     borderColor: "#eee",
   },
   itemTitle: { fontWeight: "bold" },
-  itemSubtitle: { color: "#666" },
+  itemSubtitle: { color: "#666", fontWeight: "normal" },
   totalBar: {
     marginTop: 10,
     flexDirection: "row",
@@ -1069,5 +1161,57 @@ const styles = StyleSheet.create({
     color: "black",
     fontSize: 10,
     fontWeight: "bold",
+  },
+
+  rowContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    padding: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+  },
+
+  leftColumn: {
+    flex: 1,
+    paddingRight: 10,
+  },
+
+  rightColumn: {
+    flex: 1.5,
+  },
+
+  titleText: {
+    fontWeight: "bold",
+    fontSize: 14,
+    color: "#000",
+    marginBottom: 2,
+  },
+
+  dateText: {
+    fontSize: 13,
+    color: "#333",
+  },
+
+  line: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 2,
+    alignItems: "center",
+    minHeight: 20,
+  },
+
+  label: {
+    fontSize: 13,
+    color: "#333",
+    flex: 1,
+    fontWeight: "bold",
+  },
+
+  value: {
+    fontSize: 13,
+    color: "#000",
+    textAlign: "right",
+    flex: 1,
   },
 });

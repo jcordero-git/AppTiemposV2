@@ -346,11 +346,11 @@ export default function VentaScreen({ navigation, route }) {
       setLoading(true); // Mostrar loader
 
       try {
-        const userDataUpdated = await handleLogin();
-        userData.token = userDataUpdated.token;
+        //const userDataUpdated = await handleLogin();
+        //userData.token = userDataUpdated.token;
 
         const runGeminiExample = async () => {
-          const setting = userDataUpdated.settings.find(
+          const setting = userData.settings.find(
             (s) => s.promt_extrae !== undefined,
           );
           const prompt = setting ? setting.promt_extrae : "";
@@ -784,6 +784,8 @@ export default function VentaScreen({ navigation, route }) {
       if (code === 0) {
         return null;
       }
+      const apkVersion =
+        Constants.manifest?.version || Constants.expoConfig?.version;
       const response = await fetch(
         //`https://3jbe.tiempos.website/api/ticket/${code}`,
         `${backend_url}/api/ticket/${code}?token=${userData.token}`,
@@ -793,6 +795,7 @@ export default function VentaScreen({ navigation, route }) {
           headers: {
             //"X-Access-Token": `${token}`,
             "Content-Type": "application/json",
+            "jj-apk-version": apkVersion,
           },
         },
       );
@@ -813,6 +816,8 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const fetchDeleteTiempo = async (id) => {
+    const apkVersion =
+      Constants.manifest?.version || Constants.expoConfig?.version;
     const url = `${backend_url}/api/ticket/${id}?token=${userData.token}`;
     setLoading(true);
     try {
@@ -821,6 +826,7 @@ export default function VentaScreen({ navigation, route }) {
         headers: {
           //"x-access-token": `${token}`,
           "Content-Type": "application/json",
+          "jj-apk-version": apkVersion,
         },
         // body: JSON.stringify(tiempoParaImprimir),
       });
@@ -1224,8 +1230,10 @@ export default function VentaScreen({ navigation, route }) {
         //     return;
         //   }
         // }
-        const userDataUpdated = await handleLogin();
-        userData.token = userDataUpdated.token;
+
+
+        //const userDataUpdated = await handleLogin();
+        //userData.token = userDataUpdated.token;
         
         ejecutadoPorRestringidoDialogRef.current = false;
         tiempoNumerosBackup = tiempoRef.current;
@@ -1234,6 +1242,8 @@ export default function VentaScreen({ navigation, route }) {
           return; // ⛔ No continúa si hay errores
         }
         setLoading(true);
+        const apkVersion =
+          Constants.manifest?.version || Constants.expoConfig?.version;
         const tiempoParaImprimir = resultado;
         const url = `${backend_url}/api/ticket?token=${userData.token}`;
 
@@ -1242,6 +1252,7 @@ export default function VentaScreen({ navigation, route }) {
           headers: {
             //"x-access-token": `${token}`,
             "Content-Type": "application/json",
+            "jj-apk-version": apkVersion,
           },
           body: JSON.stringify(tiempoParaImprimir),
         });
@@ -1867,6 +1878,8 @@ export default function VentaScreen({ navigation, route }) {
           lastTicketNumber: 0,
         };
       }
+      const apkVersion =
+        Constants.manifest?.version || Constants.expoConfig?.version;
       const response = await fetch(
         `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${userData.token}`,
         {
@@ -1874,6 +1887,7 @@ export default function VentaScreen({ navigation, route }) {
           headers: {
             //"x-access-token": `${token}`,
             "Content-Type": "application/json",
+            "jj-apk-version": apkVersion,
           },
         },
       );

@@ -35,10 +35,7 @@ export default function useCheckAppVersion(autoCheck = true) {
         } else if (compareVersions(currentVersion, lastVersion) === 0) {
           showSnackbar("La versión de la app está actualizada.", 1);
         } else {
-          showSnackbar(
-            "Verificar la versión de la app (contacte a un admin).",
-            3,
-          );
+          showSnackbar("La versión de la app está actualizada.", 1);
         }
       }
     } catch (e) {
