@@ -18,6 +18,7 @@ import {
   StatusBar,
   Modal,
   Dimensions,
+  TouchableHighlight,
 } from "react-native";
 import {
   Menu,
@@ -964,7 +965,7 @@ export default function VentaScreen({ navigation, route }) {
   //const openMenu = () => setMenuVisibleHeader(true);
   //const closeMenu = () => setMenuVisibleHeader(false);
 
-  const renderItem = ({ item }) => (
+  const renderItem_old = ({ item }) => (
     <View>
       <View style={styles.itemRowGeneral}>
         <View style={styles.itemRow}>
@@ -980,6 +981,97 @@ export default function VentaScreen({ navigation, route }) {
       </View>
     </View>
   );
+
+  const renderItem_old2 = ({ item }) => {
+    const content = (
+      <View style={styles.itemRowGeneral}>
+        <View style={styles.itemRow}>
+          <Text style={styles.itemLeft}>₡{item.monto}</Text>
+          <Text style={styles.itemRight}>{item.numero}</Text>
+        </View>
+        {item.reventado && (
+          <View style={styles.itemRowRev}>
+            <Text style={styles.itemLeft}>₡{item.montoReventado}</Text>
+            <Text style={styles.itemRight}>REVENTADO</Text>
+          </View>
+        )}
+      </View>
+    );
+
+    if (Platform.OS === "web") {
+      return (
+        <View style={styles.itemWrapper}>
+          {content}
+          <TouchableOpacity
+            onPress={() => solicitarEliminarItem(item)}
+            style={styles.deleteIcon}
+          >
+            <Text>🗑️</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableHighlight
+        onLongPress={() => solicitarEliminarItem(item)}
+        underlayColor="#eee"
+      >
+        {content}
+      </TouchableHighlight>
+    );
+  };
+
+  const [itemAEliminar, setItemAEliminar] = useState(null);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+
+  // const eliminarItem = () => {
+  //   setItems((prevItems) =>
+  //     prevItems.filter((i) => i.key !== itemAEliminar?.key),
+  //   );
+  //   setItemAEliminar(null);
+  //   setConfirmVisible(false);
+  // };
+  const eliminarItem = (item) => {
+    // Elimina el item de la lista
+    const nuevosItems = items.filter((i) => i.key !== item.key);
+    setItems(nuevosItems);
+
+    // Construye el nuevo arreglo de montoNumeros para el tiempo
+    const nuevosMontoNumeros = nuevosItems.map((i) => {
+      const datos = {
+        monto: i.monto,
+        numero: i.numero,
+      };
+      if (i.reventado) {
+        datos.reventado = true;
+        datos.montoReventado = i.montoReventado;
+      }
+      return datos;
+    });
+
+    // Actualiza el objeto tiempo
+    actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+
+    // Limpieza del estado de confirmación (web)
+    setItemAEliminar(null);
+    setConfirmVisible(false);
+  };
+
+  const solicitarEliminarItem = (item) => {
+    setItemAEliminar(item);
+    setConfirmVisible(true);
+
+    // if (Platform.OS === "web") {
+    //   setItemAEliminar(item);
+    //   setConfirmVisible(true);
+    // } else {
+    //   Alert.alert("Eliminar", "¿Estás seguro que deseas eliminar este item?", [
+    //     { text: "Cancelar", style: "cancel" },
+    //     { text: "OK", onPress: () => eliminarItem(item) },
+    //   ]);
+    // }
+  };
 
   const tiempoRef = useRef(tiempo);
   const tiempoAImprimirRef = useRef(tiempo);
@@ -1231,10 +1323,9 @@ export default function VentaScreen({ navigation, route }) {
         //   }
         // }
 
-
         //const userDataUpdated = await handleLogin();
         //userData.token = userDataUpdated.token;
-        
+
         ejecutadoPorRestringidoDialogRef.current = false;
         tiempoNumerosBackup = tiempoRef.current;
         const resultado = await inicializarYProcesar(tiempoNumerosBackup);
@@ -2448,6 +2539,49 @@ export default function VentaScreen({ navigation, route }) {
   const extractBodyFromHTML = (htmlString) => {
     const bodyContentMatch = htmlString.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
     return bodyContentMatch ? bodyContentMatch[1] : htmlString;
+  };
+
+  const renderItem = ({ item }) => {
+    const content = (
+      <View style={styles.itemRowGeneral}>
+        <View style={styles.itemRow}>
+          <Text style={styles.itemLeft}>₡{item.monto}</Text>
+
+          {/* Contenedor con número y botón de eliminar */}
+          <View style={styles.rightRow}>
+            <Text style={styles.itemRight}>{item.numero}</Text>
+            {Platform.OS === "web" && tiempoSeleccionado == null && (
+              <TouchableOpacity
+                onPress={() => solicitarEliminarItem(item)}
+                style={styles.deleteIcon}
+              >
+                <MaterialIcons name="delete" size={22} color="red" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {item.reventado && (
+          <View style={styles.itemRowRev}>
+            <Text style={styles.itemLeft}>₡{item.montoReventado}</Text>
+            <Text style={styles.itemRight}>REVENTADO</Text>
+          </View>
+        )}
+      </View>
+    );
+
+    if (Platform.OS === "web") {
+      return <View style={styles.itemWrapper}>{content}</View>;
+    }
+    return (
+      <TouchableHighlight
+        onLongPress={() => solicitarEliminarItem(item)}
+        underlayColor="#eee"
+        disabled={tiempoSeleccionado !== null}
+      >
+        {content}
+      </TouchableHighlight>
+    );
   };
 
   return (
@@ -4146,6 +4280,91 @@ export default function VentaScreen({ navigation, route }) {
             </Button>
           </Dialog.Actions>
         </Dialog>
+
+        {/* Dialog de confirmación solo en web */}
+        {/* {Platform.OS === "web" && confirmVisible && ( */}
+        <Dialog
+          visible={confirmVisible}
+          onDismiss={() => setConfirmVisible(false)}
+          style={[
+            {
+              backgroundColor: "white",
+              borderRadius: 10,
+              marginHorizontal: 20,
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 6,
+              zIndex: 9999,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons name="delete" size={35} color="red" />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                CONFIRMAR ELIMINACIÓN
+              </Text>
+            </View>
+            <Text style={{ fontSize: 16 }}>
+              ¿Eliminar el número{" "}
+              <Text style={{ fontWeight: "bold" }}>
+                {itemAEliminar?.numero}
+              </Text>
+              {""}
+              {/* por ₡
+              <Text style={{ fontWeight: "bold" }}>{itemAEliminar?.monto}</Text> */}
+              ?
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="gray"
+              style={{
+                backgroundColor: "white",
+                marginRight: 8,
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => setConfirmVisible(false)}
+            >
+              CANCELAR
+            </Button>
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white",
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => eliminarItem(itemAEliminar)}
+            >
+              ELIMINAR
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+        {/* )} */}
       </Portal>
 
       <SorteoSelectorModal
@@ -4417,5 +4636,18 @@ const styles = StyleSheet.create({
   reventarTitle: {
     marginHorizontal: 14,
     color: "#999",
+  },
+  rightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8, // o marginLeft
+  },
+
+  deleteIcon: {
+    paddingLeft: 6,
+    paddingRight: 4,
+    paddingVertical: 2,
+    cursor: "pointer",
   },
 });
