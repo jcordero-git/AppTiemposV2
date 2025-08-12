@@ -15,25 +15,25 @@ import {
 import { Divider, Provider } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
+import { useSnackbar } from "../context/SnackbarContext";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import mSorteo from "../models/mSorteoSingleton.js";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
-import { formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import { formatDate } from "../utils/datetimeUtils";
+import Constants from "expo-constants";
 import { useAuth } from "../context/AuthContext";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 import PrinterUtils from "../utils/print/printerUtils";
 
-export default function PremiosScreen({ navigation, route }) {
+export default function PremiosScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const isWeb = width > 710;
-  const { showSnackbar, showConfirm } = useSnackbar();
+  const { showSnackbar } = useSnackbar();
   const [modalVisible, setModalVisible] = useState(false);
 
-  const { userData, logout, ticketProfile, login, saveTicketProfile } =
-    useAuth();
+  const { userData, logout, ticketProfile } = useAuth();
   const token = userData.token;
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
@@ -42,30 +42,24 @@ export default function PremiosScreen({ navigation, route }) {
 
   const [sorteoNombre, setSorteoNombre] = useState("");
   const [sorteoId, setSorteoId] = useState(null);
-  const [fecha, setFecha] = useState(new Date()); // Siempre inicializa con un Date válido
+  const [fecha, setFecha] = useState(new Date());
   const [showPicker, setShowPicker] = useState(false);
 
   const formattedDate = formatDate(fecha, "EE dd/MM/yyyy");
   const [numero, setNumero] = useState("");
   const numeroRef = useRef(null);
 
-  const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
-  const [items, setItems] = useState([]);
+  // 🔹 Ahora es un useRef
+  const tiemposAnterioresRef = useRef([]);
 
   const [colorIndex, setColorIndex] = useState(0);
-
-  //const colors = ["white", "gray", "red"];
   const colors = ["white", "red"];
-
-  const toggleColor = () => {
-    setColorIndex((prev) => (prev + 1) % colors.length);
-  };
-
   const currentColor = colors[colorIndex];
+  const toggleColor = () => setColorIndex((prev) => (prev + 1) % colors.length);
 
   const tiemposFiltrados =
     numero.trim().length === 2
-      ? tiemposAnteriores
+      ? tiemposAnterioresRef.current
           .filter((item) =>
             item.numbers?.some((n) => n.numero === numero.trim()),
           )
@@ -80,11 +74,9 @@ export default function PremiosScreen({ navigation, route }) {
             const montoReventado = isReventado
               ? numeroCoincidente?.montoReventado || 0
               : 0;
-
             const revPrizeTimes = isReventado
               ? mSorteo?.userValues.revPrizeTimes || 0
               : 0;
-
             const revPremio = montoReventado * revPrizeTimes;
 
             return {
@@ -99,12 +91,9 @@ export default function PremiosScreen({ navigation, route }) {
           })
       : [];
 
-  // Calcular total
   const total = tiemposFiltrados?.reduce((sum, item) => {
-    //const premio = parseFloat(item.premio);
     const premio = parseFloat(item.premio) || 0;
     const revPremio = parseFloat(item.revPremio) || 0;
-    //return sum + (!isNaN(premio) ? premio : 0);
     return sum + (currentColor === "red" ? premio + revPremio : premio);
   }, 0);
 
@@ -114,29 +103,12 @@ export default function PremiosScreen({ navigation, route }) {
       headerStyle: { backgroundColor: "#4CAF50" },
       headerTintColor: "#fff",
       headerRight: () => (
-        <>
-          {/* <MaterialIcons
-            name="save"
-            size={24}
-            color="#fff" // Blanco para contraste con fondo verde
-            style={{ marginRight: 20 }}
-          /> */}
-          <TouchableOpacity onPress={handlePrintBt} style={{ marginRight: 16 }}>
-            <MaterialIcons name="print" size={24} color="#fff" />
-          </TouchableOpacity>
-        </>
+        <TouchableOpacity onPress={handlePrintBt} style={{ marginRight: 16 }}>
+          <MaterialIcons name="print" size={24} color="#fff" />
+        </TouchableOpacity>
       ),
     });
-  }, [
-    navigation,
-    tiemposFiltrados,
-    total,
-    mSorteo,
-    userData,
-    ticketProfile,
-    numero,
-    currentColor,
-  ]);
+  }, [navigation, tiemposFiltrados, total, numero, currentColor]);
 
   const handlePrintBt = async () => {
     try {
@@ -144,53 +116,26 @@ export default function PremiosScreen({ navigation, route }) {
         const mac = ticketProfile.lastPrinterMacAddress;
         try {
           await PrinterUtils.connectToDevice(mac);
-        } catch (error) {
-          console.warn("No se pudo conectar al MAC guardado. Escaneando...");
-          const dispositivos = [];
-          await new Promise((resolve, reject) => {
-            PrinterUtils.scanDevices((device) => {
-              dispositivos.push(device);
-              if (device.id === mac) {
-                resolve();
-              }
-            });
-            window.setTimeout(() => {
-              reject(new Error("Tiempo de escaneo agotado"));
-            }, 10000);
-          });
-          const found = dispositivos.find((d) => d.id === mac);
-          if (!found) {
-            showSnackbar(
-              "Impresora no encontrada. Por favor empareje desde ajustes.",
-              3,
-            );
-            return;
-          }
-          await PrinterUtils.connectToDevice(found.id);
+        } catch {
+          showSnackbar(
+            "Impresora no encontrada. Por favor empareje desde ajustes.",
+            3,
+          );
+          return;
         }
         await PrinterUtils.printPremios({
           items: tiemposFiltrados,
-          total: total,
+          total,
           sorteoSeleccionado: mSorteo,
           vendedorData: userData,
-          ticketProfile: ticketProfile,
+          ticketProfile,
           numeroPremiado: numero,
           reventado: currentColor === "red",
         });
-
         await PrinterUtils.disconnect();
-      } else if (Platform.OS === "web") {
-        // const iframeWindow = iframeRef.current.contentWindow;
-        // if (iframeWindow) {
-        //   iframeWindow.focus();
-        //   iframeWindow.print();
-        // }
-        // window.setTimeout(() => {
-        //   setDialogPrintVisible(false);
-        // }, 500);
       }
     } catch (e) {
-      console.error("Error al imprimir 4:", e);
+      console.error("Error al imprimir:", e);
       showSnackbar(
         "Hubo un error al imprimir. Revisa la conexión con la impresora.",
         3,
@@ -200,508 +145,360 @@ export default function PremiosScreen({ navigation, route }) {
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
-    if (selectedDate) {
-      setFecha(selectedDate);
-    }
+    if (selectedDate) setFecha(selectedDate);
   };
 
   const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
     try {
       if (drawCategoryId === 0 || !drawDate) {
-        return {
-          tiemposVendidos: [],
-          lastTicketNumber: 0,
-        };
+        tiemposAnterioresRef.current = [];
+        return;
       }
-
+      // const response = await fetch(
+      //   `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
+      //   { method: "GET", headers: { "Content-Type": "application/json" } },
+      // );
+      const apkVersion =
+        Constants.manifest?.version || Constants.expoConfig?.version;
       const response = await fetch(
-        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${userData.token}`,
         {
           method: "GET",
           headers: {
             //"x-access-token": `${token}`,
             "Content-Type": "application/json",
+            "jj-apk-version": apkVersion,
           },
         },
       );
       if (response.status === 403) {
         showSnackbar("⚠️ El usuario no tiene permisos.");
         logout();
-        return {
-          tiemposVendidos: [],
-          lastTicketNumber: 0,
-        };
+        tiemposAnterioresRef.current = [];
+        return;
       }
-
       if (response.status !== 200) {
-        console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
         showSnackbar("⚠️ Error al obtener tiempos vendidos");
-        logout();
-        return {
-          tiemposVendidos: [],
-          lastTicketNumber: 0,
-        };
+        tiemposAnterioresRef.current = [];
+        return;
       }
-
       const data = await response.json();
+      const sortedData = data
+        .filter((item) => item.status === 201)
+        .sort((a, b) => b.id - a.id);
 
-      const ticketsFiltrados = data.filter((item) => item.status === 201);
-
-
-      const sortedData = ticketsFiltrados.sort((a, b) => b.id - a.id);
-      setTiemposAnteriores(sortedData);
-      const ticketNumbers = sortedData
-        .map((item) => item.id)
-        .filter((n) => typeof n === "number" && n > 0);
-
-      const lastTicketNumber =
-        ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
-
-      return {
-        tiemposVendidos: sortedData,
-        lastTicketNumber,
-      };
+      tiemposAnterioresRef.current = sortedData;
     } catch (error) {
       console.error("Error al cargar tiempos anteriores:", error);
-      return [[], 0]; // ✅ fallback seguro
+      tiemposAnterioresRef.current = [];
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      const fechaActual = mFechaSeleccionada.getFecha();
-      setFecha(fechaActual);
-    }, []),
-  );
-
   const cargaSorteoSeleccionado = async () => {
-    Object.assign(mSorteo, mSorteo); // ✅ Copia las propiedades sin reemplazar el objeto
+    Object.assign(mSorteo, mSorteo);
     setSorteoNombre(mSorteo.name);
     setSorteoId(mSorteo.id);
+    setNumero("");
   };
 
+  const skipNextEffect = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      (async () => {
+      let isActive = true;
+
+      const load = async () => {
+        // 1. Obtener y setear fecha
+        const fechaActual = mFechaSeleccionada.getFecha();
+
+        skipNextEffect.current = true;
+        setFecha(fechaActual);
+
+        // 2. Cargar sorteo
         if (mSorteo.id !== 0) {
           await cargaSorteoSeleccionado();
+        }
 
-          mFechaSeleccionada.setFecha(fecha);
-          const isAllowed = await fetchTiemposAnteriores(
-            sorteoId,
-            formatDate(fecha, "yyyy-MM-dd"),
+        // 3. Esperar datos para fetch
+        const drawId = mSorteo.id || sorteoId;
+        if (fechaActual && drawId && userData?.id) {
+          mFechaSeleccionada.setFecha(fechaActual);
+          await fetchTiemposAnteriores(
+            drawId,
+            formatDate(fechaActual, "yyyy-MM-dd"),
           );
         }
-      })();
-    }, [fecha, sorteoId]), // <--- agregá las dependencias acá
+      };
+
+      load();
+      setNumero("");
+
+      return () => {
+        isActive = false;
+      };
+    }, [userData?.id, sorteoId]),
   );
 
   useEffect(() => {
+    // if (skipNextEffect.current) {
+    //   skipNextEffect.current = false;
+    //   return;
+    // }
+
     if (!fecha || !sorteoId || !userData?.id) return;
-    async function execute() {
+
+    const load = async () => {
       mFechaSeleccionada.setFecha(fecha);
-      const isAllowed = await fetchTiemposAnteriores(
-        sorteoId,
-        formatDate(fecha, "yyyy-MM-dd"),
-      );
-    }
-    execute();
-  }, [sorteoId, fecha]);
+      setNumero("");
+      console.log("entro a actualizar desde useEfect");
+      await fetchTiemposAnteriores(sorteoId, formatDate(fecha, "yyyy-MM-dd"));
+    };
+
+    load();
+  }, [fecha, sorteoId, userData?.id]);
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const fechaActual = mFechaSeleccionada.getFecha();
+  //     setFecha(fechaActual);
+  //   }, []),
+  // );
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     (async () => {
+  //       if (mSorteo.id !== 0) {
+  //         await cargaSorteoSeleccionado();
+
+  //         mFechaSeleccionada.setFecha(fecha);
+  //         const isAllowed = await fetchTiemposAnteriores(
+  //           sorteoId,
+  //           formatDate(fecha, "yyyy-MM-dd"),
+  //         );
+  //       }
+  //     })();
+  //   }, [fecha, sorteoId]), // <--- agregá las dependencias acá
+  // );
+
+  // useEffect(() => {
+  //   console.log("mSorteo.id", mSorteo.id);
+  //   console.log("sorteoId", sorteoId);
+
+  //   if (!fecha || !sorteoId || !userData?.id) return;
+  //   async function execute() {
+  //     mFechaSeleccionada.setFecha(fecha);
+  //     const isAllowed = await fetchTiemposAnteriores(
+  //       sorteoId,
+  //       formatDate(fecha, "yyyy-MM-dd"),
+  //     );
+  //   }
+  //   execute();
+  // }, [sorteoId, fecha]);
+
+  // 🔹 Un solo hook para toda la carga
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const load = async () => {
+  //       const fechaActual = mFechaSeleccionada.getFecha();
+  //       setFecha(fechaActual);
+
+  //       if (mSorteo.id !== 0) {
+  //         await cargaSorteoSeleccionado();
+  //       }
+
+  //       if (fechaActual && mSorteo.id && userData?.id) {
+  //         mFechaSeleccionada.setFecha(fechaActual);
+  //         await fetchTiemposAnteriores(
+  //           mSorteo.id,
+  //           formatDate(fechaActual, "yyyy-MM-dd"),
+  //         );
+  //       }
+  //     };
+  //     load();
+  //   }, [userData?.id, sorteoId, fecha]),
+  // );
 
   return (
     <Provider>
       <View style={{ flex: 1 }}>
         {loading && (
-          <TouchableWithoutFeedback onPress={() => {}}>
-            <View
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.4)",
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 9999, // asegurarse de que esté encima de todo
-              }}
-            >
+          <TouchableWithoutFeedback>
+            <View style={styles.overlay}>
               <ActivityIndicator size="large" color="#fff" />
             </View>
           </TouchableWithoutFeedback>
         )}
-
-        {/* Tu contenido de pantalla */}
-        <>
-          <View style={styles.container}>
-            {/* Formulario y Lista */}
-
+        <View style={styles.container}>
+          <View
+            style={[styles.formAndListContainer, isWeb && styles.webLayout]}
+          >
             <View
-              style={[styles.formAndListContainer, isWeb && styles.webLayout]}
+              style={[styles.formContainer, isWeb && styles.webFormContainer]}
             >
-              {/* Formulario */}
-
-              <View
-                style={[styles.formContainer, isWeb && styles.webFormContainer]}
-              >
-                {/* <ScrollView style={{ flex: 1 }}> */}
-                <View style={styles.formRow}>
-                  <Pressable
-                    style={styles.inputSmallSorteo}
-                    onPress={() => {
-                      setModalVisible(true);
-                    }}
+              <View style={styles.formRow}>
+                <Pressable
+                  style={styles.inputSmallSorteo}
+                  onPress={() => setModalVisible(true)}
+                >
+                  <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
+                    {sorteoNombre || "Sorteo"}
+                  </Text>
+                </Pressable>
+                {Platform.OS === "web" ? (
+                  <DatePickerWeb value={fecha} onChange={setFecha} />
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => setShowPicker(true)}
+                      style={styles.inputSmall}
+                    >
+                      <Text>{formattedDate || "Selecciona fecha"}</Text>
+                    </Pressable>
+                    {showPicker && (
+                      <DateTimePicker
+                        value={fecha}
+                        mode="date"
+                        display="calendar"
+                        onChange={handleDateChange}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+              <View style={styles.row}>
+                <TextInput
+                  ref={numeroRef}
+                  placeholder="Número"
+                  style={[styles.inputSmall, { marginRight: 8, minWidth: 70 }]}
+                  value={numero}
+                  onChangeText={(text) =>
+                    setNumero(text.replace(/[^0-9]/g, "").slice(0, 2))
+                  }
+                  keyboardType="number-pad"
+                  returnKeyType="done"
+                  blurOnSubmit={false}
+                />
+                {mSorteo.useReventado && (
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={toggleColor}
                   >
-                    <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
-                      {sorteoNombre || "Sorteo"}
+                    <MaterialIcons
+                      name="circle"
+                      size={20}
+                      color={colors[colorIndex]}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+            <Divider />
+            <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
+              <ScrollView contentContainerStyle={{ paddingHorizontal: 10 }}>
+                {tiemposFiltrados.map((item, index) => (
+                  <Pressable key={item.id || index} style={styles.item}>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Código: # {item.id || ""}
+                    </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Cliente: {item.clientName || "Sin nombre"}
+                    </Text>
+                    <Text style={{ color: "#555" }}>
+                      Fecha: {new Date(item.updatedAt).toLocaleString()}
+                    </Text>
+                    <Text style={{ fontWeight: "bold" }}>
+                      Premio: ₡{item.monto} x {item.prizeTimes} = ₡{item.premio}
+                    </Text>
+                    {currentColor === "red" && item.montoReventado > 0 && (
+                      <Text style={{ fontWeight: "bold" }}>
+                        Premio Reventado: ₡{item.montoReventado} x{" "}
+                        {item.revPrizeTimes} = ₡{item.revPremio}
+                      </Text>
+                    )}
+                    <Text style={{ color: "#090" }}>
+                      Premio Total a pagar: ₡{item.premio + item.revPremio}
                     </Text>
                   </Pressable>
-                  {Platform.OS === "web" ? (
-                    <View>
-                      <DatePickerWeb
-                        value={fecha}
-                        onChange={(date) => {
-                          setFecha(date);
-                        }}
-                      />
-                    </View>
-                  ) : (
-                    <>
-                      <Pressable
-                        onPress={() => setShowPicker(true)}
-                        style={styles.inputSmall}
-                      >
-                        <Text>{formattedDate || "Selecciona fecha"}</Text>
-                      </Pressable>
-
-                      {showPicker && (
-                        <DateTimePicker
-                          value={fecha}
-                          mode="date"
-                          display={
-                            Platform.OS === "android" ? "calendar" : "default"
-                          }
-                          onChange={handleDateChange}
-                        />
-                      )}
-                    </>
-                  )}
-                </View>
-                <>
-                  {/* Botón, Monto y Número en una fila */}
-                  <View style={styles.row}>
-                    <TextInput
-                      ref={numeroRef}
-                      placeholder="Número"
-                      style={[
-                        styles.inputSmall,
-                        { marginRight: 8, minWidth: 70 },
-                      ]}
-                      value={numero}
-                      onChangeText={(text) => {
-                        const cleaned = text.replace(/[^0-9]/g, "").slice(0, 2);
-                        setNumero(cleaned);
-
-                        // if (cleaned.length === 2) {
-                        //   if (reventar) {
-                        //     window.setTimeout(() => {
-                        //       reventarRef.current?.focus();
-                        //     });
-                        //   } else {
-                        //     submitNumero();
-                        //   }
-                        // }
-                      }}
-                      keyboardType="number-pad"
-                      returnKeyType="done"
-                      blurOnSubmit={false}
-                    />
-                    {mSorteo.useReventado && (
-                      <>
-                        <TouchableOpacity
-                          style={styles.iconButton}
-                          onPress={() => {
-                            toggleColor();
-                          }}
-                        >
-                          <MaterialIcons
-                            name="circle"
-                            size={20}
-                            color={colors[colorIndex]}
-                          />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-                </>
-                {/* </ScrollView> */}
-              </View>
-              <Divider style={{ backgroundColor: "rgba(0,0,0,0.12)" }} />
-
-              {/* Lista */}
-              <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
-                <ScrollView contentContainerStyle={{ paddingHorizontal: 10 }}>
-                  {tiemposFiltrados.map((item, index) => (
-                    <Pressable
-                      key={item.id || index}
-                      onPress={() => {
-                        //cargarTiempoSeleccionado(item);
-                      }}
-                      style={{
-                        paddingVertical: 10,
-                        borderBottomWidth: 1,
-                        borderBottomColor: "#eee",
-                      }}
-                    >
-                      <Text style={{ fontWeight: "bold" }}>
-                        Código: # {item.id || ""}
-                      </Text>
-                      <Text style={{ fontWeight: "bold" }}>
-                        Cliente: {item.clientName || "Sin nombre"}
-                      </Text>
-                      <Text style={{ color: "#555" }}>
-                        Fecha: {new Date(item.updatedAt).toLocaleString()}
-                      </Text>
-                      <Text style={{ fontWeight: "bold" }}>
-                        Premio: ₡{item.monto} x {item.prizeTimes} = ₡
-                        {item.premio}
-                      </Text>
-                      {/* <Text style={{ fontWeight: "bold" }}>
-                        Multiplicador: {item.prizeTimes} Veces
-                      </Text>
-                      <Text style={{ color: "#090" }}>
-                        Premio a pagar: ₡{item.premio}
-                      </Text> */}
-
-                      {currentColor === "red" && item.montoReventado > 0 && (
-                        <>
-                          <Text style={{ fontWeight: "bold" }}>
-                            Premio Reventado: ₡{item.montoReventado} x{" "}
-                            {item.revPrizeTimes} = ₡{item.revPremio}
-                          </Text>
-                          {/* <Text style={{ fontWeight: "bold" }}>
-                            Multiplicador Rev: {item.revPrizeTimes} Veces
-                          </Text>
-                          <Text style={{ color: "#090" }}>
-                            Premio Rev a pagar: ₡{item.revPremio}
-                          </Text> */}
-                        </>
-                      )}
-                      <Text style={{ color: "#090" }}>
-                        Premio Total a pagar: ₡{item.premio + item.revPremio}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-            {/* Total */}
-            <View style={styles.totalBar}>
-              <View style={styles.totalTextGroup}>
-                <Text style={styles.totalText}>TOTAL: </Text>
-                <Text style={styles.totalValue}>₡{total?.toFixed(0)}</Text>
-              </View>
+                ))}
+              </ScrollView>
             </View>
           </View>
-        </>
+          <View style={styles.totalBar}>
+            <View style={styles.totalTextGroup}>
+              <Text style={styles.totalText}>TOTAL: </Text>
+              <Text style={styles.totalValue}>₡{total?.toFixed(0)}</Text>
+            </View>
+          </View>
+        </View>
+        <SorteoSelectorModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          onSelect={(sorteo) => {
+            Object.assign(mSorteo, sorteo);
+            setSorteoId(mSorteo.id);
+            setSorteoNombre(mSorteo.name);
+          }}
+          leftPosition
+        />
       </View>
-
-      <SorteoSelectorModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSelect={(sorteo) => {
-          Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
-
-          setSorteoId(mSorteo.id);
-          setSorteoNombre(mSorteo.name);
-        }}
-        leftPosition={true}
-      />
     </Provider>
   );
 }
 
 const styles = StyleSheet.create({
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
   container: {
     flex: 1,
     backgroundColor: "#fff",
     paddingRight: 16,
     paddingLeft: 16,
     paddingBottom: 16,
-    justifyContent: "flex-start",
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    paddingBottom: 10,
-    marginBottom: 10,
-  },
-  headerIcons: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  icon: {
-    paddingHorizontal: 4,
-  },
-  title: { fontSize: 20, fontWeight: "bold" },
-  dropdown: {
-    position: "absolute",
-    right: 16,
-    top: 50,
-    backgroundColor: "#fff",
-    elevation: 5,
-    borderRadius: 4,
-  },
-  menuItem: {
-    padding: 12,
-    fontSize: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  formAndListContainer: {
-    flexDirection: "column",
-    marginTop: 20,
-    flex: 1,
-  },
-  webLayout: {
-    flexDirection: "row", //TODO se debe eliminar esta linea para que no se muestren los tiquetes premiados en la derecha
-  },
-  formContainer: {
-    marginBottom: 20,
-    //maxWidth: 410,
-  },
-  webFormContainer: {
-    marginRight: 20,
-    minWidth: 410,
-    maxWidth: 410,
-  },
-  listContainer: {
-    flex: 1,
-    maxHeight: 900, // puedes ajustar esto según el diseño deseado
-  },
+  formAndListContainer: { flexDirection: "column", marginTop: 20, flex: 1 },
+  webLayout: { flexDirection: "row" },
+  formContainer: { marginBottom: 20 },
+  webFormContainer: { marginRight: 20, minWidth: 410, maxWidth: 410 },
   formRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
     marginBottom: 10,
   },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  itemRowGeneral: {
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-  },
-
-  itemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-
-    borderColor: "#eee",
-  },
-  itemRowRev: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 10,
-    borderColor: "#eee",
-  },
-  itemLeft: {
-    fontWeight: "bold",
-    fontSize: 16,
-    marginLeft: 70,
-  },
-  itemRight: {
-    fontWeight: "bold",
-    fontSize: 16,
-    marginRight: 70,
-  },
-  input: {
-    borderBottomWidth: 1,
-    borderColor: "#ccc",
-    padding: 8,
-    marginBottom: 10,
-  },
+  row: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  listContainer: { flex: 1, maxHeight: 900 },
   inputSmall: {
     flex: 1,
     borderBottomWidth: 1,
     borderColor: "#ccc",
     padding: 8,
-    minHeight: 40, // importante para móviles
+    minHeight: 40,
   },
   inputSmallSorteo: {
     flex: 1,
     borderBottomWidth: 1,
     borderColor: "#ccc",
     padding: 8,
-    minHeight: 40, // importante para móviles
+    minHeight: 40,
     minWidth: 80,
-  },
-  inputSmallInvisible: {
-    flex: 1,
-    padding: 8,
-  },
-  iconButtonInvisible: {
-    width: 40,
-    height: 40,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 0,
-  },
-  switchRowContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: Platform.OS === "web" ? 10 : 0, // solo en web,
-    paddingHorizontal: 15,
-  },
-  switchRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center", // ✅ fuerza alineación vertical
-    marginBottom: 10,
-    gap: 5,
   },
   iconButton: {
     width: 40,
     height: 40,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 0,
     backgroundColor: "#e6e1e1",
     borderRadius: 8,
-    cursor: "pointer",
   },
-  iconButtonRestringidos: {
-    width: 27,
-    height: 27,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 0,
-    //backgroundColor: "#e6e1e1",
-    borderRadius: 8,
-    cursor: "pointer",
-  },
-  montoContainer: {
-    flexDirection: "column",
-    justifyContent: "space-between",
-    height: 80,
-    flex: 1,
-  },
-  item: {
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderColor: "#eee",
-  },
-  itemTitle: { fontWeight: "bold" },
-  itemSubtitle: { color: "#666" },
+  item: { paddingVertical: 10, borderBottomWidth: 1, borderColor: "#eee" },
   totalBar: {
     marginTop: 10,
     flexDirection: "row",
@@ -710,44 +507,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#ccc",
   },
-  totalTextGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8, // si usas React Native >= 0.71, si no, usa marginRight
-  },
-  totalText: {
-    fontWeight: "bold",
-    fontSize: 20,
-  },
-  totalValue: {
-    fontSize: 20,
-    marginLeft: 4,
-    fontWeight: "bold",
-  },
-  dialogWebContainer: {
-    position: "fixed", // fijo en pantalla
-    top: 0,
-    right: 0,
-    height: "100vh", // toda la altura visible
-    width: 400, // ancho fijo para el diálogo
-    backgroundColor: "white",
-    padding: 20,
-    boxShadow: "0 0 10px rgba(0,0,0,0.3)",
-    zIndex: 1000, // asegurarse que quede encima de todo
-    overflowY: "auto",
-  },
-  tooltip: {
-    position: "absolute",
-    top: -24,
-    left: 0,
-    backgroundColor: "#4CAF50",
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    zIndex: 10,
-  },
-  tooltipText: {
-    color: "white",
-    fontSize: 12,
-  },
+  totalTextGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
+  totalText: { fontWeight: "bold", fontSize: 20 },
+  totalValue: { fontSize: 20, marginLeft: 4, fontWeight: "bold" },
 });

@@ -14,6 +14,7 @@ import {
 import { Divider, Provider } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 //import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
@@ -86,18 +87,6 @@ export default function VentaGeneralScreen({ navigation, route }) {
   const [items, setItems] = useState([]);
   const [itemsGrid, setItemsGrid] = useState([]);
   const [montoTotal, setMontoTotal] = useState(0);
-
-  useFocusEffect(
-    useCallback(() => {
-      const fechaActual = mFechaSeleccionada.getFecha();
-      setFecha(fechaActual);
-      setTiempo((prev) => ({
-        ...prev,
-        drawCategoryId: mSorteo.id,
-        drawDate: formatDate(fechaActual, "yyyy-MM-dd"),
-      }));
-    }, []),
-  );
 
   const renderItem = ({ item }) => (
     <View>
@@ -231,8 +220,18 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
   const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
     try {
+      const apkVersion =
+        Constants.manifest?.version || Constants.expoConfig?.version;
       const response = await fetch(
-        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
+        `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${userData.token}`,
+        {
+          method: "GET",
+          headers: {
+            //"x-access-token": `${token}`,
+            "Content-Type": "application/json",
+            "jj-apk-version": apkVersion,
+          },
+        },
       );
 
       if (response.status === 403) {
@@ -363,50 +362,133 @@ export default function VentaGeneralScreen({ navigation, route }) {
     setSorteoId(mSorteo.id);
   };
 
+  const skipNextEffect = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      (async () => {
+      let isActive = true;
+
+      const load = async () => {
+        // 1. Obtener y setear fecha
+        const fechaActual = mFechaSeleccionada.getFecha();
+
+        skipNextEffect.current = true;
+        setFecha(fechaActual);
+
+        // 2. Cargar sorteo
         if (mSorteo.id !== 0) {
           await cargaSorteoSeleccionado();
         }
-        actualizaDesdeHeader();
-        return () => {
-          // cleanup si hace falta
-        };
-      })();
-    }, [fecha, sorteoId, userData]),
+
+        // 3. Esperar datos para fetch
+        const drawId = mSorteo.id || sorteoId;
+        if (fechaActual && drawId && userData?.id) {
+          mFechaSeleccionada.setFecha(fechaActual);
+          console.log("entro a actualizar desde useFocusEffect");
+          actualizaDesdeHeader(fechaActual, drawId, userData);
+        }
+      };
+
+      load();
+
+      return () => {
+        isActive = false;
+      };
+    }, [userData?.id, sorteoId, mSorteo.id]),
   );
 
   useEffect(() => {
-    if (fecha || sorteoId || userData?.id) {
-      mFechaSeleccionada.setFecha(fecha);
-      actualizaDesdeHeader();
-    }
-  }, [sorteoId, fecha]);
+    // if (skipNextEffect.current) {
+    //   skipNextEffect.current = false;
+    //   return;
+    // }
 
-  const actualizaDesdeHeader = useCallback(() => {
-    async function execute() {
-      if (!fecha || !sorteoId || !userData?.id) return;
-      const updated = await actualizaGrid(fecha, sorteoId, userData);
-      if (updated) {
-        showSnackbar("Lista Actualizada Correctamente.", 1);
-      } else {
-        console.warn("Error al intentar actualizar la lista.");
-        showSnackbar("Error al intentar actualizar la lista.", 3);
-      }
-    }
-    (async () => {
+    if (!fecha || !sorteoId || !userData?.id) return;
+
+    const load = async () => {
+      mFechaSeleccionada.setFecha(fecha);
+      console.log("entro a actualizar desde useEfect");
+      actualizaDesdeHeader(fecha, sorteoId, userData);
+    };
+
+    load();
+  }, [fecha, sorteoId, userData?.id]);
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     const fechaActual = mFechaSeleccionada.getFecha();
+  //     setFecha(fechaActual);
+  //     setTiempo((prev) => ({
+  //       ...prev,
+  //       drawCategoryId: mSorteo.id,
+  //       drawDate: formatDate(fechaActual, "yyyy-MM-dd"),
+  //     }));
+  //   }, []),
+  // );
+
+  // useFocusEffect(
+  //   useCallback(() => {
+  //     (async () => {
+  //       if (mSorteo.id !== 0) {
+  //         await cargaSorteoSeleccionado();
+  //       }
+  //       actualizaDesdeHeader();
+  //       return () => {
+  //         // cleanup si hace falta
+  //       };
+  //     })();
+  //   }, [fecha, sorteoId, userData]),
+  // );
+
+  // useEffect(() => {
+  //   if (fecha || sorteoId || userData?.id) {
+  //     mFechaSeleccionada.setFecha(fecha);
+  //     actualizaDesdeHeader();
+  //   }
+  // }, [sorteoId, fecha]);
+
+  const actualizaDesdeHeader = useCallback(
+    async (fechaParam, sorteoParam, user) => {
+      if (!fechaParam || !sorteoParam || !user?.id) return;
       try {
         setLoading(true);
-        await execute();
+        const updated = await actualizaGrid(fechaParam, sorteoParam, user);
+        if (updated) {
+          //showSnackbar("Lista Actualizada Correctamente.", 1);
+        } else {
+          showSnackbar("Error al intentar actualizar la lista.", 3);
+        }
       } catch (err) {
-        console.warn("Error al intentar actualizar la lista.");
         showSnackbar("Error al intentar actualizar la lista.", 3);
       } finally {
         setLoading(false);
       }
-    })();
-  }, [fecha, sorteoId, userData]);
+    },
+    [],
+  );
+
+  // const actualizaDesdeHeader = useCallback(() => {
+  //   async function execute() {
+  //     if (!fecha || !sorteoId || !userData?.id) return;
+  //     const updated = await actualizaGrid(fecha, sorteoId, userData);
+  //     if (updated) {
+  //       showSnackbar("Lista Actualizada Correctamente.", 1);
+  //     } else {
+  //       console.warn("Error al intentar actualizar la lista.");
+  //       showSnackbar("Error al intentar actualizar la lista.", 3);
+  //     }
+  //   }
+  //   (async () => {
+  //     try {
+  //       setLoading(true);
+  //       await execute();
+  //     } catch (err) {
+  //       console.warn("Error al intentar actualizar la lista.");
+  //       showSnackbar("Error al intentar actualizar la lista.", 3);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   })();
+  // }, [fecha, sorteoId, userData]);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
@@ -417,7 +499,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
         <>
           <Pressable
             onPress={() => {
-              actualizaDesdeHeader();
+              actualizaDesdeHeader(fecha, sorteoId, userData);
             }}
             style={{ marginRight: 20 }}
           >
@@ -426,7 +508,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, actualizaDesdeHeader]);
+  }, [navigation, actualizaDesdeHeader, fecha, sorteoId, userData]);
 
   useEffect(() => {
     tiempoRef.current = tiempo;

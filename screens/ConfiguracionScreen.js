@@ -500,18 +500,19 @@ export default function ConfiguracionScreen({ navigation, route }) {
                       }));
                     }}
                   />
-
-                  <Pressable
-                    style={styles.inputSmall}
-                    onPress={() => setModalPrinterVisible(true)}
-                    editable={false}
-                  >
-                    <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
-                      {ticketProfile?.lastPrinterMacAddress
-                        ? ticketProfile.lastPrinterMacAddress
-                        : "Seleccione una impresora"}
-                    </Text>
-                  </Pressable>
+                  {Platform.OS !== "web" && (
+                    <Pressable
+                      style={styles.inputSmall}
+                      onPress={() => setModalPrinterVisible(true)}
+                      editable={false}
+                    >
+                      <Text style={{ color: sorteoNombre ? "#000" : "#aaa" }}>
+                        {ticketProfile?.lastPrinterMacAddress
+                          ? ticketProfile.lastPrinterMacAddress
+                          : "Seleccione una impresora"}
+                      </Text>
+                    </Pressable>
+                  )}
                   <PrinterSelectorModal
                     visible={modalPrinterVisible}
                     onClose={() => setModalPrinterVisible(false)}

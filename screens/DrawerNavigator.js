@@ -17,8 +17,8 @@ export default function DrawerNavigator() {
   const [sorteo, setSorteo] = useState(""); // Estado para Sorteo
   const [fecha, setFecha] = useState(new Date()); // Estado para Fecha
   const { width } = useWindowDimensions();
- // const isWeb = Platform.OS === "web" && width > 768;
-  const isWeb =  width > 768;
+  // const isWeb = Platform.OS === "web" && width > 768;
+  const isWeb = width > 768;
   const drawerWidth = Platform.OS === "web" ? "250px" : 250;
 
   return (

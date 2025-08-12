@@ -19,6 +19,10 @@ export default function SorteoDetalleScreen({ navigation, route }) {
   const [fechaRestringida, setFechaRestringida] = useState(false);
   const [restricciones, setRestricciones] = useState([]);
   const [hora, setHora] = useState("");
+  const settingBackendURL = userData.settings.find(
+    (s) => s.backend_url !== undefined,
+  );
+  const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
 
   const { width } = useWindowDimensions();
   const isWeb = width > 710;
@@ -31,7 +35,7 @@ export default function SorteoDetalleScreen({ navigation, route }) {
       setReventar(sorteo.useReventado);
     if (!userData?.id || !sorteo?.id) return;
 
-    const endpoint = `https://3jbe.tiempos.website/api/restrictedNumbers/byUser/${userData.id}/${sorteo.id}`;
+    const endpoint = `${backend_url}/api/restrictedNumbers/byUser/${userData.id}/${sorteo.id}`;
     fetch(endpoint)
       .then((res) => res.json())
       .then((data) => {
