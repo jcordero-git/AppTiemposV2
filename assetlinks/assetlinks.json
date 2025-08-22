@@ -1,0 +1,13 @@
+[
+    {
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "tiempos.com.apptiemposv2",
+        "sha256_cert_fingerprints": [
+          "C6:2C:8A:C1:E6:E3:9B:B0:83:DA:50:DC:F7:F7:24:42:CB:B4:FB:E3:21:F8:9A:1E:0E:A5:0A:B2:85:2D:1A:0E"
+        ]
+      }
+    }
+  ]
+  

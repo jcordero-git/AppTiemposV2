@@ -20,8 +20,10 @@ import {
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useAuth } from "../context/AuthContext";
 import { formatHourStr } from "../utils/datetimeUtils";
+import crashlytics from "@react-native-firebase/crashlytics";
 
 const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
+  crashlytics().setAttributes({ screen: "sorteos" }); // atributos adicionales
   const route = useRoute();
   const { userData, logout } = useAuth();
   const settingBackendURL = userData.settings.find(

@@ -12,6 +12,22 @@ import SorteoDetalleScreen from "../screens/SorteoDetalleScreen";
 
 const Stack = createNativeStackNavigator();
 
+// Configuración de deep linking
+const linking = {
+  prefixes: ["https://app.tiempos.website", "tiempos.com.apptiemposv2://"],
+  config: {
+    screens: {
+      ResetPassword: {
+        path: "token/:token",
+        parse: {
+          token: (token) => `${token}`,
+        },
+      },
+      // Si quieres soportar otras pantallas, las agregas aquí
+    },
+  },
+};
+
 export default function MainNavigator() {
   const context = useContext(AuthContext);
 
@@ -26,7 +42,7 @@ export default function MainNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer linking={linking}>
       <Stack.Navigator
         initialRouteName={userData ? "Home" : "Login"}
         screenOptions={{

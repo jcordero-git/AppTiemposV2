@@ -30,8 +30,10 @@ import useCheckAppVersion from "../utils/versionChecker";
 import { ht } from "date-fns/locale";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton";
+import crashlytics from "@react-native-firebase/crashlytics";
 
 export default function ConfiguracionScreen({ navigation, route }) {
+  crashlytics().setAttributes({ screen: "configuracion" }); // atributos adicionales
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);

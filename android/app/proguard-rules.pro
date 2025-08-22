@@ -43,3 +43,17 @@
 -keepclasseswithmembers class * {
    public <init>(...);
 }
+
+# Firebase Crashlytics
+-keep class com.google.firebase.crashlytics.** { *; }
+-dontwarn com.google.firebase.crashlytics.**
+
+# Mantener clases necesarias para RNFB (React Native Firebase)
+-keep class io.invertase.firebase.crashlytics.** { *; }
+-keepclassmembers class io.invertase.firebase.crashlytics.** { *; }
+
+# Evitar que Proguard elimine métodos de registro de JS
+-keepclassmembers class * {
+    void recordError(...);
+    void log(...);
+}

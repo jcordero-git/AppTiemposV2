@@ -8,12 +8,17 @@ import {
   Pressable,
   StyleSheet,
   Platform,
+  useWindowDimensions,
+  Alert,
 } from "react-native";
 import PrinterUtils from "../utils/print/printerUtils";
+import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 export default function PrinterSelectorModal({ visible, onClose, onSelect }) {
   const [printerItems, setPrinterItems] = useState([]);
   const scanningRef = useRef(false);
+  const { showSnackbar, showConfirm } = useSnackbar();
+  const { width, height } = useWindowDimensions();
 
   useEffect(() => {
     if (Platform.OS !== "web" && visible) {
@@ -27,36 +32,90 @@ export default function PrinterSelectorModal({ visible, onClose, onSelect }) {
     };
   }, [visible]);
 
+  // const startScan = async () => {
+  //   if (scanningRef.current) return; // evitar escaneo múltiple
+  //   scanningRef.current = true;
+  //   setPrinterItems([]);
+
+  //   try {
+  //     await PrinterUtils.requestBluetoothPermissions();
+
+  //     // Escanea y agrega dispositivos según se detecten
+  //     PrinterUtils.manager.startDeviceScan(null, null, (error, device) => {
+  //       if (error) {
+  //         console.error("Error escaneando:", error);
+  //         scanningRef.current = false;
+  //         return;
+  //       }
+  //       if (device?.name) {
+  //         setPrinterItems((prev) => {
+  //           // Evitar duplicados
+  //           if (prev.find((d) => d.id === device.id)) return prev;
+  //           return [...prev, device];
+  //         });
+  //       }
+  //     });
+
+  //     // Detener escaneo tras 10 segundos
+  //     window.setTimeout(() => {
+  //       stopScan();
+  //     }, 10000);
+  //   } catch (err) {
+  //     console.error("Permisos denegados o error:", err);
+  //     scanningRef.current = false;
+  //   }
+  // };
+
   const startScan = async () => {
-    if (scanningRef.current) return; // evitar escaneo múltiple
+    if (scanningRef.current) return;
     scanningRef.current = true;
     setPrinterItems([]);
 
     try {
-      await PrinterUtils.requestPermissions();
+      const permissionsOk = await PrinterUtils.requestBluetoothPermissions();
+      if (!permissionsOk) {
+        // Alert.alert(
+        //   "Permisos requeridos",
+        //   "Debes conceder permisos de Bluetooth y ubicación.",
+        // );
+        showSnackbar("Debes conceder permisos de Bluetooth y ubicación.", 2);
+        scanningRef.current = false;
+        return;
+      }
 
-      // Escanea y agrega dispositivos según se detecten
-      PrinterUtils.manager.startDeviceScan(null, null, (error, device) => {
-        if (error) {
-          console.error("Error escaneando:", error);
-          scanningRef.current = false;
-          return;
-        }
-        if (device?.name) {
-          setPrinterItems((prev) => {
-            // Evitar duplicados
-            if (prev.find((d) => d.id === device.id)) return prev;
-            return [...prev, device];
-          });
-        }
-      });
+      const locationOk = await PrinterUtils.ensureLocationEnabled();
+      if (!locationOk) {
+        scanningRef.current = false;
+        onClose();
+        return;
+      }
 
-      // Detener escaneo tras 10 segundos
+      PrinterUtils.manager.startDeviceScan(
+        [], // Filtro vacío: mejor compatibilidad en Huawei
+        { allowDuplicates: false },
+        (error, device) => {
+          if (error) {
+            console.error("Error escaneando:", error);
+            showSnackbar("Verifique que el Bluetooth está encendido.", 3);
+            onClose();
+            scanningRef.current = false;
+            return;
+          }
+          if (device?.name) {
+            setPrinterItems((prev) => {
+              if (prev.find((d) => d.id === device.id)) return prev;
+              return [...prev, device];
+            });
+          }
+        },
+      );
+
+      // Detener escaneo después de 20 segundos
       window.setTimeout(() => {
         stopScan();
-      }, 10000);
+      }, 20000);
     } catch (err) {
-      console.error("Permisos denegados o error:", err);
+      console.error("Error en escaneo:", err);
       scanningRef.current = false;
     }
   };
@@ -73,6 +132,7 @@ export default function PrinterSelectorModal({ visible, onClose, onSelect }) {
       visible={visible}
       transparent
       animationType="fade"
+      style={{ maxHeight: height * 0.6 }}
       onRequestClose={() => {
         stopScan();
         onClose();

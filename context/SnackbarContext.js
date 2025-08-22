@@ -53,7 +53,7 @@ export const SnackbarProvider = ({ children }) => {
   useEffect(() => {
     return () => {
       if (timerRef.current) {
-        clearTimeout(timerRef.current);
+        window.clearTimeout(timerRef.current);
       }
     };
   }, []);

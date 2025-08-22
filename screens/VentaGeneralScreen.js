@@ -28,8 +28,10 @@ import mSorteo from "../models/mSorteoSingleton.js";
 import { useTiempo } from "../models/mTiempoContext";
 import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
+import crashlytics from "@react-native-firebase/crashlytics";
 
 export default function VentaGeneralScreen({ navigation, route }) {
+  crashlytics().setAttributes({ screen: "venta general" }); // atributos adicionales
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);

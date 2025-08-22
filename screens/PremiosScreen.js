@@ -376,6 +376,7 @@ export default function PremiosScreen({ navigation }) {
                   keyboardType="number-pad"
                   returnKeyType="done"
                   blurOnSubmit={false}
+                  maxLength={2}
                 />
                 {mSorteo.useReventado && (
                   <TouchableOpacity

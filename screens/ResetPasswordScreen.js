@@ -6,6 +6,7 @@ import {
   Alert,
   Image,
   Pressable,
+  Platform,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
@@ -14,6 +15,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
   const [token, setToken] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [success, setSuccess] = useState(false); // ✅ nueva bandera
   const { showSnackbar } = useSnackbar();
 
   useEffect(() => {
@@ -44,17 +46,29 @@ export default function ResetPasswordScreen({ navigation, route }) {
       }
 
       if (response.ok) {
-        Alert.alert("Éxito", "Contraseña cambiada correctamente");
-        navigation.goBack();
+        if (Platform.OS === "web") {
+          showSnackbar("Contraseña cambiada correctamente.", 1, 5000);
+          window.setTimeout(() => {
+            window.location.href = "https://app.tiempos.website/";
+          }, 5000);
+        } else {
+          showSnackbar(
+            "Contraseña cambiada correctamente. Cierre y abra la app.",
+            1,
+            8000,
+          );
+        }
+
+        setSuccess(true); // bloquea inputs y botón
       } else {
         const errorData = await response.json();
-        Alert.alert(
-          "Error",
-          errorData.message || "No se pudo cambiar la contraseña",
+        showSnackbar(
+          errorData.message || "No se pudo cambiar la contraseña.",
+          3,
         );
       }
     } catch (error) {
-      Alert.alert("Error", "Hubo un problema con la conexión al servidor");
+      showSnackbar("Hubo un problema con la conexión al servidor.", 3);
     }
   };
 
@@ -75,6 +89,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
           value={token}
           onChangeText={setToken}
           autoCapitalize="none"
+          editable={!success} // ✅ bloqueado si éxito
         />
         <TextInput
           placeholder="Nueva contraseña"
@@ -82,6 +97,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
           style={styles.input}
           value={password}
           onChangeText={setPassword}
+          editable={!success} // ✅ bloqueado si éxito
         />
         <TextInput
           placeholder="Confirmar contraseña"
@@ -89,6 +105,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
           style={styles.input}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
+          editable={!success} // ✅ bloqueado si éxito
         />
 
         {confirmPassword !== "" && password !== confirmPassword && (
@@ -99,7 +116,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
         <Pressable
           onPress={handleResetPassword}
-          disabled={!isFormValid}
+          disabled={!isFormValid || success} // ✅ deshabilitado si éxito
           style={({ pressed }) => [
             styles.button,
             pressed && styles.buttonPressed,

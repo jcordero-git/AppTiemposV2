@@ -1,6 +1,8 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: 'com.google.gms.google-services'
+apply plugin: 'com.google.firebase.crashlytics'
 
 def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
 
@@ -111,6 +113,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file(System.getenv("MYAPP_UPLOAD_STORE_FILE") ?: "A:\\sign.jks")
+            storePassword System.getenv("MYAPP_UPLOAD_STORE_PASSWORD") ?: "251188"
+            keyAlias System.getenv("MYAPP_UPLOAD_KEY_ALIAS") ?: "key0"
+            keyPassword System.getenv("MYAPP_UPLOAD_KEY_PASSWORD") ?: "251188"
+        }
     }
     buildTypes {
         debug {
@@ -119,12 +127,18 @@ android {
         release {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             //shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
             shrinkResources true
             minifyEnabled true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
             crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
+        }
+        buildTypes.all { buildType ->
+            firebaseCrashlytics {
+                nativeSymbolUploadEnabled true
+                unstrippedNativeLibsDir = file("$buildDir/intermediates/merged_native_libs/${buildType.name}/out/lib")
+            }
         }
         applicationVariants.all{
             variant ->
@@ -169,6 +183,12 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+   // Firebase BOM: asegura compatibilidad de versiones
+    implementation platform('com.google.firebase:firebase-bom:32.1.1')
+
+    // Firebase Crashlytics y Analytics usando el BOM
+    implementation 'com.google.firebase:firebase-crashlytics'
+    implementation 'com.google.firebase:firebase-analytics'
 
     def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
     def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";

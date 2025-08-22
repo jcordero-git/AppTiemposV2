@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "244472170264",
+    "project_id": "tiemposv2",
+    "storage_bucket": "tiemposv2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:244472170264:android:8f6d9347ee197c746a806d",
+        "android_client_info": {
+          "package_name": "tiempos.com.apptiemposv2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAttNd-AI2qFHZGzAoS6CKISKXAkwvIlr8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

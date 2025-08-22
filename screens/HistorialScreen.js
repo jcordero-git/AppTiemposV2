@@ -9,7 +9,10 @@ import {
   useWindowDimensions,
   Alert,
   Platform,
+  ScrollView,
   ActivityIndicator,
+  Keyboard,
+  TouchableOpacity,
   TouchableWithoutFeedback,
 } from "react-native";
 import { Provider, Portal, Dialog, Button } from "react-native-paper";
@@ -18,6 +21,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { subMonths, addDays, format } from "date-fns";
 import DatePickerWeb from "../components/DatePickerWeb";
+import Constants from "expo-constants";
 
 import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -26,11 +30,17 @@ import mDraws from "../models/mDraws";
 import mBanking from "../models/mBanking";
 import { toFloat } from "../utils/numeroUtils";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
-import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import {
+  getInternetDate,
+  formatDate,
+  formatDateLocal,
+} from "../utils/datetimeUtils"; // ajusta el path si es necesario
+import crashlytics from "@react-native-firebase/crashlytics";
 
 export default function HistorialScreen({ navigation, route }) {
-  const { showSnackbar } = useSnackbar();
-  const { userData } = useAuth();
+  crashlytics().setAttributes({ screen: "historial" }); // atributos adicionales
+  const { showSnackbar, showConfirm } = useSnackbar();
+  const { userData, logout } = useAuth();
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
   );
@@ -38,7 +48,7 @@ export default function HistorialScreen({ navigation, route }) {
   const [showPickerDesde, setShowPickerDesde] = useState(false);
   const [showPickerHasta, setShowPickerHasta] = useState(false);
 
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
 
   // Resta 2 meses desde hoy
@@ -46,6 +56,12 @@ export default function HistorialScreen({ navigation, route }) {
   const [fechaHasta, setfechaHasta] = useState(subMonths(getInternetDate(), 0));
   const [dialogVisible, setDialogVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingPremiados, setLoadingPremiados] = useState(false);
+
+  const [dialogTicketsPremiadosVisible, setDialogTicketsPremiadosVisible] =
+    useState(false);
+  const [tiemposPremiados, setTiemposPremiados] = useState([]);
+  const [tiempoSeleccionado, setTiempoSeleccionado] = useState(null);
 
   const formatDateForAPI = (fecha) => {
     try {
@@ -75,6 +91,21 @@ export default function HistorialScreen({ navigation, route }) {
   const [comisionTotalFloat, setcomisionTotalFloat] = useState(0);
   const [premiosTotalFloat, setpremiosTotalFloat] = useState(0);
 
+  const [searchTicketId, setSearchTicketId] = React.useState("");
+  // const tiemposFiltrados = tiemposPremiados.filter((item) =>
+  //   item.ticketId?.toString().includes(searchTicketId),
+  // );
+  const tiemposFiltrados = tiemposPremiados
+    .filter((item) => item.ticketId?.toString().includes(searchTicketId))
+    .sort((a, b) => {
+      // 1️⃣ Pendientes primero
+      if (a.isPaid !== b.isPaid) {
+        return a.isPaid ? 1 : -1; // Si a está pagado, va después
+      }
+      // 2️⃣ Luego orden por ticketId descendente
+      return b.ticketId - a.ticketId;
+    });
+
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
 
@@ -93,85 +124,9 @@ export default function HistorialScreen({ navigation, route }) {
       setfechaHasta(selectedDate);
     }
   };
+
   const renderItem = ({ item }) => {
     const itemBackgroundColor = item.cancelDebt ? "#ffe5e5" : "white"; // Rojo pálido si hay deuda cancelada
-
-    // return (
-    //   <View
-    //     style={[
-    //       styles.item,
-    //       {
-    //         backgroundColor: itemBackgroundColor,
-    //         borderRadius: 5,
-    //         margin: 2,
-    //         padding: 3,
-    //       },
-    //     ]}
-    //   >
-    //     <View style={styles.itemRow}>
-    //       <Text style={styles.itemTitle}>{item.description}</Text>
-    //       <Text style={styles.itemSubtitle}>
-    //         Monto: ₡{Number(item.amount + item.revAmount).toFixed(0)}
-    //       </Text>
-    //     </View>
-    //     <View style={styles.itemRow}>
-    //       <Text style={styles.itemSubtitle}>
-    //         Fecha: {format(new Date(item.date), "dd/MM/yyyy", { locale: es })}
-    //       </Text>
-    //       {item.isDraw && (
-    //         <Text style={styles.itemSubtitle}>
-    //           Comisión: ₡{item.comision || 0}
-    //         </Text>
-    //       )}
-    //     </View>
-    //     {item.isDraw && (
-    //       <View style={styles.itemRow}>
-    //         <Text></Text>
-
-    //         <View style={{ flexDirection: "row", alignItems: "center" }}>
-    //           <View
-    //             style={[
-    //               styles.circle,
-    //               {
-    //                 backgroundColor: item.isPrizeRev ? "#e53935" : "white", // Rojo o blanco
-    //               },
-    //             ]}
-    //           >
-    //             <Text style={styles.circleText}>#{item.priceNumber}</Text>
-    //           </View>
-    //           <Text style={styles.itemSubtitle}>
-    //             Premios: ₡{Number(item.price + item.revPrice).toFixed(0)}
-    //           </Text>
-    //         </View>
-    //       </View>
-    //     )}
-    //     <View style={styles.itemRow}>
-    //       <Text></Text>
-    //       <Text style={styles.itemSubtitle}>
-    //         Subtotal: ₡{Number(item.subTotal).toFixed(0)}
-    //       </Text>
-    //     </View>
-    //     <View style={styles.itemRow}>
-    //       <Text></Text>
-    //       <Text style={styles.itemSubtitle}>
-    //         Acumulado: ₡{item.acumulado || 0}
-    //       </Text>
-    //     </View>
-    //     <View style={styles.itemRow}>
-    //       <Text></Text>
-    //       {item.cancelDebt && (
-    //         <Text
-    //           style={[
-    //             styles.itemSubtitle,
-    //             { color: "red", fontWeight: "bold" },
-    //           ]}
-    //         >
-    //           DEUDA CANCELADA
-    //         </Text>
-    //       )}
-    //     </View>
-    //   </View>
-    // );
     return (
       <View style={styles.rowContainer}>
         {/* Columna izquierda */}
@@ -201,16 +156,39 @@ export default function HistorialScreen({ navigation, route }) {
           {item.isDraw && (
             <View style={styles.line}>
               <Text style={styles.label}>Premios:</Text>
-
-              <View style={styles.circleContainer}>
-                <View
-                  style={[
-                    styles.circle,
-                    { backgroundColor: item.isPrizeRev ? "#e53935" : "white" },
-                  ]}
-                >
-                  <Text style={styles.circleText}>#{item.priceNumber}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={styles.circleContainer}>
+                  <View
+                    style={[
+                      styles.circle,
+                      {
+                        backgroundColor: item.isPrizeRev ? "#e53935" : "white",
+                        justifyContent: "center",
+                        alignItems: "center",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.circleText,
+                        { lineHeight: 22, textAlignVertical: "center" }, // 👈 fuerza al texto a estar centrado
+                      ]}
+                    >
+                      #{item.priceNumber}
+                    </Text>
+                  </View>
                 </View>
+
+                <TouchableOpacity
+                  onPress={() => openDialogTicketsPremiados(item.id)}
+                  style={{ marginLeft: 10, justifyContent: "center" }} // 👈 centra el icono respecto al círculo
+                >
+                  <MaterialIcons
+                    name="remove-red-eye"
+                    size={22}
+                    color="green"
+                  />
+                </TouchableOpacity>
               </View>
 
               <Text style={styles.value}>
@@ -272,6 +250,128 @@ export default function HistorialScreen({ navigation, route }) {
 
   const closeDialog = () => {
     setDialogVisible(false);
+  };
+
+  const closeDialogTicketsPremiados = () => {
+    setDialogTicketsPremiadosVisible(false);
+  };
+
+  const openDialogTicketsPremiados = (drawCategoryId) => {
+    Keyboard.dismiss(); // Oculta el teclado
+    const actualizaTiemposVendidos = async () => {
+      const { tiemposVendidos, lastTicketNumber } =
+        await fetchTiemposPremiados(drawCategoryId);
+    };
+    actualizaTiemposVendidos();
+    setDialogTicketsPremiadosVisible(true);
+  };
+
+  const fetchTiemposPremiados = async (drawCategoryId) => {
+    try {
+      setLoading(true); // ⬅️ activar loading
+      if (drawCategoryId === 0) {
+        setTiemposPremiados([]);
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+      const apkVersion =
+        Constants.manifest?.version || Constants.expoConfig?.version;
+      const response = await fetch(
+        `${backend_url}/api/ticketPrize/draw/${drawCategoryId}?token=${userData.token}`,
+        {
+          method: "GET",
+          headers: {
+            //"x-access-token": `${token}`,
+            "Content-Type": "application/json",
+            "jj-apk-version": apkVersion,
+          },
+        },
+      );
+      if (response.status === 403) {
+        showSnackbar("⚠️ El usuario no tiene permisos.", 3);
+        logout();
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+
+      crashlytics().crash();
+
+      if (response.status !== 200) {
+        console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
+        showSnackbar(
+          "⚠️ Error al obtener tiempos vendidos, recargue la pantalla",
+          3,
+        );
+        setTiemposPremiados([]);
+        return {
+          tiemposVendidos: [],
+          lastTicketNumber: 0,
+        };
+      }
+
+      const data = await response.json();
+      const sortedData = data.data.sort((a, b) => b.ticketId - a.ticketId);
+      setTiemposPremiados(sortedData);
+      const ticketNumbers = sortedData
+        .map((item) => item.ticketId)
+        .filter((n) => typeof n === "number" && n > 0);
+
+      const lastTicketNumber =
+        ticketNumbers.length > 0 ? Math.max(...ticketNumbers) : 0;
+
+      return {
+        tiemposVendidos: sortedData,
+        lastTicketNumber,
+      };
+    } catch (error) {
+      console.error("Error al cargar tiempos anteriores:", error);
+      setTiemposPremiados([]);
+      return [[], 0]; // ✅ fallback seguro
+    } finally {
+      setLoading(false); // ⬅️ desactivar loading siempre
+    }
+  };
+
+  const markTicketAsPaid = async (ticket) => {
+    try {
+      // Clonamos el objeto y cambiamos isPaid a true
+      const updatedTicket = {
+        ...ticket,
+        isPaid: true,
+        paymentMethod: "Efectivo",
+      };
+
+      console.log("Ticket a pagar: ", updatedTicket);
+
+      const response = await fetch(
+        `${backend_url}/api/ticketPrize/${ticket.id}?token=${userData.token}`,
+        {
+          method: "PUT", // o POST según tu API
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updatedTicket),
+        },
+      );
+
+      if (response.status !== 200) {
+        showSnackbar("⚠️ Error al marcar como pagado", 3);
+        console.warn("Error al pagar ticket:", response.status);
+        return;
+      }
+
+      showSnackbar("✅ Ticket marcado como pagado", 1);
+
+      // Refrescamos la lista
+      await fetchTiemposPremiados(ticket.drawId);
+    } catch (error) {
+      console.error("Error al actualizar ticket:", error);
+      showSnackbar("⚠️ Error de conexión al marcar como pagado", 3);
+    }
   };
 
   React.useLayoutEffect(() => {
@@ -944,6 +1044,270 @@ export default function HistorialScreen({ navigation, route }) {
                 borderRadius: 3,
               }}
               onPress={closeDialog}
+            >
+              CERRAR
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        {/* Diálogo Tiempos Premiados */}
+        <Dialog
+          visible={dialogTicketsPremiadosVisible}
+          onDismiss={closeDialogTicketsPremiados}
+          style={[
+            {
+              backgroundColor: "white",
+              borderRadius: 10,
+              marginHorizontal: 20,
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons
+                name="format-list-numbered"
+                size={35}
+                color="#000"
+              />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                TIEMPOS PREMIADOS
+              </Text>
+            </View>
+
+            {loading ? (
+              // ⬅️ Spinner mientras carga
+              <View
+                style={{
+                  height: 200,
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <ActivityIndicator size="large" color="green" />
+                <Text style={{ marginTop: 10 }}>
+                  Cargando tiempos Premiados...
+                </Text>
+              </View>
+            ) : (
+              // ⬅️ tu lista normal
+
+              <View style={{ maxHeight: height * 0.6 }}>
+                <TextInput
+                  placeholder="Buscar por código..."
+                  value={searchTicketId}
+                  onChangeText={setSearchTicketId}
+                  style={{
+                    marginHorizontal: 10,
+                    marginBottom: 8,
+                    padding: 8,
+                    borderBottomWidth: 1,
+                    borderColor: "#ccc",
+                    borderRadius: 3,
+                    fontSize: 14,
+                    backgroundColor: "#fff",
+                  }}
+                />
+
+                <ScrollView
+                  contentContainerStyle={{
+                    paddingHorizontal: 10,
+                    paddingVertical: 10,
+                  }}
+                >
+                  {tiemposFiltrados.map((item, index) => {
+                    const esSeleccionado =
+                      tiempoSeleccionado?.ticketId === item.ticketId;
+
+                    return (
+                      <View
+                        key={item.ticketId || index}
+                        style={{
+                          paddingVertical: 10,
+                          borderBottomWidth: 1,
+                          borderBottomColor: "#eee",
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          position: "relative", // Necesario para que el sello se posicione sobre este contenedor
+                          overflow: "hidden",
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Text style={{ fontWeight: "bold" }}>
+                              Código: # {item.ticketId || ""}
+                            </Text>
+                            <Text style={{ fontWeight: "bold" }}>
+                              Premiado: # {item.winningNumber || ""}
+                            </Text>
+                          </View>
+
+                          <Text style={{ fontWeight: "bold" }}>
+                            Cliente: {item.clientName || "Sin nombre"}
+                          </Text>
+                          <Text style={{ color: "#555" }}>
+                            Fecha:{" "}
+                            {formatDateLocal(
+                              item.updatedAt,
+                              "dd/MM/yyy hh:mm:ss a",
+                            )}
+                          </Text>
+
+                          <Text>Premio: {item.normalPrize}</Text>
+                          {item.isReventado && (
+                            <Text>Premio Reventado: {item.reventadoPrize}</Text>
+                          )}
+                          <Text style={{ fontWeight: "bold" }}>
+                            Premio Total a pagar: {item.totalPrize}
+                          </Text>
+
+                          {/* Estado solo si está pendiente */}
+                          {/* {!item.isPaid && (
+                          <Text
+                            style={{
+                              marginTop: 5,
+                              fontWeight: "bold",
+                              color: "red",
+                              alignSelf: "flex-end",
+                            }}
+                          >
+                            Pendiente de pago
+                          </Text>
+                        )} */}
+
+                          {/* Botón pagar si está pendiente */}
+                          {!item.isPaid && (
+                            <Button
+                              mode="contained"
+                              textColor="green"
+                              style={{
+                                marginTop: 5,
+                                borderRadius: 3,
+                                backgroundColor: "white",
+                                alignSelf: "flex-end",
+                              }}
+                              onPress={() => {
+                                showConfirm({
+                                  message: `¿Pagar el ticket # ${item.ticketId} ?`,
+                                  onConfirm: () => markTicketAsPaid(item),
+                                });
+                              }}
+                            >
+                              PAGAR
+                            </Button>
+                          )}
+                        </View>
+
+                        {/* {esSeleccionado && (
+                        <MaterialIcons
+                          name="check-circle"
+                          size={24}
+                          color="green"
+                        />
+                      )} */}
+
+                        {/* Sello ANULADO diagonal */}
+                        {item.isPaid === true && (
+                          <View
+                            style={{
+                              position: "absolute",
+                              top: "60%",
+                              right: "-15%",
+                              transform: [{ rotate: "-30deg" }],
+                              backgroundColor: "rgba(76, 175, 80, 0.2)",
+                              paddingHorizontal: 85,
+                              paddingVertical: 5,
+                              zIndex: -10,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: "green",
+                                fontWeight: "bold",
+                                fontSize: 18,
+                                letterSpacing: 2,
+                                textTransform: "uppercase",
+                              }}
+                            >
+                              PAGADO
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            {/* Contadores en columna con fuente monoespaciada */}
+            <View style={{ flexDirection: "column" }}>
+              <Text
+                style={{
+                  fontWeight: "bold",
+                  color: "green",
+                  fontFamily: "monospace",
+                }}
+              >
+                Pagados : {tiemposPremiados.filter((t) => t.isPaid).length}
+              </Text>
+              <Text
+                style={{
+                  fontWeight: "bold",
+                  color: "red",
+                  fontFamily: "monospace",
+                }}
+              >
+                Pendientes: {tiemposPremiados.filter((t) => !t.isPaid).length}
+              </Text>
+            </View>
+
+            {/* Botón cerrar */}
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white",
+                borderRadius: 3,
+              }}
+              onPress={closeDialogTicketsPremiados}
             >
               CERRAR
             </Button>

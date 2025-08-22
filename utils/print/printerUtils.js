@@ -6,10 +6,12 @@ import {
   LogLevel,
   BluetoothState,
 } from "react-native-ble-plx";
-import { Platform, PermissionsAndroid } from "react-native";
+import { Platform, PermissionsAndroid, Alert, Linking } from "react-native";
 import { Buffer } from "buffer";
 import { getUpdatedInternetDate, formatDate } from "../datetimeUtils";
 import { useSnackbar } from "../../context/SnackbarContext"; // Ajusta el path
+import * as Location from "expo-location";
+import { Snackbar } from "react-native-paper";
 
 class PrinterUtils {
   constructor() {
@@ -44,11 +46,11 @@ class PrinterUtils {
           this.onBluetoothPowerOff();
           this.manager.enable().catch((error) => {
             if (error.errorCode === BleErrorCode.BluetoothUnauthorized) {
-              this.requestPermissions();
+              this.requestBluetoothPermissions();
             }
           });
         } else if (state === BleErrorCode.BluetoothUnauthorized) {
-          this.requestPermissions();
+          this.requestBluetoothPermissions();
         } else {
           console.warn("Unsupported state:", state);
         }
@@ -60,23 +62,61 @@ class PrinterUtils {
     this.showErrorToast("Bluetooth is turned off");
   }
 
-  async requestPermissions() {
+  // async requestPermissions() {
+  //   if (Platform.OS !== "android") return true;
+
+  //   const granted = await PermissionsAndroid.requestMultiple([
+  //     PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+  //     PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+  //     PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+  //   ]);
+  //   return Object.values(granted).every((res) => res === "granted");
+  // }
+
+  requestBluetoothPermissions = async () => {
     if (Platform.OS !== "android") return true;
 
-    const granted = await PermissionsAndroid.requestMultiple([
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
-      PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-    ]);
-    return Object.values(granted).every((res) => res === "granted");
-  }
+    if (Platform.Version >= 31) {
+      // Android 12+
+      const granted = await PermissionsAndroid.requestMultiple([
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      ]);
+      return Object.values(granted).every(
+        (res) => res === PermissionsAndroid.RESULTS.GRANTED,
+      );
+    } else {
+      // Android 11 o menor
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      );
+      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    }
+  };
+
+  ensureLocationEnabled = async () => {
+    const enabled = await Location.hasServicesEnabledAsync();
+    if (!enabled) {
+      Alert.alert(
+        "Ubicación desactivada",
+        "Para detectar impresoras, activa la ubicación en los ajustes del dispositivo.",
+        [
+          { text: "OK", style: "cancel" },
+          // { text: "Abrir ajustes", onPress: () => Linking.openSettings() },
+        ],
+      );
+      return false;
+    }
+    return true;
+  };
 
   async scanDevices(callback) {
     if (Platform.OS === "web") {
       console.warn("getDeviceList no es compatible con web");
       return [];
     }
-    await this.requestPermissions();
+    await this.requestBluetoothPermissions();
 
     this.manager.startDeviceScan(null, null, (error, device) => {
       if (error) {
@@ -675,8 +715,8 @@ function generarCodigoBarrasBuffer(barcodeValue, preferido = "CODE128") {
     // CODE128 (0x49)
     // [GS k m n d1..dn]
     // m=73 (0x49), n=longitud, dn=data
-    comandos.push(Buffer.from([0x1d, 0x6b, 0x49, valueAscii.length]));
-    comandos.push(valueAscii);
+    comandos.push(Buffer.from([0x1d, 0x6b, 0x49, barcodeValue.length]));
+    comandos.push(barcodeValue);
   } else if (preferido === "CODE39") {
     // CODE39 requiere terminación NULL (\0)
     // [GS k m d1..dn NUL]

@@ -19,6 +19,7 @@ import {
   Modal,
   Dimensions,
   TouchableHighlight,
+  InteractionManager,
 } from "react-native";
 import {
   Menu,
@@ -61,7 +62,10 @@ import useCheckAppVersion from "../utils/versionChecker";
 import getHtml2Canvas from "../utils/getHtml2Canvas";
 import { el } from "date-fns/locale";
 
+import crashlytics from "@react-native-firebase/crashlytics";
+
 export default function VentaScreen({ navigation, route }) {
+  //const crashlytics = getCrashlytics();
   const ticketRef = useRef(null);
   const { widthRender } = useWindowDimensions();
   const [html, setHtml] = React.useState(null);
@@ -121,6 +125,14 @@ export default function VentaScreen({ navigation, route }) {
   );
   const { checkVersion } = useCheckAppVersion(false);
 
+  crashlytics().setUserId(userData.id?.toString() ?? "unknown");
+  crashlytics().setAttributes({
+    id: userData.id?.toString() ?? "unknown",
+    usuario: userData.name?.toString() ?? "unknown",
+    backendUrl: backend_url?.toString() ?? "unknown",
+    screen: "ventas",
+  });
+
   const cerrarButtonRef = useRef(null);
 
   useEffect(() => {
@@ -160,7 +172,6 @@ export default function VentaScreen({ navigation, route }) {
   }
 
   const dialogAbierto = dialogRestringidoVisible || dialogPrecargarVisible;
-
   useEffect(() => {
     if (Platform.OS === "web" && dialogAbierto) {
       const timeout = window.setTimeout(() => {
@@ -1103,7 +1114,7 @@ export default function VentaScreen({ navigation, route }) {
       setMontoReventado("");
       setIsMontoRevLocked(false);
     }
-    montoRef?.current?.focus();
+    //montoRef?.current?.focus();
   };
 
   const handleOpenScanner = async () => {
@@ -1668,15 +1679,43 @@ export default function VentaScreen({ navigation, route }) {
   const [isMontoLocked, setIsMontoLocked] = useState(false);
   const [isMontoRevLocked, setIsMontoRevLocked] = useState(false);
   const [shouldFocusMonto, setShouldFocusMonto] = useState(false);
+  const [shouldFocusMontoRev, setShouldFocusMontoRev] = useState(false);
+
+  // useEffect(() => {
+  //   console.log("isMontoLocked", isMontoLocked);
+  //   console.log("shouldFocusMonto", shouldFocusMonto);
+  //   if (!isMontoLocked && shouldFocusMonto) {
+  //     window.setTimeout(() => {
+  //       montoRef.current?.focus();
+  //       console.log("focusing monto");
+  //     }, 100);
+  //     setShouldFocusMonto(false); // Reset
+  //   }
+  // }, [isMontoLocked, shouldFocusMonto, reventar]);
 
   useEffect(() => {
-    if (!isMontoLocked && shouldFocusMonto) {
-      window.setTimeout(() => {
-        montoRef.current?.focus();
-      }, 100); // o prueba con 300
-      setShouldFocusMonto(false); // Reset
+    if (shouldFocusMonto) {
+      requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          montoRef?.current?.focus();
+          console.log("✔ focusing monto");
+        }, 0);
+      });
+      setShouldFocusMonto(false);
     }
-  }, [isMontoLocked, shouldFocusMonto]);
+  }, [shouldFocusMonto, isMontoLocked, reventar]);
+
+  useEffect(() => {
+    if (shouldFocusMontoRev) {
+      requestAnimationFrame(() => {
+        window.setTimeout(() => {
+          montoRevRef?.current?.focus();
+          console.log("✔ focusing monto rev");
+        }, 0);
+      });
+      setShouldFocusMontoRev(false);
+    }
+  }, [shouldFocusMontoRev, isMontoRevLocked, reventar]);
 
   function getMontoPorNumero(items, numero) {
     return items?.reduce((sum, item) => {
@@ -1982,6 +2021,7 @@ export default function VentaScreen({ navigation, route }) {
           },
         },
       );
+      crashlytics().crash();
       if (response.status === 403) {
         showSnackbar("⚠️ El usuario no tiene permisos.", 3);
         logout();
@@ -1994,7 +2034,7 @@ export default function VentaScreen({ navigation, route }) {
       if (response.status !== 200) {
         console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);
         showSnackbar("⚠️ Error al obtener tiempos vendidos", 3);
-        logout();
+        //logout();
         return {
           tiemposVendidos: [],
           lastTicketNumber: 0,
@@ -2017,6 +2057,7 @@ export default function VentaScreen({ navigation, route }) {
       };
     } catch (error) {
       console.error("Error al cargar tiempos anteriores:", error);
+
       return [[], 0]; // ✅ fallback seguro
     }
   };
@@ -2622,6 +2663,19 @@ export default function VentaScreen({ navigation, route }) {
               >
                 {/* <ScrollView style={{ flex: 1 }}> */}
                 <View style={styles.formRow}>
+                  {/* <Button
+                    title="Forzar crash nativo"
+                    onPress={() => {
+                      try {
+                        throw new Error("Error JS de prueba");
+                      } catch (e) {
+                        crashlytics.recordError(
+                          new Error("Error JS de prueba"),
+                        );
+                      }
+                    }}
+                  /> */}
+
                   <Pressable
                     style={styles.inputSmallSorteo}
                     onPress={() => {
@@ -2744,8 +2798,8 @@ export default function VentaScreen({ navigation, route }) {
                         onPress={() => {
                           if (isMontoLocked) {
                             setIsMontoLocked(false);
-                            setShouldFocusMonto(true);
                             setMonto("");
+                            setShouldFocusMonto(true);
                           } else {
                             const montoNum = parseInt(monto, 10);
                             if (!isNaN(montoNum) && validateMonto(montoNum)) {
@@ -2771,6 +2825,7 @@ export default function VentaScreen({ navigation, route }) {
                       </TouchableOpacity>
 
                       <TextInput
+                        key="monto"
                         ref={montoRef}
                         placeholder="Monto"
                         style={[
@@ -2792,6 +2847,7 @@ export default function VentaScreen({ navigation, route }) {
                         keyboardType="number-pad"
                         returnKeyType="done"
                         editable={!isMontoLocked}
+                        autoFocus={false}
                         blurOnSubmit={false}
                         onKeyPress={({ nativeEvent }) => {
                           if (nativeEvent.key === "Tab") {
@@ -2838,6 +2894,7 @@ export default function VentaScreen({ navigation, route }) {
                         keyboardType="number-pad"
                         returnKeyType="done"
                         blurOnSubmit={false}
+                        maxLength={2}
                         onFocus={() => {
                           const montoNum = parseInt(monto, 10);
                           if (
@@ -2956,9 +3013,11 @@ export default function VentaScreen({ navigation, route }) {
                           onPress={() => {
                             if (isMontoRevLocked) {
                               setIsMontoRevLocked(false);
-                              setShouldFocusMonto(true);
+                              //setShouldFocusMonto(true);
                               setMontoReventado("");
-                              montoRevRef?.current?.focus();
+                              console.log("focusing monto rev onpress");
+                              setShouldFocusMontoRev(true);
+                              //montoRevRef?.current?.focus();
                             } else {
                               const montoNum = parseInt(monto, 10);
                               const montoReventadoNum = parseInt(
@@ -3650,9 +3709,9 @@ export default function VentaScreen({ navigation, route }) {
                             right: "-15%",
                             transform: [{ rotate: "-30deg" }],
                             backgroundColor: "rgba(255, 0, 0, 0.2)",
-                            paddingHorizontal: 65,
+                            paddingHorizontal: 80,
                             paddingVertical: 5,
-                            zIndex: 10,
+                            zIndex: -10,
                           }}
                         >
                           <Text

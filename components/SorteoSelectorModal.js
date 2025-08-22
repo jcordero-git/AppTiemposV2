@@ -10,6 +10,7 @@ import {
   Pressable,
   StyleSheet,
   useWindowDimensions,
+  ScrollView,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { mSorteo } from "../models/mSorteo";
@@ -66,6 +67,7 @@ export default function SorteoSelectorModal({
       visible={visible}
       transparent
       animationType="fade"
+      style={{ maxHeight: height * 0.6 }}
       onRequestClose={onClose}
     >
       <Pressable
@@ -75,7 +77,7 @@ export default function SorteoSelectorModal({
         <Pressable
           style={[
             styles.modal,
-            { marginHorizontal: 20 },
+            { marginHorizontal: 20, maxHeight: height * 0.8 },
             isWeb && { position: "absolute", top: 74, width: 400 },
             isWeb && leftPosition && { left: 0 },
             isWeb && !leftPosition && { right: 0 },

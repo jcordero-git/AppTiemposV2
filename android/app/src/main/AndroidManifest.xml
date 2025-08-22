@@ -33,6 +33,21 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="com.jose.cordero.brenes.apptiemposv2"/>
       </intent-filter>
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+
+        <!-- Para abrir la app desde un link HTTPS -->
+        <data
+          android:scheme="https"
+          android:host="app.tiempos.website"
+          android:pathPrefix="/token" />
+      </intent-filter>
+
+
+
+
     </activity>
     <provider
         android:name="androidx.core.content.FileProvider"
