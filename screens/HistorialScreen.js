@@ -35,10 +35,13 @@ import {
   formatDate,
   formatDateLocal,
 } from "../utils/datetimeUtils"; // ajusta el path si es necesario
-import crashlytics from "@react-native-firebase/crashlytics";
+let crashlytics;
+if (Platform.OS !== "web") {
+  crashlytics = require("@react-native-firebase/crashlytics").default;
+}
 
 export default function HistorialScreen({ navigation, route }) {
-  crashlytics().setAttributes({ screen: "historial" }); // atributos adicionales
+  //crashlytics().setAttributes({ screen: "historial" }); // atributos adicionales
   const { showSnackbar, showConfirm } = useSnackbar();
   const { userData, logout } = useAuth();
   const settingBackendURL = userData.settings.find(
@@ -62,6 +65,15 @@ export default function HistorialScreen({ navigation, route }) {
     useState(false);
   const [tiemposPremiados, setTiemposPremiados] = useState([]);
   const [tiempoSeleccionado, setTiempoSeleccionado] = useState(null);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && crashlytics) {
+      crashlytics().setAttributes({
+        screen: "historial",
+      });
+      crashlytics().log("📌 Entrando a pantalla historial");
+    }
+  }, [userData, backend_url]);
 
   const formatDateForAPI = (fecha) => {
     try {
@@ -297,8 +309,6 @@ export default function HistorialScreen({ navigation, route }) {
           lastTicketNumber: 0,
         };
       }
-
-      crashlytics().crash();
 
       if (response.status !== 200) {
         console.warn(`⚠️ Error al obtener tiempos: Status ${response.status}`);

@@ -15,15 +15,19 @@ import {
   useWindowDimensions,
   Alert,
   ActivityIndicator,
+  Platform,
   TouchableWithoutFeedback,
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useAuth } from "../context/AuthContext";
 import { formatHourStr } from "../utils/datetimeUtils";
-import crashlytics from "@react-native-firebase/crashlytics";
+let crashlytics;
+if (Platform.OS !== "web") {
+  crashlytics = require("@react-native-firebase/crashlytics").default;
+}
 
 const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
-  crashlytics().setAttributes({ screen: "sorteos" }); // atributos adicionales
+  //crashlytics().setAttributes({ screen: "sorteos" }); // atributos adicionales
   const route = useRoute();
   const { userData, logout } = useAuth();
   const settingBackendURL = userData.settings.find(
@@ -45,6 +49,15 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
   const isWeb = width > 768;
 
   const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && crashlytics) {
+      crashlytics().setAttributes({
+        screen: "sorteos",
+      });
+      crashlytics().log("📌 Entrando a pantalla sorteos");
+    }
+  }, [userData, backend_url]);
 
   React.useLayoutEffect(() => {
     if (!navigation?.setOptions) return;

@@ -28,10 +28,12 @@ import mSorteo from "../models/mSorteoSingleton.js";
 import { useTiempo } from "../models/mTiempoContext";
 import { getInternetDate, formatDate } from "../utils/datetimeUtils"; // ajusta el path si es necesario
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
-import crashlytics from "@react-native-firebase/crashlytics";
+let crashlytics;
+if (Platform.OS !== "web") {
+  crashlytics = require("@react-native-firebase/crashlytics").default;
+}
 
 export default function VentaGeneralScreen({ navigation, route }) {
-  crashlytics().setAttributes({ screen: "venta general" }); // atributos adicionales
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -215,6 +217,15 @@ export default function VentaGeneralScreen({ navigation, route }) {
       }));
     }
   };
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && crashlytics) {
+      crashlytics().setAttributes({
+        screen: "venta general",
+      });
+      crashlytics().log("📌 Entrando a pantalla venta general");
+    }
+  }, [userData, backend_url]);
 
   function generateKey() {
     return `${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;

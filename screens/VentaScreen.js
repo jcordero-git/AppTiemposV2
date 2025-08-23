@@ -62,7 +62,11 @@ import useCheckAppVersion from "../utils/versionChecker";
 import getHtml2Canvas from "../utils/getHtml2Canvas";
 import { el } from "date-fns/locale";
 
-import crashlytics from "@react-native-firebase/crashlytics";
+//import crashlytics from "@react-native-firebase/crashlytics";
+let crashlytics;
+if (Platform.OS !== "web") {
+  crashlytics = require("@react-native-firebase/crashlytics").default;
+}
 
 export default function VentaScreen({ navigation, route }) {
   //const crashlytics = getCrashlytics();
@@ -125,13 +129,18 @@ export default function VentaScreen({ navigation, route }) {
   );
   const { checkVersion } = useCheckAppVersion(false);
 
-  crashlytics().setUserId(userData.id?.toString() ?? "unknown");
-  crashlytics().setAttributes({
-    id: userData.id?.toString() ?? "unknown",
-    usuario: userData.name?.toString() ?? "unknown",
-    backendUrl: backend_url?.toString() ?? "unknown",
-    screen: "ventas",
-  });
+  useEffect(() => {
+    if (Platform.OS !== "web" && crashlytics) {
+      crashlytics().setUserId(userData.id?.toString() ?? "unknown");
+      crashlytics().setAttributes({
+        id: userData.id?.toString() ?? "unknown",
+        usuario: userData.name?.toString() ?? "unknown",
+        backendUrl: backend_url?.toString() ?? "unknown",
+        screen: "ventas",
+      });
+      crashlytics().log("📌 Entrando a pantalla VentaScreen");
+    }
+  }, [userData, backend_url]);
 
   const cerrarButtonRef = useRef(null);
 
@@ -362,15 +371,17 @@ export default function VentaScreen({ navigation, route }) {
         //userData.token = userDataUpdated.token;
 
         const runGeminiExample = async () => {
-          const setting = userData.settings.find(
-            (s) => s.promt_extrae !== undefined,
-          );
-          const prompt = setting ? setting.promt_extrae : "";
+          // const setting = userData.settings.find(
+          //   (s) => s.promt_extrae !== undefined,
+          // );
+          // const prompt = setting ? setting.promt_extrae : "";
 
-          const day = new Date().getDate();
-          const extraPrompt = prompt;
+          // const day = new Date().getDate();
+          //  const extraPrompt = prompt;
           const text = categoriasExtraerTexto;
-          const result = await parseMessage(text, day, extraPrompt);
+          //const result = await parseMessage(text, day, extraPrompt);
+          const result = await fetchExtractNumbers(text);
+
           return result;
         };
 
@@ -412,6 +423,43 @@ export default function VentaScreen({ navigation, route }) {
     setCategoriasHasta("");
     setCategoriasExtraerTexto("");
     setLoading(false);
+  };
+
+  const fetchExtractNumbers = async ({ message }) => {
+    try {
+      const response = await fetch(
+        `${backend_url}/api/ai/extract-numbers?token=${userData.token}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ message }),
+        },
+      );
+      const data = await response.json();
+      if (data.success === false) {
+        console.warn(
+          "error al extraer los numeros y montos del mensaje.",
+          data.message,
+        );
+        return null;
+      }
+      // Verifica si hay datos válidos
+      if (response.ok && data && Object.keys(data).length > 0) {
+        return data;
+      } else {
+        console.log("error al extraer los numeros y montos del mensaje.");
+        return null;
+      }
+    } catch (error) {
+      console.error(
+        "error al extraer los numeros y montos del mensaje.",
+        error,
+      );
+      return null;
+    }
   };
 
   const loginUser = async ({ username, password, imei, apkVersion }) => {
@@ -2021,7 +2069,6 @@ export default function VentaScreen({ navigation, route }) {
           },
         },
       );
-      crashlytics().crash();
       if (response.status === 403) {
         showSnackbar("⚠️ El usuario no tiene permisos.", 3);
         logout();
@@ -3492,7 +3539,8 @@ export default function VentaScreen({ navigation, route }) {
                 setDialogPrintVisible(false);
                 setWebviewHeight(100);
                 setIframeHeight(100);
-                montoRef.current?.focus();
+                //montoRef.current?.focus();
+                shouldFocusMonto = true;
                 limpiarDespuesDeImprimir();
                 setRefreshHeader(true);
               }}

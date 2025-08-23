@@ -30,10 +30,13 @@ import useCheckAppVersion from "../utils/versionChecker";
 import { ht } from "date-fns/locale";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton";
-import crashlytics from "@react-native-firebase/crashlytics";
+let crashlytics;
+if (Platform.OS !== "web") {
+  crashlytics = require("@react-native-firebase/crashlytics").default;
+}
 
 export default function ConfiguracionScreen({ navigation, route }) {
-  crashlytics().setAttributes({ screen: "configuracion" }); // atributos adicionales
+  //crashlytics().setAttributes({ screen: "configuracion" }); // atributos adicionales
   const { showSnackbar } = useSnackbar();
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
@@ -154,6 +157,15 @@ export default function ConfiguracionScreen({ navigation, route }) {
       <MaterialIcons name="more-vert" size={24} color="#fff" />
     </TouchableOpacity>
   );
+
+  useEffect(() => {
+    if (Platform.OS !== "web" && crashlytics) {
+      crashlytics().setAttributes({
+        screen: "configuracion",
+      });
+      crashlytics().log("📌 Entrando a pantalla configuracion");
+    }
+  }, [userData, backend_url]);
 
   React.useLayoutEffect(() => {
     navigation.setOptions({
