@@ -60,7 +60,7 @@ import { formatDate, formatDateLocal } from "../utils/datetimeUtils"; // ajusta 
 import { useIsFocused } from "@react-navigation/native";
 import useCheckAppVersion from "../utils/versionChecker";
 import getHtml2Canvas from "../utils/getHtml2Canvas";
-import { el } from "date-fns/locale";
+import { el, tr } from "date-fns/locale";
 
 //import crashlytics from "@react-native-firebase/crashlytics";
 let crashlytics;
@@ -399,8 +399,8 @@ export default function VentaScreen({ navigation, route }) {
           );
         }
         //setLoading(false);
-      } finally {
-        // setLoading(false);
+      } catch {
+        setLoading(false);
       }
     }
 
@@ -425,7 +425,7 @@ export default function VentaScreen({ navigation, route }) {
     setLoading(false);
   };
 
-  const fetchExtractNumbers = async ({ message }) => {
+  const fetchExtractNumbers = async (message) => {
     try {
       const response = await fetch(
         `${backend_url}/api/ai/extract-numbers?token=${userData.token}`,
@@ -435,10 +435,18 @@ export default function VentaScreen({ navigation, route }) {
             "Content-Type": "application/json",
             Accept: "application/json",
           },
-          body: JSON.stringify({ message }),
+          body: JSON.stringify({ message: message }),
         },
       );
+
       const data = await response.json();
+      console.log("message", message);
+      console.log("data", data);
+      if (response.status === 403) {
+        showSnackbar("⚠️ El usuario no tiene permisos.", 3);
+        logout();
+        return null;
+      }
       if (data.success === false) {
         console.warn(
           "error al extraer los numeros y montos del mensaje.",
@@ -448,7 +456,7 @@ export default function VentaScreen({ navigation, route }) {
       }
       // Verifica si hay datos válidos
       if (response.ok && data && Object.keys(data).length > 0) {
-        return data;
+        return data.data;
       } else {
         console.log("error al extraer los numeros y montos del mensaje.");
         return null;
@@ -1323,8 +1331,10 @@ export default function VentaScreen({ navigation, route }) {
         "Hubo un error al imprimir. Revisa la conexión con la impresora.",
         3,
       );
+      await PrinterUtils.disconnect();
     } finally {
       setLoading(false);
+      await PrinterUtils.disconnect();
     }
   };
 
@@ -3540,7 +3550,7 @@ export default function VentaScreen({ navigation, route }) {
                 setWebviewHeight(100);
                 setIframeHeight(100);
                 //montoRef.current?.focus();
-                shouldFocusMonto = true;
+                setShouldFocusMonto(true);
                 limpiarDespuesDeImprimir();
                 setRefreshHeader(true);
               }}

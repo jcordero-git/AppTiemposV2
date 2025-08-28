@@ -490,15 +490,17 @@ class PrinterUtils {
         ),
       );
     }
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
-    parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
-    parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
-    parts.push(Buffer.from(`${ticketTitle}`, "ascii"));
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
+    if (ticketTitle !== "") {
+      parts.push(Buffer.from([0x0a])); // Salto de Linea
+      parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
+      parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
+      parts.push(Buffer.from(`${ticketTitle}`, "ascii"));
+      parts.push(Buffer.from([0x0a])); // Salto de Linea
+    }
 
     if (re_impresion) {
+      parts.push(Buffer.from([0x1b, 0x61, 0x01])); // center
+      parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
       parts.push(Buffer.from([0x1b, 0x21, 0x30])); // Doble ancho y alto
       parts.push(Buffer.from(`RE-IMPRESION`, "ascii"));
       parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal

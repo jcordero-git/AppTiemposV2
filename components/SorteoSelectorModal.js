@@ -11,6 +11,7 @@ import {
   StyleSheet,
   useWindowDimensions,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { mSorteo } from "../models/mSorteo";
@@ -27,6 +28,7 @@ export default function SorteoSelectorModal({
   );
   const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
   const [sorteoItems, setSorteoItems] = useState([]);
+  const [loading, setLoading] = useState(false); // ⬅️ nuevo estado
   //console.log("User desde modal:", userData.id);
   /** @type {mSorteo[]} */
   let mSorteos = [];
@@ -36,6 +38,7 @@ export default function SorteoSelectorModal({
 
   useEffect(() => {
     if (visible) {
+      setLoading(true); // ⬅️ activa loading antes del fetch
       fetch(`${backend_url}/api/drawCategory/user/${userData.id}`)
         .then((res) => {
           return res.json();
@@ -57,8 +60,13 @@ export default function SorteoSelectorModal({
             );
           }
           setSorteoItems(mSorteos);
+          setSorteoItems(Array.isArray(mSorteos) ? mSorteos : []);
         })
-        .catch((error) => console.error("Error al obtener sorteos", error));
+        .catch((error) => {
+          console.error("Error al obtener sorteos", error);
+          setSorteoItems([]);
+        })
+        .finally(() => setLoading(false)); // ⬅️ siempre desactiva loading
     }
   }, [visible]);
 
@@ -85,7 +93,42 @@ export default function SorteoSelectorModal({
           onPress={() => {}}
         >
           <Text style={styles.title}>SORTEOS DISPONIBLES</Text>
-          <FlatList
+
+          {loading ? (
+            <View
+              style={{
+                height: 150,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <ActivityIndicator size="large" color="green" />
+              <Text style={{ marginTop: 10 }}>Cargando sorteos...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={sorteoItems}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.item}
+                  onPress={() => {
+                    onSelect(item);
+                    onClose();
+                  }}
+                >
+                  <Text>{item.name}</Text>
+                </TouchableOpacity>
+              )}
+              ListEmptyComponent={
+                <Text style={{ textAlign: "center", marginTop: 20 }}>
+                  No hay sorteos disponibles
+                </Text>
+              }
+            />
+          )}
+
+          {/* <FlatList
             data={sorteoItems}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
@@ -99,7 +142,7 @@ export default function SorteoSelectorModal({
                 <Text>{item.name}</Text>
               </TouchableOpacity>
             )}
-          />
+          /> */}
         </Pressable>
       </Pressable>
     </Modal>
