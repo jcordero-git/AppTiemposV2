@@ -145,6 +145,7 @@ export default function PremiosScreen({ navigation }) {
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
+    if (event.type === "dismissed") return; // 🚫 ignorar cancel
     if (selectedDate) setFecha(selectedDate);
   };
 

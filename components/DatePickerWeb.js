@@ -162,7 +162,7 @@ export default function DatePickerWeb({ value, onChange, defaultMonth }) {
           backgroundColor: "#fff",
           color: "#333",
           minWidth: 150,
-          maxWidth: 150,
+          maxWidth: 250,
           display: "flex",
           alignItems: "center",
           gap: 8,

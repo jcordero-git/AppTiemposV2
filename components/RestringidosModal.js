@@ -142,7 +142,7 @@ export default function RestringidosModal({
                   }}
                 >
                   <Text style={{ fontSize: 16, color: "#888" }}>
-                    No hay información disponible
+                    Sin restricciones...
                   </Text>
                 </View>
               )}

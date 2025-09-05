@@ -1101,6 +1101,9 @@ export default function VentaScreen({ navigation, route }) {
   // };
   const eliminarItem = (item) => {
     // Elimina el item de la lista
+
+    if (!item) return; // 🔒 protección
+
     const nuevosItems = items.filter((i) => i.key !== item.key);
     setItems(nuevosItems);
 
@@ -1155,6 +1158,8 @@ export default function VentaScreen({ navigation, route }) {
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
+    console.log("event.type", event.type);
+    if (event.type === "dismissed") return; // 🚫 ignorar cancel
     if (selectedDate) {
       setFecha(selectedDate);
       setTiempo((prev) => ({
@@ -4475,6 +4480,7 @@ export default function VentaScreen({ navigation, route }) {
                 marginBottom: 10,
                 borderRadius: 3,
               }}
+              disabled={!itemAEliminar} // 🔒 no se puede eliminar si es null
               onPress={() => eliminarItem(itemAEliminar)}
             >
               ELIMINAR

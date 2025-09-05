@@ -209,6 +209,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
+    if (event.type === "dismissed") return; // 🚫 ignorar cancel
     if (selectedDate) {
       setFecha(selectedDate);
       setTiempo((prev) => ({
@@ -459,10 +460,14 @@ export default function VentaGeneralScreen({ navigation, route }) {
   //   }
   // }, [sorteoId, fecha]);
 
+  const loadingRef = useRef(false);
+
   const actualizaDesdeHeader = useCallback(
     async (fechaParam, sorteoParam, user) => {
       if (!fechaParam || !sorteoParam || !user?.id) return;
+      if (loadingRef.current) return; // 🔒 evita doble ejecución
       try {
+        loadingRef.current = true;
         setLoading(true);
         const updated = await actualizaGrid(fechaParam, sorteoParam, user);
         if (updated) {
@@ -474,6 +479,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
         showSnackbar("Error al intentar actualizar la lista.", 3);
       } finally {
         setLoading(false);
+        loadingRef.current = false;
       }
     },
     [],

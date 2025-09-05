@@ -19,7 +19,15 @@ import { Provider, Portal, Dialog, Button } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 //import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { subMonths, addDays, format } from "date-fns";
+//mport { subMonths, addDays, format } from "date-fns";
+import {
+  subMonths,
+  subWeeks,
+  addDays,
+  format,
+  isAfter,
+  isBefore,
+} from "date-fns";
 import DatePickerWeb from "../components/DatePickerWeb";
 import Constants from "expo-constants";
 
@@ -54,9 +62,13 @@ export default function HistorialScreen({ navigation, route }) {
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
 
-  // Resta 2 meses desde hoy
-  const [fechaDesde, setfechaDesde] = useState(subMonths(getInternetDate(), 2));
-  const [fechaHasta, setfechaHasta] = useState(subMonths(getInternetDate(), 0));
+  // 🔹 Estados para API (2 meses)
+  const [apiDesde] = useState(subMonths(getInternetDate(), 2));
+  const [apiHasta] = useState(getInternetDate());
+
+  // Resta 2 semanas desde hoy
+  const [fechaDesde, setfechaDesde] = useState(subWeeks(getInternetDate(), 2));
+  const [fechaHasta, setfechaHasta] = useState(subWeeks(getInternetDate(), 0));
   const [dialogVisible, setDialogVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingPremiados, setLoadingPremiados] = useState(false);
@@ -118,7 +130,11 @@ export default function HistorialScreen({ navigation, route }) {
       return b.ticketId - a.ticketId;
     });
 
+  // 🔹 Items completos desde API
+  const [allItems, setAllItems] = useState([]);
+  // 🔹 Items filtrados por los DatePickers
   const [items, setItems] = useState([]);
+
   const [total, setTotal] = useState(0);
 
   const toInputDateFormat = (date) => {
@@ -126,16 +142,52 @@ export default function HistorialScreen({ navigation, route }) {
   };
   const handleFechaDesdeChange = (event, selectedDate) => {
     setShowPickerDesde(false);
+    console.log("event.type", event.type);
+    if (event.type === "dismissed") return; // 🚫 ignorar cancel
     if (selectedDate) {
       setfechaDesde(selectedDate);
     }
   };
   const handleFechaHastaChange = (event, selectedDate) => {
     setShowPickerHasta(false);
+    if (event.type === "dismissed") return; // 🚫 ignorar cancel
     if (selectedDate) {
       setfechaHasta(selectedDate);
     }
   };
+
+  useEffect(() => {
+    let ventaTotal = 0;
+    let premiosTotal = 0;
+    let comisionTotal = 0;
+
+    for (const history of items) {
+      if (!history.cancelDebt) {
+        const amount = Number(history.amount) || 0;
+        const revAmount = Number(history.revAmount) || 0;
+        const price = Number(history.price) || 0;
+        const revPrice = Number(history.revPrice) || 0;
+        const sellerPercent = Number(history.sellerPercent) || 0;
+        const revSellerPercent = Number(history.revSellerPercent) || 0;
+
+        if (history.isDraw) {
+          const comision =
+            amount * (sellerPercent / 100) +
+            revAmount * (revSellerPercent / 100);
+
+          ventaTotal += amount + revAmount;
+          premiosTotal += price + revPrice;
+          comisionTotal += comision;
+        } else {
+          ventaTotal += amount + revAmount;
+        }
+      }
+    }
+
+    setVentaTotalFloat(ventaTotal);
+    setpremiosTotalFloat(premiosTotal);
+    setcomisionTotalFloat(comisionTotal);
+  }, [items]);
 
   const renderItem = ({ item }) => {
     const itemBackgroundColor = item.cancelDebt ? "#ffe5e5" : "white"; // Rojo pálido si hay deuda cancelada
@@ -426,12 +478,26 @@ export default function HistorialScreen({ navigation, route }) {
     }
   }, [fechaDesde, fechaHasta, userData]);
 
+  // Filtrar en memoria cada vez que cambian los pickers o los datos
+  useEffect(() => {
+    if (allItems.length > 0) {
+      const filtered = allItems.filter((item) => {
+        const itemDate = new Date(item.date);
+        return (
+          !isBefore(itemDate, fechaDesde) &&
+          !isAfter(itemDate, addDays(fechaHasta, 1)) // incluir el día hasta
+        );
+      });
+      setItems(filtered);
+    }
+  }, [allItems, fechaDesde, fechaHasta]);
+
   const actualizaDesdeHeader = useCallback(() => {
     async function execute() {
       if (!fechaDesde || !fechaHasta || !userData?.id) return;
       const updated = await fetchDraws();
       if (updated) {
-        showSnackbar("Historial Actualizado Correctamente.", 1);
+        //showSnackbar("Historial Actualizado Correctamente.", 1);
       } else {
         showSnackbar("Error al intentar actualizar el historial.", 3);
       }
@@ -535,9 +601,9 @@ export default function HistorialScreen({ navigation, route }) {
         return new Date(a.date) - new Date(b.date);
       });
 
-      setVentaTotalFloat(0);
-      setcomisionTotalFloat(0);
-      setpremiosTotalFloat(0);
+      // setVentaTotalFloat(0);
+      // setcomisionTotalFloat(0);
+      // setpremiosTotalFloat(0);
       let total = 0;
       let acumulado = 0;
       let frezeTotalAmount = false;
@@ -559,15 +625,13 @@ export default function HistorialScreen({ navigation, route }) {
               history.revPrice;
             history.subTotal = subtotal;
 
-            // Actualizar totales
-            //ventaTotalFloat += history.amount + history.revAmount;
-            setVentaTotalFloat(
-              (prev) => prev + history.amount + history.revAmount,
-            );
-            setpremiosTotalFloat(
-              (prev) => prev + history.price + history.revPrice,
-            );
-            setcomisionTotalFloat((prev) => prev + history.comision);
+            // setVentaTotalFloat(
+            //   (prev) => prev + history.amount + history.revAmount,
+            // );
+            // setpremiosTotalFloat(
+            //   (prev) => prev + history.price + history.revPrice,
+            // );
+            // setcomisionTotalFloat((prev) => prev + history.comision);
 
             total += subtotal;
           } else {
@@ -604,8 +668,10 @@ export default function HistorialScreen({ navigation, route }) {
   };
 
   const fetchDraws = async () => {
-    const desde = formatDateForAPI(fechaDesde);
-    const hasta = formatDateHastaForAPI(fechaHasta);
+    // const desde = formatDateForAPI(fechaDesde);
+    // const hasta = formatDateHastaForAPI(fechaHasta);
+    const desde = formatDate(apiDesde, "yyyy-MM-dd");
+    const hasta = formatDate(addDays(apiHasta, 1), "yyyy-MM-dd");
 
     try {
       const drawsResponse = await fetch(
@@ -728,7 +794,8 @@ export default function HistorialScreen({ navigation, route }) {
       setpremiosTotalFloat(premiosTotal);
       setcomisionTotalFloat(comisionTotal);
       setTotal(Number(total) || 0);
-      setItems([...history_history].reverse());
+      //setItems([...history_history].reverse());
+      setAllItems([...history_history].reverse());
 
       return true;
     } catch (error) {
@@ -768,79 +835,73 @@ export default function HistorialScreen({ navigation, route }) {
             style={[styles.formContainer, isWeb && styles.webFormContainer]}
           >
             <View style={styles.formRow}>
-              {Platform.OS === "web" ? (
-                <>
-                  <DatePickerWeb
-                    value={fechaDesde}
-                    onChange={(date) => handleFechaDesdeChange(null, date)}
-                  />
-                </>
-              ) : (
-                // <input
-                //   type="date"
-                //   value={toInputDateFormat(fechaDesde)}
-                //   onChange={(e) => {
-                //     const newDate = new Date(e.target.value);
-                //     if (!isNaN(newDate)) {
-                //       handleFechaDesdeChange(null, newDate);
-                //     }
-                //   }}
-                //   style={{
-                //     ...styles.inputSmall,
-                //     padding: 8,
-                //     fontSize: 16,
-                //     border: "none",
-                //   }}
-                // />
-                <>
-                  <Pressable
-                    onPress={() => setShowPickerDesde(true)}
-                    style={styles.inputSmall}
-                  >
-                    <Text>{formattedFechaDesde || "Fecha desde"}</Text>
-                  </Pressable>
-
-                  {showPickerDesde && (
-                    <DateTimePicker
+              <View style={styles.datePickerWrapper}>
+                {Platform.OS === "web" ? (
+                  <>
+                    <DatePickerWeb
                       value={fechaDesde}
-                      mode="date"
-                      display={
-                        Platform.OS === "android" ? "calendar" : "default"
-                      }
-                      onChange={handleFechaDesdeChange}
+                      style={{ flex: 1, maxWidth: "1000px", minWidth: 0 }} // 🔹 rompe el max-width interno
+                      onChange={(date) => {
+                        //handleFechaDesdeChange(null, date);
+                        setfechaDesde(date);
+                      }}
                     />
-                  )}
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => setShowPickerDesde(true)}
+                      style={styles.inputSmall}
+                    >
+                      <Text>{formattedFechaDesde || "Fecha desde"}</Text>
+                    </Pressable>
 
-              {Platform.OS === "web" ? (
-                <>
-                  <DatePickerWeb
-                    value={fechaHasta}
-                    onChange={(date) => handleFechaHastaChange(null, date)}
-                  />
-                </>
-              ) : (
-                <>
-                  <Pressable
-                    onPress={() => setShowPickerHasta(true)}
-                    style={styles.inputSmall}
-                  >
-                    <Text>{formattedFechaHasta || "Fecha hasta"}</Text>
-                  </Pressable>
-
-                  {showPickerHasta && (
-                    <DateTimePicker
+                    {showPickerDesde && (
+                      <DateTimePicker
+                        value={fechaDesde}
+                        mode="date"
+                        display={
+                          Platform.OS === "android" ? "calendar" : "default"
+                        }
+                        onChange={handleFechaDesdeChange}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
+              <View style={styles.datePickerWrapper}>
+                {Platform.OS === "web" ? (
+                  <>
+                    <DatePickerWeb
                       value={fechaHasta}
-                      mode="date"
-                      display={
-                        Platform.OS === "android" ? "calendar" : "default"
-                      }
-                      onChange={handleFechaHastaChange}
+                      onChange={(date) => {
+                        //handleFechaHastaChange(null, date);
+                        setfechaHasta(date);
+                      }}
                     />
-                  )}
-                </>
-              )}
+                  </>
+                ) : (
+                  <>
+                    <Pressable
+                      onPress={() => setShowPickerHasta(true)}
+                      style={styles.inputSmall}
+                    >
+                      <Text>{formattedFechaHasta || "Fecha hasta"}</Text>
+                    </Pressable>
+
+                    {showPickerHasta && (
+                      <DateTimePicker
+                        value={fechaHasta}
+                        mode="date"
+                        display={
+                          Platform.OS === "android" ? "calendar" : "default"
+                        }
+                        onChange={handleFechaHastaChange}
+                      />
+                    )}
+                  </>
+                )}
+              </View>
             </View>
           </View>
 
@@ -1381,6 +1442,7 @@ const styles = StyleSheet.create({
   },
   webFormContainer: {
     marginRight: 20,
+    minWidth: 410,
   },
   listContainer: {
     flex: 1,
@@ -1388,9 +1450,14 @@ const styles = StyleSheet.create({
   },
   formRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
+    justifyContent: "center", // 🔹 centra todo el bloque
+    alignItems: "center",
+    gap: 16, // espacio entre ellos
     marginBottom: 10,
+  },
+  datePickerWrapper: {
+    flex: 1, // 🔹 ambos ocupan el mismo ancho
+    maxWidth: 250, // opcional para que no se estiren demasiado en web
   },
   row: {
     flexDirection: "row",
