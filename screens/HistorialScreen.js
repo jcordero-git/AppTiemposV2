@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from "react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -472,11 +472,11 @@ export default function HistorialScreen({ navigation, route }) {
     }, [fechaDesde, fechaHasta, userData]),
   );
 
-  useEffect(() => {
-    if (userData?.id) {
-      actualizaDesdeHeader();
-    }
-  }, [fechaDesde, fechaHasta, userData]);
+  // useEffect(() => {
+  //   if (userData?.id) {
+  //     actualizaDesdeHeader();
+  //   }
+  // }, [fechaDesde, fechaHasta, userData]);
 
   // Filtrar en memoria cada vez que cambian los pickers o los datos
   useEffect(() => {
@@ -494,6 +494,7 @@ export default function HistorialScreen({ navigation, route }) {
 
   const actualizaDesdeHeader = useCallback(() => {
     async function execute() {
+      console.log("actualiza desde header");
       if (!fechaDesde || !fechaHasta || !userData?.id) return;
       const updated = await fetchDraws();
       if (updated) {
@@ -513,7 +514,7 @@ export default function HistorialScreen({ navigation, route }) {
         setLoading(false);
       }
     })();
-  }, [fechaDesde, fechaHasta, userData]);
+  }, []);
 
   const fetchDraws_old = async () => {
     const desde = formatDateForAPI(fechaDesde);
@@ -835,9 +836,9 @@ export default function HistorialScreen({ navigation, route }) {
             style={[styles.formContainer, isWeb && styles.webFormContainer]}
           >
             <View style={styles.formRow}>
-              <View style={styles.datePickerWrapper}>
-                {Platform.OS === "web" ? (
-                  <>
+              {Platform.OS === "web" ? (
+                <>
+                  <View style={styles.datePickerWrapper}>
                     <DatePickerWeb
                       value={fechaDesde}
                       style={{ flex: 1, maxWidth: "1000px", minWidth: 0 }} // 🔹 rompe el max-width interno
@@ -846,32 +847,33 @@ export default function HistorialScreen({ navigation, route }) {
                         setfechaDesde(date);
                       }}
                     />
-                  </>
-                ) : (
-                  <>
-                    <Pressable
-                      onPress={() => setShowPickerDesde(true)}
-                      style={styles.inputSmall}
-                    >
-                      <Text>{formattedFechaDesde || "Fecha desde"}</Text>
-                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Pressable
+                    onPress={() => setShowPickerDesde(true)}
+                    style={styles.inputSmall}
+                  >
+                    <Text>{formattedFechaDesde || "Fecha desde"}</Text>
+                  </Pressable>
 
-                    {showPickerDesde && (
-                      <DateTimePicker
-                        value={fechaDesde}
-                        mode="date"
-                        display={
-                          Platform.OS === "android" ? "calendar" : "default"
-                        }
-                        onChange={handleFechaDesdeChange}
-                      />
-                    )}
-                  </>
-                )}
-              </View>
-              <View style={styles.datePickerWrapper}>
-                {Platform.OS === "web" ? (
-                  <>
+                  {showPickerDesde && (
+                    <DateTimePicker
+                      value={fechaDesde}
+                      mode="date"
+                      display={
+                        Platform.OS === "android" ? "calendar" : "default"
+                      }
+                      onChange={handleFechaDesdeChange}
+                    />
+                  )}
+                </>
+              )}
+
+              {Platform.OS === "web" ? (
+                <>
+                  <View style={styles.datePickerWrapper}>
                     <DatePickerWeb
                       value={fechaHasta}
                       onChange={(date) => {
@@ -879,29 +881,29 @@ export default function HistorialScreen({ navigation, route }) {
                         setfechaHasta(date);
                       }}
                     />
-                  </>
-                ) : (
-                  <>
-                    <Pressable
-                      onPress={() => setShowPickerHasta(true)}
-                      style={styles.inputSmall}
-                    >
-                      <Text>{formattedFechaHasta || "Fecha hasta"}</Text>
-                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Pressable
+                    onPress={() => setShowPickerHasta(true)}
+                    style={styles.inputSmall}
+                  >
+                    <Text>{formattedFechaHasta || "Fecha hasta"}</Text>
+                  </Pressable>
 
-                    {showPickerHasta && (
-                      <DateTimePicker
-                        value={fechaHasta}
-                        mode="date"
-                        display={
-                          Platform.OS === "android" ? "calendar" : "default"
-                        }
-                        onChange={handleFechaHastaChange}
-                      />
-                    )}
-                  </>
-                )}
-              </View>
+                  {showPickerHasta && (
+                    <DateTimePicker
+                      value={fechaHasta}
+                      mode="date"
+                      display={
+                        Platform.OS === "android" ? "calendar" : "default"
+                      }
+                      onChange={handleFechaHastaChange}
+                    />
+                  )}
+                </>
+              )}
             </View>
           </View>
 
@@ -910,7 +912,7 @@ export default function HistorialScreen({ navigation, route }) {
             <FlatList
               data={items}
               renderItem={renderItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => item.id.toString()}
               style={{ marginTop: 0 }}
               ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
             />
