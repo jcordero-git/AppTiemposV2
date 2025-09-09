@@ -494,7 +494,6 @@ export default function HistorialScreen({ navigation, route }) {
 
   const actualizaDesdeHeader = useCallback(() => {
     async function execute() {
-      console.log("actualiza desde header");
       if (!fechaDesde || !fechaHasta || !userData?.id) return;
       const updated = await fetchDraws();
       if (updated) {

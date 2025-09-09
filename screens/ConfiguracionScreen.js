@@ -157,6 +157,18 @@ export default function ConfiguracionScreen({ navigation, route }) {
       <MaterialIcons name="more-vert" size={24} color="#fff" />
     </TouchableOpacity>
   );
+  const [innerPrinter, setInnerPrinter] = useState(false);
+
+  // Detectar si ya viene asignado "00:11:22:33:44:55"
+  useEffect(() => {
+    if (ticketProfile?.lastPrinterMacAddress === "00:11:22:33:44:55") {
+      setInnerPrinter(true);
+    }
+  }, [ticketProfile?.lastPrinterMacAddress]);
+
+  const printerValue = innerPrinter
+    ? "00:11:22:33:44:55"
+    : ticketProfile?.lastPrinterMacAddress || "";
 
   useEffect(() => {
     if (Platform.OS !== "web" && crashlytics) {
@@ -514,7 +526,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
                       }));
                     }}
                   />
-                  {Platform.OS !== "web" && (
+                  {/* {Platform.OS !== "web" && (
                     <Pressable
                       style={styles.inputSmall}
                       onPress={() => setModalPrinterVisible(true)}
@@ -536,7 +548,87 @@ export default function ConfiguracionScreen({ navigation, route }) {
                         lastPrinterMacAddress: printer.id,
                       }));
                     }}
-                  />
+                  /> */}
+
+                  <>
+                    {Platform.OS !== "web" && (
+                      <View>
+                        {/* Switch Inner Printer */}
+                        <View style={styles.switchGroup}>
+                          <View style={styles.switchRow}>
+                            <Text style={styles.switchLabel}>
+                              Impresora interna
+                            </Text>
+                            <Switch
+                              value={innerPrinter}
+                              onValueChange={(val) => {
+                                setInnerPrinter(val);
+                                if (val) {
+                                  // asignar valor fijo
+                                  setTicketProfile((prev) => ({
+                                    ...prev,
+                                    lastPrinterMacAddress: "00:11:22:33:44:55",
+                                  }));
+                                } else {
+                                  // limpiar si se apaga
+                                  setTicketProfile((prev) => ({
+                                    ...prev,
+                                    lastPrinterMacAddress: "",
+                                  }));
+                                }
+                              }}
+                            />
+                          </View>
+                        </View>
+
+                        {/* Input con lupa */}
+                        <View style={styles.inputContainer}>
+                          <TextInput
+                            style={styles.inputSmall}
+                            placeholder="Seleccione una impresora"
+                            value={printerValue}
+                            editable={!innerPrinter}
+                            onChangeText={(text) =>
+                              setTicketProfile((prev) => ({
+                                ...prev,
+                                lastPrinterMacAddress: text,
+                              }))
+                            }
+                          />
+                          <TouchableOpacity
+                            style={styles.iconButton}
+                            onPress={() =>
+                              !innerPrinter && setModalPrinterVisible(true)
+                            }
+                            disabled={innerPrinter}
+                            // style={({ pressed }) => [
+                            //   styles.iconContainer,
+                            //   pressed && { opacity: 0.5 },
+                            // ]}
+                          >
+                            <MaterialIcons
+                              name="search"
+                              size={20}
+                              //color={innerPrinter ? "#ccc" : "#000"}
+                              color="gray"
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Modal selector */}
+                    <PrinterSelectorModal
+                      visible={modalPrinterVisible}
+                      onClose={() => setModalPrinterVisible(false)}
+                      onSelect={(printer) => {
+                        setTicketProfile((prev) => ({
+                          ...prev,
+                          lastPrinterMacAddress: printer.id,
+                        }));
+                      }}
+                    />
+                  </>
 
                   <View style={styles.switchGroup}>
                     <Pressable
@@ -969,11 +1061,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   inputSmall: {
+    flex: 1,
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 6,
     paddingHorizontal: 12,
     minHeight: 44, // altura mínima estándar de input
+    maxHeight: 44, // altura mínima estándar de input
     justifyContent: "center", // centra verticalmente el texto
     marginTop: 15,
   },
@@ -989,13 +1083,15 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 0,
-    backgroundColor: "#ccc",
+    marginTop: 15, // mismo marginTop que el input
+    marginLeft: 8,
+    backgroundColor: "#e6e1e1",
     borderRadius: 8,
+    cursor: "pointer",
   },
   montoContainer: {
     flexDirection: "column",
@@ -1054,5 +1150,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#333",
     flexShrink: 1,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%", // ocupar todo el ancho disponible
+  },
+  iconContainer: {
+    marginLeft: 8,
+    padding: 6,
   },
 });
