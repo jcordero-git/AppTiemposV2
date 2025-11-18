@@ -603,7 +603,7 @@ export default function VentaScreen({ navigation, route }) {
       <MaterialIcons name="more-vert" size={24} color="#fff" />
     </TouchableOpacity>
   );
-  const [refreshHeader, setRefreshHeader] = useState(0);
+  //const [refreshHeader, setRefreshHeader] = useState(0);
   const [isSharing, setIsSharing] = useState(false);
   const isSharingRef = useRef(false);
   //const [modalVisiblePreCargar, setModalVisiblePreCargar] = useState(false);
@@ -722,9 +722,10 @@ export default function VentaScreen({ navigation, route }) {
     navigation,
     menuVisibleHeader,
     idTicketSeleccionado,
-    refreshHeader,
+    //refreshHeader,
     ticketProfile,
     isSharing,
+    tiempo,
     dialogPrintVisible,
   ]);
 
@@ -1268,6 +1269,12 @@ export default function VentaScreen({ navigation, route }) {
 
   const handlePrintBt = async () => {
     try {
+      //const sorteoSnapshot2 = { ...mSorteo };
+      const sorteoSnapshot = JSON.parse(JSON.stringify(mSorteo));
+
+      //console.log("sorteo snap 1", sorteoSnapshot2);
+      console.log("sorteo snap 2", sorteoSnapshot);
+
       let tiempoAImprimir =
         tiempoSeleccionado !== null
           ? tiempoSeleccionado
@@ -1303,7 +1310,7 @@ export default function VentaScreen({ navigation, route }) {
         }
         await PrinterUtils.printTicket({
           tiempo: tiempoAImprimir,
-          sorteoSeleccionado: mSorteo,
+          sorteoSeleccionado: sorteoSnapshot,
           vendedorData: userData,
           ticketProfile: ticketProfile,
           re_impresion: tiempoSeleccionado !== null ? true : false,
@@ -1972,12 +1979,23 @@ export default function VentaScreen({ navigation, route }) {
     return updatedItems;
   };
 
-  const actualizarMontoNumerosEnTiempo = (montoNumeros) => {
+  const actualizarMontoNumerosEnTiempov1 = (montoNumeros) => {
     setTiempo((prev) => ({
       ...prev,
       numbers: montoNumeros,
     }));
-    setRefreshHeader((prev) => prev + 1);
+    //setRefreshHeader((prev) => prev + 1);
+  };
+  const actualizarMontoNumerosEnTiempo = (montoNumeros) => {
+    //const t0 = global?.performance.now();
+    requestAnimationFrame(() => {
+      setTiempo((prev) => {
+        const res = { ...prev, numbers: montoNumeros };
+        //const t1 = global?.performance.now();
+        //console.log(`⏱️ setTiempo ejecutado en ${(t1 - t0).toFixed(2)} ms`);
+        return res;
+      });
+    });
   };
 
   const addNumeroToListAdapter = (
@@ -2487,7 +2505,7 @@ export default function VentaScreen({ navigation, route }) {
     return [updatedItems ?? items, true];
   }
 
-  const submitNumero = async () => {
+  const submitNumerov1 = async () => {
     if (!reventar) {
       if (numero.length === 2) {
         if (monto.trim() === "" || numero.trim() === "") {
@@ -2512,8 +2530,9 @@ export default function VentaScreen({ navigation, route }) {
           items,
           tiemposAnteriores,
         );
-
+        console.log("paso 2");
         setItems(currentItems);
+        console.log("paso 3");
         const nuevosMontoNumeros = currentItems.map((item) => ({
           monto: item.monto,
           numero: item.numero,
@@ -2521,10 +2540,81 @@ export default function VentaScreen({ navigation, route }) {
           montoReventado: item.montoReventado,
         }));
         actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+        console.log("paso 4");
       } else if (numero.length > 2) {
         // Si el número tiene más de 2 dígitos, limpiamos el campo
         setNumero(""); // Limpiar número si tiene más de 2 dígitos
         //Alert.alert("Error", "El número debe tener exactamente 2 dígitos.");
+      }
+    } else {
+      if (numero.length === 2 && useReventado) {
+        reventarRef.current?.focus();
+      }
+    }
+  };
+
+  const submitNumero = async () => {
+    //const startTotal = global?.performance.now();
+    //console.log(`[⏱️ ${new Date().toLocaleTimeString()}] submitNumero → START`);
+
+    if (!reventar) {
+      if (numero.length === 2) {
+        if (monto.trim() === "" || numero.trim() === "") {
+          console.log("❌ monto o número vacío");
+          return;
+        }
+
+        //const t1 = global?.performance.now();
+        tiempoNumerosBackup = tiempoRef.current;
+        const nuevoNumero = {
+          monto: monto,
+          numero: numero,
+          reventado: false,
+          montoReventado: 0,
+        };
+        tiempoNumerosBackup.numbers.push(nuevoNumero);
+        ejecutadoPorRestringidoDialogRef.current = false;
+        //const t2 = global?.performance.now();
+        //console.log(`🧩 Preparar datos: ${(t2 - t1).toFixed(2)} ms`);
+
+        //const t3 = global?.performance.now();
+        const [currentItems] = await verificaRestringidosYAgregaNumero(
+          monto,
+          numero,
+          false,
+          0,
+          items,
+          tiemposAnteriores,
+        );
+        //const t4 = global?.performance.now();
+        // console.log(
+        //   `⚙️ verificaRestringidosYAgregaNumero: ${(t4 - t3).toFixed(2)} ms`,
+        // );
+
+        //const t5 = global?.performance.now();
+        setItems(currentItems);
+        //const t6 = global?.performance.now();
+        //console.log(`🧠 setItems (trigger render): ${(t6 - t5).toFixed(2)} ms`);
+
+        //const t7 = global?.performance.now();
+        const nuevosMontoNumeros = currentItems.map((item) => ({
+          monto: item.monto,
+          numero: item.numero,
+          reventado: item.reventado,
+          montoReventado: item.montoReventado,
+        }));
+        actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+        //const t8 = global?.performance.now();
+        // console.log(
+        //   `📦 actualizarMontoNumerosEnTiempo: ${(t8 - t7).toFixed(2)} ms`,
+        // );
+
+        //const total = global?.performance.now() - startTotal;
+        // console.log(
+        //   `[✅ ${new Date().toLocaleTimeString()}] submitNumero → FIN — TOTAL: ${total.toFixed(2)} ms`,
+        // );
+      } else if (numero.length > 2) {
+        setNumero("");
       }
     } else {
       if (numero.length === 2 && useReventado) {
@@ -3515,7 +3605,7 @@ export default function VentaScreen({ navigation, route }) {
                                     mimeType: "image/png",
                                     dialogTitle: "Compartir ticket",
                                   });
-                                  setRefreshHeader(true);
+                                  //setRefreshHeader(true);
                                 }
 
                                 setGenerateImage(false);
@@ -3557,7 +3647,7 @@ export default function VentaScreen({ navigation, route }) {
                 //montoRef.current?.focus();
                 setShouldFocusMonto(true);
                 limpiarDespuesDeImprimir();
-                setRefreshHeader(true);
+                //setRefreshHeader(true);
               }}
             >
               CERRAR

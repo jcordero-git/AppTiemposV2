@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { formatHourStr } from "../utils/datetimeUtils";
+import { convertNumero, validateMonto } from "../utils/numeroUtils";
 
 export default function SorteoDetalleScreen({ navigation, route }) {
   const { sorteo, userData } = route.params;
@@ -55,7 +56,9 @@ export default function SorteoDetalleScreen({ navigation, route }) {
     const contenido = isFecha ? (
       <View style={styles.rowCenter}>
         <Ionicons name="calendar" size={20} style={{ marginRight: 8 }} />
-        <Text style={styles.bold}>[{new Date().getDate()}]</Text>
+        <Text style={styles.bold}>
+          [{convertNumero(parseInt(new Date().getDate()))}]
+        </Text>
       </View>
     ) : (
       <Text style={styles.bold}>[{item.restricted}]</Text>

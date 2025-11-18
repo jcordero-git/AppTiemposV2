@@ -19,8 +19,22 @@ export async function syncInternetTime(timezone = "America/Costa_Rica") {
 }
 
 export function getInternetDate() {
-  return internetDate ?? new Date();
+  return internetDate ?? toLocalMidnight(new Date());
 }
+
+export function toLocalMidnight(date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function subWeeksLocal(date, weeks) {
+  const daysToSubtract = weeks * 7;
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate() - daysToSubtract,
+  );
+}
+
 
 export async function getUpdatedInternetDate(current = new Date()) {
   const currentFormatted = format(current, "yyyy-MM-dd HH:mm");
@@ -70,6 +84,20 @@ export function formatDate(fecha, formatStr) {
   if (!fecha) return "";
   const dateObj = typeof fecha === "string" ? parseDateUTC(fecha) : fecha;
   return format(dateObj, formatStr, { locale: es });
+}
+
+export function toUTC(date) {
+  return new Date(
+    Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      date.getHours(),
+      date.getMinutes(),
+      date.getSeconds(),
+      date.getMilliseconds(),
+    ),
+  );
 }
 
 function parseDateUTC(fechaStr) {

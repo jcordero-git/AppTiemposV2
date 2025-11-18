@@ -19,6 +19,7 @@ import { Provider, Portal, Dialog, Button } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 //import { Ionicons } from "@expo/vector-icons";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { convertNumero, validateMonto } from "../utils/numeroUtils";
 //mport { subMonths, addDays, format } from "date-fns";
 import {
   subMonths,
@@ -40,6 +41,9 @@ import { toFloat } from "../utils/numeroUtils";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 import {
   getInternetDate,
+  toUTC,
+  subWeeksLocal,
+  toLocalMidnight,
   formatDate,
   formatDateLocal,
 } from "../utils/datetimeUtils"; // ajusta el path si es necesario
@@ -67,8 +71,12 @@ export default function HistorialScreen({ navigation, route }) {
   const [apiHasta] = useState(getInternetDate());
 
   // Resta 2 semanas desde hoy
-  const [fechaDesde, setfechaDesde] = useState(subWeeks(getInternetDate(), 2));
-  const [fechaHasta, setfechaHasta] = useState(subWeeks(getInternetDate(), 0));
+  const [fechaDesde, setfechaDesde] = useState(
+    subWeeksLocal(getInternetDate(), 2),
+  );
+  const [fechaHasta, setfechaHasta] = useState(
+    subWeeksLocal(getInternetDate(), 0),
+  );
   const [dialogVisible, setDialogVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingPremiados, setLoadingPremiados] = useState(false);
@@ -178,8 +186,6 @@ export default function HistorialScreen({ navigation, route }) {
           ventaTotal += amount + revAmount;
           premiosTotal += price + revPrice;
           comisionTotal += comision;
-        } else {
-          ventaTotal += amount + revAmount;
         }
       }
     }
@@ -238,7 +244,7 @@ export default function HistorialScreen({ navigation, route }) {
                         { lineHeight: 22, textAlignVertical: "center" }, // 👈 fuerza al texto a estar centrado
                       ]}
                     >
-                      #{item.priceNumber}
+                      #{convertNumero(parseInt(`${item.priceNumber}`))}
                     </Text>
                   </View>
                 </View>
@@ -377,6 +383,7 @@ export default function HistorialScreen({ navigation, route }) {
 
       const data = await response.json();
       const sortedData = data.data.sort((a, b) => b.ticketId - a.ticketId);
+      console.log("sorted", sortedData);
       setTiemposPremiados(sortedData);
       const ticketNumbers = sortedData
         .map((item) => item.ticketId)
@@ -471,25 +478,21 @@ export default function HistorialScreen({ navigation, route }) {
       actualizaDesdeHeader();
     }, [fechaDesde, fechaHasta, userData]),
   );
-
-  // useEffect(() => {
-  //   if (userData?.id) {
-  //     actualizaDesdeHeader();
-  //   }
-  // }, [fechaDesde, fechaHasta, userData]);
-
   // Filtrar en memoria cada vez que cambian los pickers o los datos
   useEffect(() => {
     if (allItems.length > 0) {
+      // console.log("All Items", allItems);
+      const fechaDesdeLocal = toLocalMidnight(fechaDesde);
+      const fechaHastaLocal = toLocalMidnight(fechaHasta);
+
       const filtered = allItems.filter((item) => {
-        const itemDate = new Date(item.date);
-        return (
-          !isBefore(itemDate, fechaDesde) &&
-          !isAfter(itemDate, addDays(fechaHasta, 1)) // incluir el día hasta
-        );
+        const itemDate = toLocalMidnight(new Date(item.date));
+        return itemDate >= fechaDesdeLocal && itemDate <= fechaHastaLocal;
       });
       setItems(filtered);
     }
+    // console.log("fechaDesdeLocal", toLocalMidnight(fechaDesde));
+    // console.log("fechaHastaLocal", toLocalMidnight(fechaHasta));
   }, [allItems, fechaDesde, fechaHasta]);
 
   const actualizaDesdeHeader = useCallback(() => {
@@ -670,8 +673,9 @@ export default function HistorialScreen({ navigation, route }) {
   const fetchDraws = async () => {
     // const desde = formatDateForAPI(fechaDesde);
     // const hasta = formatDateHastaForAPI(fechaHasta);
+    const hoy = new Date();
     const desde = formatDate(apiDesde, "yyyy-MM-dd");
-    const hasta = formatDate(addDays(apiHasta, 1), "yyyy-MM-dd");
+    const hasta = formatDate(addDays(hoy, 1), "yyyy-MM-dd");
 
     try {
       const drawsResponse = await fetch(
@@ -1241,12 +1245,15 @@ export default function HistorialScreen({ navigation, route }) {
                               Código: # {item.ticketId || ""}
                             </Text>
                             <Text style={{ fontWeight: "bold" }}>
-                              Premiado: # {item.winningNumber || ""}
+                              Premiado: #{" "}
+                              {convertNumero(
+                                parseInt(`${item.winningNumber}`),
+                              ) || ""}
                             </Text>
                           </View>
 
                           <Text style={{ fontWeight: "bold" }}>
-                            Cliente: {item.clientName || "Sin nombre"}
+                            Cliente: {item.ticket.clientName || "Sin nombre"}
                           </Text>
                           <Text style={{ color: "#555" }}>
                             Fecha:{" "}
