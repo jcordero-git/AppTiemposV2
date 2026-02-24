@@ -8,7 +8,11 @@ import {
 } from "react-native-ble-plx";
 import { Platform, PermissionsAndroid, Alert, Linking } from "react-native";
 import { Buffer } from "buffer";
-import { getUpdatedInternetDate, formatDate } from "../datetimeUtils";
+import {
+  getUpdatedInternetDate,
+  formatDate,
+  formatHour_custom,
+} from "../datetimeUtils";
 import { useSnackbar } from "../../context/SnackbarContext"; // Ajusta el path
 import * as Location from "expo-location";
 import { Snackbar } from "react-native-paper";
@@ -544,6 +548,7 @@ class PrinterUtils {
     ticketProfile,
     numeroPremiado,
     reventado,
+    fecha,
   }) {
     //const { id: codigo, clientName, drawDate, numbers = [] } = items;
     const { phoneNumber, printBarCode, sellerName, ticketFooter, ticketTitle } =
@@ -576,11 +581,24 @@ class PrinterUtils {
     parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho
     parts.push(Buffer.from([0x1b, 0x45, 0x01])); // Activar negrita
     parts.push(Buffer.from([0x0a])); // Salto de Linea
-    parts.push(Buffer.from(`PREMIOS\n`, "ascii"));
+    parts.push(Buffer.from(`PREMIOS`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
     parts.push(Buffer.from(`${sorteoSeleccionado.name}`, "ascii"));
     parts.push(Buffer.from([0x0a])); // Salto de Linea
-    parts.push(Buffer.from([0x0a])); // Salto de Linea
+
+    parts.push(Buffer.from([0x1b, 0x21, 0x00])); // Tamaño normal
+
+    parts.push(
+      Buffer.from(
+        alignLeftRight(
+          "FECHA:",
+          `${formatHour_custom(fecha, "E dd/MM/yyy")}\n`,
+          33,
+        ),
+        "ascii",
+      ),
+    );
+    parts.push(Buffer.from([0x1b, 0x21, 0x20])); // Doble ancho   
     parts.push(
       Buffer.from(alignLeftRight("PREMIADO: ", `#${numeroPremiado}`), "ascii"),
     );
@@ -594,7 +612,7 @@ class PrinterUtils {
       parts.push(Buffer.from(`Codigo:    #${item.id}\n`, "ascii"));
       parts.push(
         Buffer.from(
-          `Fecha:     ${formatDate(item.createdAt, "dd/MM/yyyy hh:mm:a")}\n`,
+          `Hora:      ${formatHour_custom(new Date(item.createdAt), "hh:mm:ss a")}\n`,
           "ascii",
         ),
       );

@@ -646,8 +646,10 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
             {/* Total */}
             <View style={styles.totalBar}>
-              <Text style={styles.totalText}>TOTAL: </Text>
-              <Text style={styles.totalValue}>₡{montoTotal?.toFixed(0)}</Text>
+              {/* <Text style={styles.totalText}>TOTAL: </Text> */}
+              <Text style={styles.totalValue}>
+                TOTAL: ₡{montoTotal?.toFixed(0)}
+              </Text>
             </View>
           </View>
         </>
@@ -840,6 +842,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginLeft: 4,
     fontWeight: "bold",
+    minWidth: 250,
+    textAlign: "right",
   },
   dialogWebContainer: {
     position: "fixed", // fijo en pantalla

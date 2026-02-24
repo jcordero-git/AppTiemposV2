@@ -11,8 +11,9 @@ import {
   ScrollView,
   ActivityIndicator,
   TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
-import { Divider, Provider } from "react-native-paper";
+import { Divider, Provider, Portal, Dialog, Button } from "react-native-paper";
 import { useFocusEffect } from "@react-navigation/native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext";
@@ -20,15 +21,32 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import mSorteo from "../models/mSorteoSingleton.js";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
-import { formatDate } from "../utils/datetimeUtils";
+import { formatDate, formatHour_custom } from "../utils/datetimeUtils";
 import Constants from "expo-constants";
 import { useAuth } from "../context/AuthContext";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 import PrinterUtils from "../utils/print/printerUtils";
+import { generateHTMLPremios } from "../utils/share/generateHTMLPremios";
+import { WebView } from "react-native-webview";
+
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
+import getHtml2Canvas from "../utils/getHtml2Canvas";
 
 export default function PremiosScreen({ navigation }) {
+  const ticketRef = useRef(null);
+  const iframeRef = useRef(null);
+  const [iframeHeight, setIframeHeight] = useState(100);
+
+  const [webviewHeight, setWebviewHeight] = useState(100); // altura inicial mínima
+  const [generateImage, setGenerateImage] = useState(false);
+
+  const [loaded, setLoaded] = useState(false);
+
+  const [html, setHtml] = React.useState(null);
+  const [dialogPrintVisible, setDialogPrintVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
   const { showSnackbar } = useSnackbar();
   const [modalVisible, setModalVisible] = useState(false);
@@ -103,12 +121,58 @@ export default function PremiosScreen({ navigation }) {
       headerStyle: { backgroundColor: "#4CAF50" },
       headerTintColor: "#fff",
       headerRight: () => (
-        <TouchableOpacity onPress={handlePrintBt} style={{ marginRight: 16 }}>
+        // <TouchableOpacity onPress={handlePrintBt} style={{ marginRight: 16 }}>
+        <TouchableOpacity onPress={handlePrint} style={{ marginRight: 16 }}>
           <MaterialIcons name="print" size={24} color="#fff" />
         </TouchableOpacity>
       ),
     });
   }, [navigation, tiemposFiltrados, total, numero, currentColor]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    const handleMessage = (event) => {
+      if (
+        event.data &&
+        typeof event.data === "object" &&
+        event.data.type === "htmlHeight"
+      ) {
+        const newHeight = parseInt(event.data.height, 10);
+        setIframeHeight((prev) => (newHeight > prev ? newHeight : prev));
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handlePrint = async () => {
+    setIframeHeight(100);
+    setWebviewHeight(100);
+
+    const htmlGenerado = await generateHTMLPremios(
+      tiemposFiltrados,
+      total,
+      mSorteo,
+      userData,
+      ticketProfile,
+      numero,
+      currentColor === "red",
+      mFechaSeleccionada.getFecha(),
+    );
+    setHtml(htmlGenerado);
+    setLoaded(false);
+    setDialogPrintVisible(true);
+    Keyboard.dismiss(); // Oculta el teclado
+  };
+
+  const isWebMobile = () => {
+    if (typeof navigator === "undefined") return false;
+    return /Mobi|Android|iPhone|iPad|iPod|Opera Mini|IEMobile|WPDesktop/i.test(
+      navigator.userAgent,
+    );
+  };
 
   const handlePrintBt = async () => {
     try {
@@ -131,8 +195,21 @@ export default function PremiosScreen({ navigation }) {
           ticketProfile,
           numeroPremiado: numero,
           reventado: currentColor === "red",
+          fecha: mFechaSeleccionada.getFecha(),
         });
         await PrinterUtils.disconnect();
+      } else if (Platform.OS === "web") {
+        const iframeWindow = iframeRef?.current?.contentWindow;
+        if (iframeWindow) {
+          iframeWindow.focus();
+          iframeWindow.print();
+        }
+
+        if (!isWebMobile()) {
+          window.setTimeout(() => {
+            setDialogPrintVisible(false);
+          }, 100);
+        }
       }
     } catch (e) {
       console.error("Error al imprimir:", e);
@@ -142,6 +219,119 @@ export default function PremiosScreen({ navigation }) {
       );
     }
   };
+
+  useEffect(() => {
+    if (!html || !loaded) return;
+
+    const compartir = async () => {
+      if (Platform.OS === "web") {
+        const html2canvas = getHtml2Canvas();
+        if (!html2canvas) {
+          showSnackbar("html2canvas no disponible en esta plataforma.", 3);
+          return;
+        }
+
+        const container = window.document.createElement("div");
+
+        container.innerHTML = html;
+        container.style.width = "60mm";
+        container.style.padding = "10px";
+        container.style.margin = "10";
+        container.style.boxSizing = "border-box";
+        container.style.backgroundColor = "white";
+
+        window.document.body.appendChild(container);
+        await new Promise((r) => window.setTimeout(r, 100));
+
+        // const svg = container.querySelector("#barcode");
+        // if (svg) {
+        //   JsBarcode(
+        //     svg,
+        //     tiempoSeleccionado !== null
+        //       ? tiempoSeleccionado.id
+        //       : tiempoAImprimirRef.current.id,
+        //     {
+        //       format: "CODE128",
+        //       lineColor: "#000",
+        //       width: 3,
+        //       height: 30,
+        //       displayValue: false,
+        //       fontSize: 14,
+        //       margin: 0,
+        //     },
+        //   );
+        // }
+
+        // Esperar un poco más para asegurar render
+        await new Promise((r) => window.setTimeout(r, 100));
+
+        const canvas = await html2canvas(container, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+        });
+
+        // const imgDataUrl = canvas.toDataURL("image/png");
+        // const link = window.document.createElement("a");
+        // link.href = imgDataUrl;
+        // link.download = `ticket_${Date.now()}.png`;
+        // link.click();
+
+        const blob = await new Promise((resolve) =>
+          canvas.toBlob((b) => resolve(b), "image/png"),
+        );
+
+        if (blob) {
+          const ClipboardItem = window.ClipboardItem || window.clipboardItem;
+          const clipboardItem = new ClipboardItem({ "image/png": blob });
+          try {
+            await navigator.clipboard.write([clipboardItem]);
+            showSnackbar(
+              "✅ Imagen copiada. Ahora podés pegarla en WhatsApp Web (Ctrl+V).",
+              1,
+            );
+            // if (Platform.OS === "web") {
+            window.location.href = "whatsapp://";
+            // }
+            setDialogPrintVisible(false);
+          } catch (error) {
+            console.error("❌ Error copiando al portapapeles:", error);
+            showSnackbar(
+              "Tu navegador no permite copiar imágenes al portapapeles.",
+              3,
+            );
+          }
+        }
+
+        window.document.body.removeChild(container);
+      } else {
+        // try {
+        //   const uri = await captureRef(ticketRef.current, {
+        //     format: "png",
+        //     quality: 1,
+        //     result: "tmpfile", // o base64 si prefieres compartir directamente
+        //   });
+
+        //   const canShare = await Sharing.isAvailableAsync();
+
+        //   if (canShare) {
+        //     await Sharing.shareAsync(uri, {
+        //       mimeType: "image/png",
+        //       dialogTitle: "Compartir ticket",
+        //     });
+        //   } else {
+        //     const url = `whatsapp://send?text=${encodeURIComponent("Revisa el ticket generado.")}`;
+        //     Linking.openURL(url);
+        //   }
+        // } catch (e) {
+        //   console.error("Error compartiendo el ticket:", e);
+        // }
+        setGenerateImage(true); // activa WebView oculto para capturar
+      }
+    };
+
+    compartir();
+  }, [loaded]);
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
@@ -401,12 +591,18 @@ export default function PremiosScreen({ navigation }) {
                     <Text style={{ fontWeight: "bold" }}>
                       Código: # {item.id || ""}
                     </Text>
+                    <Text style={{ color: "#555" }}>
+                      Hora:{" "}
+                      {formatHour_custom(
+                        new Date(item.createdAt),
+                        "hh:mm:ss a",
+                      )}
+                    </Text>
+
                     <Text style={{ fontWeight: "bold" }}>
                       Cliente: {item.clientName || "Sin nombre"}
                     </Text>
-                    <Text style={{ color: "#555" }}>
-                      Fecha: {new Date(item.updatedAt).toLocaleString()}
-                    </Text>
+
                     <Text style={{ fontWeight: "bold" }}>
                       Premio: ₡{item.monto} x {item.prizeTimes} = ₡{item.premio}
                     </Text>
@@ -426,8 +622,8 @@ export default function PremiosScreen({ navigation }) {
           </View>
           <View style={styles.totalBar}>
             <View style={styles.totalTextGroup}>
-              <Text style={styles.totalText}>TOTAL: </Text>
-              <Text style={styles.totalValue}>₡{total?.toFixed(0)}</Text>
+              {/* <Text style={styles.totalText}>TOTAL: </Text> */}
+              <Text style={styles.totalValue}>TOTAL: ₡{total?.toFixed(0)}</Text>
             </View>
           </View>
         </View>
@@ -442,6 +638,325 @@ export default function PremiosScreen({ navigation }) {
           leftPosition
         />
       </View>
+
+      <Portal>
+        {/* Diálogo print */}
+        <Dialog
+          visible={dialogPrintVisible}
+          onDismiss={() => {}} // Evita cerrar al tocar fuera
+          style={[
+            {
+              backgroundColor: "white",
+              borderRadius: 10,
+              marginHorizontal: 20,
+              maxHeight: "95%",
+            },
+            isWeb && {
+              position: "absolute",
+              right: 0,
+              top: 10,
+              width: 400,
+              maxHeight: "100%",
+              elevation: 4,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          {/* Diálogo Print */}
+          <Dialog.Content>
+            {dialogPrintVisible && html && (
+              <>
+                <View
+                  style={{
+                    maxHeight: height * 0.6, // Límite del 80% altura real
+                    width: "100%",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <ScrollView
+                    style={{
+                      width: "100%",
+                      backgroundColor: "white",
+                      // borderWidth: 1,
+                      // borderColor: "#ccc",
+                    }}
+                    contentContainerStyle={{
+                      alignItems: "center",
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <View
+                      ref={ticketRef}
+                      collapsable={false}
+                      style={{
+                        width: 225,
+                        borderWidth: 1,
+                        borderColor: "#ccc",
+                        overflow: "hidden", // 👈 evitar scroll innecesario
+                      }}
+                    >
+                      {Platform.OS === "web" ? (
+                        <iframe
+                          ref={iframeRef}
+                          srcDoc={`
+                      <!DOCTYPE html>
+                      <html>
+                        <head>
+                          <meta name="viewport", initial-scale=1.0">
+                          <style>
+                          html { margin: 0; padding: 0; overflow: hidden; box-sizing: border-box; width: 100%; height: auto; }
+                            body { width:59mm; margin-left: 0px; padding: 0px; box-sizing: border-box; }
+                            .wrapper {
+                              // margin-left: 5px;
+                              //justify-content: "center"
+                              //width: 60mm;
+                              }
+                          </style>
+                          <script>
+                            function sendHeight() {
+                              const height = document.documentElement.scrollHeight;
+                              window.parent.postMessage({ type: "htmlHeight", height }, "*");
+                            }
+                    
+                            window.addEventListener("load", () => {
+                              sendHeight();
+                              // Retry a couple of times in case fonts/layouts shift content
+                              setTimeout(sendHeight, 100);
+                              setTimeout(sendHeight, 300);                              
+
+                            });
+                    
+                            // Optional: observe height changes dynamically
+                             window.addEventListener("DOMContentLoaded", () => {
+                              const body = document.body;
+                              if (body) {
+                                const observer = new ResizeObserver(sendHeight);
+                                observer.observe(body);
+                              }
+                            });
+
+
+                          </script>
+                        </head>
+                        <body>
+                          <div class="wrapper">
+                            ${html}
+                          </div>
+                         </body>
+                      </html>
+                    `}
+                          style={{
+                            width: "100%",
+                            //width: 240,
+                            height: iframeHeight,
+                            border: "none",
+                            display: "block",
+                          }}
+                          sandbox="allow-scripts allow-same-origin allow-modals"
+                        />
+                      ) : (
+                        <>
+                          <WebView
+                            originWhitelist={["*"]}
+                            source={{ html }}
+                            scalesPageToFit={false}
+                            onMessage={(event) => {
+                              const height = parseInt(
+                                event.nativeEvent.data,
+                                10,
+                              );
+                              setWebviewHeight(height);
+                            }}
+                            injectedJavaScript={`
+                     const meta = document.createElement('meta');
+                     meta.setAttribute('name', 'viewport');
+                     meta.setAttribute('content', 'width=245, initial-scale=1, maximum-scale=1, user-scalable=no');
+                     document.head.appendChild(meta);
+                     document.body.style.margin = '0';
+                     document.body.style.overflow = 'auto';
+                     document.documentElement.style.overflow = 'auto';
+ 
+                     setTimeout(() => {
+                       const height = document.body.scrollHeight;
+                       window.ReactNativeWebView.postMessage(height.toString());
+                     }, 200);
+                     true;
+                   `}
+                            style={{
+                              width: "100%",
+                              height: webviewHeight || 100,
+                              backgroundColor: "white",
+                              //marginLeft: 8,
+                            }}
+                          />
+
+                          {/* WebView oculto para generar imagen */}
+                          {generateImage && (
+                            <WebView
+                              originWhitelist={["*"]}
+                              renderToHardwareTextureAndroid={true}
+                              source={{
+                                html: `
+                            <!DOCTYPE html>
+                            <html>
+                              <head>
+                                <meta name="viewport" content="width=60mm, initial-scale=1.0">
+                                <style>
+                                  body { margin: 0; padding: 0px; opacity: 0; background: transparent; box-sizing: border-box; }
+                                 .wrapper {
+                                    //margin-left: 30px;
+                                    //width: 56mm;
+                                    }
+                                  </style>
+                                <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+                              </head>
+                              <body>
+                                <div class="wrapper">
+                                <div id="ticket">${html}</div>
+                                 </div>
+                                <script>
+                                  window.onload = () => {
+                                    console.log("ONLOAD fired");
+
+                                    setTimeout(() => {
+                                        const el = document.getElementById("ticket");
+                                        if (!el) {
+                                          console.log("No ticket element found");
+                                          return;
+                                        }
+
+                                      html2canvas(el, {
+                                        scale: 2,
+                                        backgroundColor: "#ffffff"
+                                      }).then(canvas => {
+                                        console.log("Canvas generated");
+                                        const base64 = canvas.toDataURL("image/png");
+                                        window.ReactNativeWebView.postMessage(base64);
+                                      });
+                                    }, 500);
+                                  };
+                                </script>
+                              </body>
+                            </html>
+                          `,
+                              }}
+                              javaScriptEnabled
+                              onMessage={async (event) => {
+                                //setImageToShare(event.nativeEvent.data);
+
+                                const base64Image = event.nativeEvent.data;
+                                const path =
+                                  FileSystem.documentDirectory +
+                                  `ticket_${Date.now()}.png`;
+
+                                await FileSystem.writeAsStringAsync(
+                                  path,
+                                  base64Image.replace(
+                                    "data:image/png;base64,",
+                                    "",
+                                  ),
+                                  { encoding: FileSystem.EncodingType.Base64 },
+                                );
+
+                                const canShare =
+                                  await Sharing.isAvailableAsync();
+                                if (canShare) {
+                                  await Sharing.shareAsync(path, {
+                                    mimeType: "image/png",
+                                    dialogTitle: "Compartir ticket",
+                                  });
+                                  //setRefreshHeader(true);
+                                }
+
+                                setGenerateImage(false);
+                                setDialogPrintVisible(false);
+                              }}
+                              style={{
+                                width: "100%",
+                                height: "100%",
+                                opacity: 1,
+                                top: -9999,
+                                left: -9999,
+                                backgroundColor: "transparent",
+                                position: "absolute",
+                                pointerEvents: "none",
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                    </View>
+                  </ScrollView>
+                </View>
+              </>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                setDialogPrintVisible(false);
+                setWebviewHeight(100);
+                setIframeHeight(100);
+              }}
+            >
+              CERRAR
+            </Button>
+            <Button
+              textColor="green"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                setLoaded(true);
+                setGenerateImage(true);
+                // setWebviewHeight(100);
+                // setIframeHeight(100);
+                // montoRef.current?.focus();
+                // limpiarDespuesDeImprimir();
+                // setDialogPrintVisible(false);
+              }}
+            >
+              COMPARTIR
+            </Button>
+            <Button
+              textColor="green"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={() => {
+                // if (Platform.OS === "web" && iframeRef.current) {
+                //   const iframeWindow = iframeRef.current.contentWindow;
+                //   iframeWindow.focus();
+                //   iframeWindow.print();
+                // }
+                // if (Platform.OS === "android") {
+                //   handlePrintBt();
+                // }
+                handlePrintBt();
+                //montoRef.current?.focus();
+                //setWebviewHeight(100);
+                //setIframeHeight(100);
+              }}
+            >
+              IMPRIMIR
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </Provider>
   );
 }
@@ -509,7 +1024,19 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#ccc",
   },
-  totalTextGroup: { flexDirection: "row", alignItems: "center", gap: 8 },
+  totalTextGroup: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    flexShrink: 1,
+    gap: 8,
+  },
   totalText: { fontWeight: "bold", fontSize: 20 },
-  totalValue: { fontSize: 20, marginLeft: 4, fontWeight: "bold" },
+  totalValue: {
+    fontSize: 20,
+    marginLeft: 4,
+    fontWeight: "bold",
+    minWidth: 250,
+    textAlign: "right",
+  },
 });

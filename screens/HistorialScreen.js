@@ -927,7 +927,13 @@ export default function HistorialScreen({ navigation, route }) {
           <View style={{ flexDirection: "row", width: "100%" }}>
             <View style={{ flex: 1 }}>
               {total > 0 && (
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
                   <View
                     style={{
                       width: 20,
@@ -936,15 +942,17 @@ export default function HistorialScreen({ navigation, route }) {
                       borderRadius: 4,
                     }}
                   />
-                  <Text style={{ marginLeft: 4, fontSize: 20 }}>DEBO</Text>
+                  <Text style={{ marginLeft: 4, fontSize: 20, minWidth: 500 }}>
+                    DEBO
+                  </Text>
                 </View>
               )}
               {total < 0 && (
                 <View
                   style={{
+                    flex: 1,
                     flexDirection: "row",
                     alignItems: "center",
-                    borderRadius: 4,
                   }}
                 >
                   <View
@@ -955,11 +963,19 @@ export default function HistorialScreen({ navigation, route }) {
                       borderRadius: 4,
                     }}
                   />
-                  <Text style={{ marginLeft: 4, fontSize: 20 }}>ME DEBEN</Text>
+                  <Text style={{ marginLeft: 4, fontSize: 20, minWidth: 500 }}>
+                    ME DEBEN
+                  </Text>
                 </View>
               )}
               {total === 0 && (
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
                   <View
                     style={{
                       width: 20,
@@ -968,19 +984,28 @@ export default function HistorialScreen({ navigation, route }) {
                       borderRadius: 4,
                     }}
                   />
-                  <Text style={{ marginLeft: 4, fontSize: 20 }}>SIN DEUDA</Text>
+                  <Text
+                    style={{
+                      marginLeft: 4,
+                      fontSize: 20,
+                      minWidth: 500,
+                      alignItems: "center",
+                    }}
+                  >
+                    SIN DEUDA
+                  </Text>
                 </View>
               )}
             </View>
             <View style={styles.totalTextGroup}>
-              <Text style={styles.totalText}>TOTAL: </Text>
+              {/* <Text style={styles.totalText}>TOTAL: </Text> */}
               <Text
                 style={[
                   styles.totalValue,
                   { color: total < 0 ? "red" : total > 0 ? "green" : "black" },
                 ]}
               >
-                ₡{total.toFixed(0)}
+                TOTAL: ₡{total.toFixed(0)}
               </Text>
             </View>
           </View>
@@ -1578,17 +1603,21 @@ const styles = StyleSheet.create({
   totalTextGroup: {
     flexDirection: "row",
     alignItems: "flex-end",
-    flexShrink: 0,
+    justifyContent: "space-between",
+    flexShrink: 1,
     gap: 8, // si usas React Native >= 0.71, si no, usa marginRight
   },
   totalText: {
     fontWeight: "bold",
     fontSize: 20,
+    minWidth: 0,
   },
   totalValue: {
     fontSize: 20,
     marginLeft: 4,
     fontWeight: "bold",
+    minWidth: 250,
+    textAlign: "right",
   },
   circle: {
     borderRadius: 12,

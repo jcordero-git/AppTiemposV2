@@ -65,6 +65,19 @@ export function formatHour(fecha) {
   //   return timeStr;
   // }
 }
+
+export function formatHour_custom(fecha, customFormat) {
+  if (!fecha) return "";
+  return format(fecha, customFormat, { locale: es }).toUpperCase();
+
+  // try {
+  //   const date = parse(timeStr, "HH:mm:ss", new Date());
+  //   return format(date, "hh:mm a", { locale: es }).toUpperCase();
+  // } catch (e) {
+  //   return timeStr;
+  // }
+}
+
 export function formatHourStr(timeStr) {
   try {
     const date = parse(timeStr, "HH:mm:ss", new Date());
@@ -75,6 +88,7 @@ export function formatHourStr(timeStr) {
 }
 
 export function formatDateLocal(fecha, formatStr) {
+  console.log("fecha 3: ", fecha);
   if (!fecha) return "";
   const dateObj = typeof fecha === "string" ? new Date(fecha) : fecha;
   return format(dateObj, formatStr, { locale: es });

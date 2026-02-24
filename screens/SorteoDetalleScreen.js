@@ -56,12 +56,14 @@ export default function SorteoDetalleScreen({ navigation, route }) {
     const contenido = isFecha ? (
       <View style={styles.rowCenter}>
         <Ionicons name="calendar" size={20} style={{ marginRight: 8 }} />
-        <Text style={styles.bold}>
+        <Text style={[styles.bold, { minWidth: 60 }]}>
           [{convertNumero(parseInt(new Date().getDate()))}]
         </Text>
       </View>
     ) : (
-      <Text style={styles.bold}>[{item.restricted}]</Text>
+      <Text style={[styles.bold, { minWidth: 60, textAlignVertical: "top" }]}>
+        [{item.restricted}]
+      </Text>
     );
 
     // return (
@@ -85,10 +87,20 @@ export default function SorteoDetalleScreen({ navigation, route }) {
 
           {/* Columna derecha: monto y porcentaje */}
           <View style={styles.restriccionValores}>
-            <Text style={styles.restriccionAmount}>
+            <Text
+              style={[
+                styles.restriccionAmount,
+                { minWidth: 60, textAlign: "right" },
+              ]}
+            >
               (₡{item.restrictedAmount})
             </Text>
-            <Text style={styles.restriccionPercent}>
+            <Text
+              style={[
+                styles.restriccionPercent,
+                { minWidth: 30, textAlign: "right" },
+              ]}
+            >
               %{item.sellerRestrictedPercent}
             </Text>
           </View>
@@ -403,6 +415,8 @@ const styles = StyleSheet.create({
     //flexShrink: 1,
     //flexWrap: "wrap",
     maxWidth: "70%",
+    minWidth: 0,
+    flex: 1,
   },
 
   restriccionValores: {

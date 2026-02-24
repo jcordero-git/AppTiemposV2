@@ -1109,7 +1109,7 @@ const styles = StyleSheet.create({
   totalBar: {
     marginTop: 10,
     flexDirection: "row",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     paddingTop: 10,
     borderTopWidth: 1,
     borderColor: "#ccc",
@@ -1117,11 +1117,15 @@ const styles = StyleSheet.create({
   totalText: {
     fontWeight: "bold",
     fontSize: 20,
+    minWidth: 200,
+    textAlign: "left",
   },
   totalValue: {
     fontSize: 20,
     marginLeft: 4,
     fontWeight: "bold",
+    minWidth: 100,
+    textAlign: "right",
   },
   dialogWebContainer: {
     position: "fixed", // fijo en pantalla
@@ -1149,7 +1153,7 @@ const styles = StyleSheet.create({
   switchLabel: {
     fontSize: 14,
     color: "#333",
-    flexShrink: 1,
+    minWidth: 250,
   },
   inputContainer: {
     flexDirection: "row",

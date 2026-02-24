@@ -916,7 +916,7 @@ export default function VentaScreen({ navigation, route }) {
         new Promise((resolve) => window.setTimeout(resolve, ms));
       let tiempoSeleccionado;
       let intentos = 0;
-      const maxIntentos = 5;
+      const maxIntentos = 20;
       let procesadoCorrectamente = false;
 
       do {
@@ -1456,7 +1456,7 @@ export default function VentaScreen({ navigation, route }) {
           new Promise((resolve) => window.setTimeout(resolve, ms));
         let tiempoSeleccionado;
         let intentos = 0;
-        const maxIntentos = 5;
+        const maxIntentos = 20;
         let procesadoCorrectamente = false;
 
         do {
@@ -2914,7 +2914,7 @@ export default function VentaScreen({ navigation, route }) {
                         style={styles.switchRow}
                         onPress={() => setLimpiar(!limpiar)}
                       >
-                        <Text>Limpiar al imprimir</Text>
+                        <Text style={{ flex: 1 }}>Limpiar</Text>
                         <Switch value={limpiar} onValueChange={setLimpiar} />
                       </Pressable>
 
@@ -2924,10 +2924,10 @@ export default function VentaScreen({ navigation, route }) {
                       {useReventado && (
                         <>
                           <Pressable
-                            style={styles.switchRow}
+                            style={styles.switchRowRev}
                             onPress={() => handleReventarChange(!reventar)}
                           >
-                            <Text>Reventar</Text>
+                            <Text style={{ flex: 1 }}>Reventar</Text>
                             <Switch
                               value={reventar}
                               onValueChange={handleReventarChange}
@@ -3367,8 +3367,10 @@ export default function VentaScreen({ navigation, route }) {
                   )}
                 </View>
                 <View style={styles.totalTextGroup}>
-                  <Text style={styles.totalText}>TOTAL: </Text>
-                  <Text style={styles.totalValue}>₡{total?.toFixed(0)}</Text>
+                  {/* <Text style={styles.totalText}>TOTAL: </Text> */}
+                  <Text style={styles.totalValue}>
+                    TOTAL: ₡{total?.toFixed(0)}
+                  </Text>
                 </View>
               </View>
             </View>
@@ -3741,6 +3743,7 @@ export default function VentaScreen({ navigation, route }) {
                   fontWeight: "bold",
                   color: "#000",
                   fontSize: 18,
+                  minWidth: 300,
                 }}
               >
                 TIEMPOS VENDIDOS
@@ -3828,7 +3831,7 @@ export default function VentaScreen({ navigation, route }) {
                             alignItems: "center",
                           }}
                         >
-                          <Text style={{ fontWeight: "bold" }}>
+                          <Text style={{ fontWeight: "bold", minWidth: 500 }}>
                             Código: # {item.id || ""}
                           </Text>
                         </View>
@@ -3940,6 +3943,7 @@ export default function VentaScreen({ navigation, route }) {
                   fontWeight: "bold",
                   color: "#000",
                   fontSize: 18,
+                  minWidth: 400,
                 }}
               >
                 CATEGORÍAS PREDETERMINADAS
@@ -4237,6 +4241,7 @@ export default function VentaScreen({ navigation, route }) {
                     fontWeight: "bold",
                     color: "#000",
                     fontSize: 18,
+                    minWidth: 150,
                   }}
                 >
                   PRE CARGAR
@@ -4688,6 +4693,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
 
     borderColor: "#eee",
+    minWidth: 0,
   },
   itemRowRev: {
     flexDirection: "row",
@@ -4700,11 +4706,19 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
     marginLeft: 70,
+    flexShrink: 1,
+    minWidth: 90,
+    maxWidth: 90,
+    
   },
   itemRight: {
     fontWeight: "bold",
     fontSize: 16,
     marginRight: 70,
+    flexShrink: 1,
+    minWidth: 40,
+    maxWidth: 800,
+    textAlign: "center",
   },
   input: {
     borderBottomWidth: 1,
@@ -4744,13 +4758,34 @@ const styles = StyleSheet.create({
     marginVertical: Platform.OS === "web" ? 10 : 0, // solo en web,
     paddingHorizontal: 15,
   },
+
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center", // ✅ fuerza alineación vertical
+    //flex: 1, // 🔥
+    minWidth: 170, // 🔥 clave Motorola
     marginBottom: 10,
     gap: 5,
   },
+  switchRowRev: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center", // ✅ fuerza alineación vertical
+    //flex: 1, // 🔥
+    minWidth: 150, // 🔥 clave Motorola
+    marginBottom: 10,
+    gap: 5,
+  },
+  textWrapper: {
+    flex: 1, // 🔥 clave
+    minWidth: 0, // 🔥 CLAVE EN MOTOROLA
+    marginRight: 12,
+  },
+  switchLabel: {
+    flexShrink: 1, // permite reducir ancho
+  },
+
   iconButton: {
     width: 40,
     height: 40,
@@ -4795,17 +4830,21 @@ const styles = StyleSheet.create({
   totalTextGroup: {
     flexDirection: "row",
     alignItems: "flex-end",
-    flexShrink: 0,
+    justifyContent: "space-between",
+    flexShrink: 1,
     gap: 8, // si usas React Native >= 0.71, si no, usa marginRight
   },
   totalText: {
     fontWeight: "bold",
     fontSize: 20,
+    minWidth: 0,
   },
   totalValue: {
     fontSize: 20,
     marginLeft: 4,
     fontWeight: "bold",
+    minWidth: 250,
+    textAlign: "right",
   },
   dialogWebContainer: {
     position: "fixed", // fijo en pantalla

@@ -189,7 +189,12 @@ export default function LoginScreen({ navigation }) {
         </Pressable>
         <Pressable onPress={() => navigation.navigate("ResetPassword")}>
           <Text
-            style={{ marginTop: 15, color: "#4CAF50", textAlign: "center" }}
+            style={{
+              marginTop: 15,
+              color: "#4CAF50",
+              textAlign: "center",
+              minWidth: 300,
+            }}
           >
             Restablecer Contraseña
           </Text>

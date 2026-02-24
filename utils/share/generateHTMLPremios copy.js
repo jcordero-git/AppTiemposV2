@@ -1,0 +1,198 @@
+import { getInternetDate, formatDate, formatHour } from "../datetimeUtils"; // ajusta el path si es necesario
+
+export const generateHTMLPremios = async (
+  items,
+  total,
+  sorteoSeleccionado,
+  vendedorData,
+  ticketProfile,
+  numeroPremiado,
+  reventado,
+) => {
+  const {
+    phoneNumber,
+    printBarCode,
+    printerSize,
+    sellerName,
+    ticketFooter,
+    ticketTitle,
+  } = ticketProfile;
+
+  console.log("list items", items);
+
+  const renderLines = (list, useReventado = false) => {
+    const grouped = {};
+    list.forEach((n) => {
+      const monto = useReventado
+        ? parseInt(n.montoReventado)
+        : parseInt(n.monto);
+      if (!grouped[monto]) grouped[monto] = [];
+      grouped[monto].push(n.numero);
+    });
+
+    const rows = [];
+    Object.entries(grouped)
+      .sort((a, b) => parseInt(b[0]) - parseInt(a[0])) // orden ascendente por monto
+      .forEach(([monto, numeros]) => {
+        for (let i = 0; i < numeros.length; i += 3) {
+          const grupo = numeros.slice(i, i + 3);
+          rows.push(`
+          <tr>
+            <td style="width: 58px;">${monto}</td>
+            <td>* ${grupo.join(",&nbsp;")}</td>
+          </tr>
+        `);
+        }
+      });
+
+    return `
+      <table style="line-height: 0.6; width: 100%; font-family: monospace; font-size: 20px; text-align: left; margin-top: 4px; margin-bottom: 6px;">
+        ${rows.join("")}
+      </table>
+    `;
+  };
+
+  // Vendedor nombre y código concatenados
+  const vendedorNombre =
+    ticketProfile.sellerName?.trim() !== ""
+      ? ticketProfile.sellerName
+      : vendedorData.name || "";
+  const vendedorCodigo = vendedorData.userCode || "";
+  const telefono =
+    ticketProfile.phoneNumber?.trim() !== ""
+      ? ticketProfile.phoneNumber
+      : vendedorData.phone || "N/A";
+
+  // Porcentajes y valores desde sorteo o vendedor, según preferencia
+  // Preferencia a sorteoSeleccionado.userValues si existe
+  const prizeTimes =
+    sorteoSeleccionado.userValues?.prizeTimes ?? vendedorData.prizeTimes ?? "";
+  const sellerPercent =
+    sorteoSeleccionado.userValues?.sellerPercent ??
+    vendedorData.percentValue ??
+    "";
+  const revPrizeTimes =
+    sorteoSeleccionado.userValues?.revPrizeTimes ??
+    vendedorData.revPrizeTimes ??
+    "";
+  const revSellerPercent =
+    sorteoSeleccionado.userValues?.revSellerPercent ??
+    vendedorData.revPercentValue ??
+    "";
+
+  const htmlContent = `
+    <html>
+      <head>
+        <title>Ticket</title>
+        <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+        <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>        
+        <style>
+          @media print {
+            @page {
+                  size: 58mm auto;
+                  margin: 0;
+                }
+            body { margin: 0; }
+          }
+          body {
+            // width: 60mm;
+            font-family: monospace;
+            font-size: 12px;
+            padding: 0px;
+            margin: 0px;
+            text-align: center;
+            height: 100%;
+            line-height: 0.8;
+          }
+          h2, h3, h4 {
+            margin: 2px 0;
+          }
+          .line {
+            display: flex;
+            justify-content: flex-start;
+            font-size: 16px;
+            margin: 2px 0;
+          }
+          .divider {
+            border-top: 2px dashed #000;
+            margin: 6px 0;
+          }
+          .dividerInvisible {
+            border-top: 1px dashed rgba(19, 18, 18, 0.50);
+            margin: 6px 0;
+          }
+          .section-title {
+            font-weight: bold;
+            margin: 5px 0;
+          }
+          .barcode {
+            margin-top: 8px;
+            font-size: 18px;
+            letter-spacing: 2px;
+          }
+          .amount {
+            min-width: 60px;
+            text-align: left;
+            font-weight: bold;
+          }
+          .numbers {
+            text-align: left;
+          }
+        </style>
+      </head>
+      <body style="line-height: 0.8;">
+       
+       <div class="dividerInvisible" style="height: 2px;  margin-bottom: 2px;"></div>
+
+        <h3 style="width: 100%; font-family:  monospace; font-size:22px; margin-top: 4px;" >PREMIOS</h3>
+        <h3 style="width: 100%; font-family:  monospace; font-size: 22px; margin-top: 1px;" >${sorteoSeleccionado.name}</h3>
+
+        <table style="line-height: 0.8; text-align: left; font-family: monospace; font-size: 12px; margin-top: 8px; width: 100%;">
+        <tr>
+          <td>VENDEDOR:</td>
+          <td>${vendedorNombre} - ${vendedorCodigo}</td>
+        </tr>
+        <tr>
+          <td>TEL.:</td>
+          <td>${telefono || "N/A"}</td>
+        </tr>
+         <tr>
+          <td>CLIENTE:</td>
+          <td>nombrecliente || "Sin Nombre"}</td>
+        </tr>
+        <tr>
+          <td>SORTEO:</td>
+          <td>fecha, "dd/MM/yyyy")}</td>
+        </tr>
+        <tr>
+          <td>IMPRESIÓN:</td>
+          <td>${formatDate(new Date(), "dd/MM/yyyy hh:mm:a")} </td>
+        </tr>
+      </table>
+
+        <div class="divider"></div>
+
+
+        <div  style="line-height: 0.5;">
+        <div class="divider"></div>
+        <table style="width: 100%; line-height: 0.5; font-family: monospace; font-size: 20px; font-weight: bold; margin-top: 10px;">
+          <tr>
+            <td style="text-align: left;">TOTAL</td>
+            <td style="text-align: right;">${total}</td>
+          </tr>
+          </table>
+        <div class="divider"></div>
+
+       
+       </div>
+     
+
+        <div class="dividerInvisible" style="height: 2px;  margin-top: 40px;"></div>
+  
+
+      </body>
+    </html>
+  `;
+
+  return htmlContent;
+};
