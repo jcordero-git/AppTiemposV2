@@ -88,6 +88,8 @@ export default function VentaScreen({ navigation, route }) {
     useState(false);
   const [dialogPrintVisible, setDialogPrintVisible] = useState(false);
   const [dialogPrecargarVisible, setDialogPrecargarVisible] = useState(false);
+  const [dialogDesgloseVentaVisible, setDialogDesgloseVentaVisible] =
+    useState(false);
   const [codigo, setCodigo] = useState("");
   const [idTicketSeleccionado, setIdTicketSeleccionado] = useState(0);
   const [posisionSorteoModalAlaIzquierda, setposisionSorteoModalAlaIzquierda] =
@@ -105,6 +107,11 @@ export default function VentaScreen({ navigation, route }) {
   let tiempoNumerosBackup = null;
   const ejecutadoPorRestringidoDialogRef = useRef(false);
   const [hovered, setHovered] = useState(false);
+  const [totalHovered, setTotalHovered] = useState(false);
+
+  const [ventaTotalNormalFloat, setVentaTotalNormalFloat] = useState(0);
+  const [ventaTotalReventadosFloat, setVentaTotalReventadosFloat] = useState(0);
+  const [ventaTotalTotalFloat, setVentaTotalTotalFloat] = useState(0);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [modalCameraVisible, setModalCameraVisible] = useState(false);
@@ -217,6 +224,10 @@ export default function VentaScreen({ navigation, route }) {
     setNumero("");
     //numeroRef.current?.focus();
     setDialogRestringidoVisible(false);
+  };
+
+  const closeDialogDesgloseVenta = async () => {
+    setDialogDesgloseVentaVisible(false);
   };
 
   const closeDialogPreCarga = async () => {
@@ -764,6 +775,78 @@ export default function VentaScreen({ navigation, route }) {
     });
 
     mSorteo.restringidos = reglasProcesadas;
+  };
+
+  const handleMuestraDesgloseVenta = async (resultado) => {
+    Keyboard.dismiss(); // Oculta el teclado
+    const actualizaTiemposVendidos = async () => {
+      const { tiemposVendidos, lastTicketNumber } =
+        await fetchTiemposAnteriores(
+          tiempoRef.current?.drawCategoryId,
+          tiempoRef.current?.drawDate,
+        );
+    };
+    actualizaTiemposVendidos();
+
+    const tiemposVendidos = tiemposAnteriores.filter(
+      (item) => item.status === 201,
+    );
+
+    const agrupados = {};
+
+    tiemposVendidos.forEach((ticket) => {
+      ticket.numbers.forEach(({ numero, monto, montoReventado, reventado }) => {
+        if (!agrupados[numero]) {
+          agrupados[numero] = {
+            numero,
+            monto: 0,
+            montoReventado: 0,
+            reventado: false,
+          };
+        }
+
+        agrupados[numero].monto += monto;
+        agrupados[numero].montoReventado += montoReventado;
+
+        // Si al menos uno es reventado, se marca como true
+        if (reventado) {
+          agrupados[numero].reventado = true;
+        }
+      });
+    });
+    const items = Array.from({ length: 100 }, (_, i) => {
+      const numero = i.toString().padStart(2, "0");
+      return agrupados[numero]
+        ? { ...agrupados[numero], key: generateKey() }
+        : {
+            numero,
+            monto: 0,
+            montoReventado: 0,
+            reventado: false,
+            key: generateKey(),
+          };
+    });
+
+    //Aquí sumás los montos normales
+    const totalNormal = items.reduce((acc, item) => acc + item.monto, 0);
+
+    //Aquí sumás los montos normales
+    const totalReventados = items.reduce(
+      (acc, item) => acc + item.montoReventado,
+      0,
+    );
+
+    //Aquí sumás los montos normales + reventados
+    const totalTotal = items.reduce(
+      (acc, item) => acc + item.monto + item.montoReventado,
+      0,
+    );
+
+    setVentaTotalNormalFloat(totalNormal);
+    setVentaTotalReventadosFloat(totalReventados);
+    setVentaTotalTotalFloat(totalTotal); // ⬅️ Guardás en el estado
+
+    setDialogDesgloseVentaVisible(true);
   };
 
   const [restringidosDisponibles, setRestrigosDisponibles] = useState([]);
@@ -3331,14 +3414,26 @@ export default function VentaScreen({ navigation, route }) {
             </View>
             {/* Total */}
             <View style={styles.totalBar}>
-              <View style={{ flexDirection: "row", width: "100%" }}>
-                <View style={{ flex: 1 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  width: "100%",
+                }}
+              >
+                {/* IZQUIERDA → ICONOS */}
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
                   {mostrarCampos && (
                     <>
                       <Pressable
-                        onPress={() => {
-                          handleMuestraRestringidosDisponibles();
-                        }}
+                        onPress={handleMuestraRestringidosDisponibles}
                         onHoverIn={() =>
                           Platform.OS === "web" && setHovered(true)
                         }
@@ -3349,25 +3444,55 @@ export default function VentaScreen({ navigation, route }) {
                       >
                         <MaterialIcons name="warning" size={24} color="green" />
                       </Pressable>
-                      <RestringidosModal
-                        visible={restringidosModalVisible}
-                        onClose={() => setRestringidosModalVisible(false)}
-                        onSelect={(sorteo) => {}}
-                        data={restringidosDisponibles}
-                        useReventado={mSorteo.useReventado}
-                      />
+
+                      <Pressable
+                        onPress={handleMuestraDesgloseVenta}
+                        onHoverIn={() =>
+                          Platform.OS === "web" && setTotalHovered(true)
+                        }
+                        onHoverOut={() =>
+                          Platform.OS === "web" && setTotalHovered(false)
+                        }
+                        style={styles.iconButtonRestringidos}
+                      >
+                        <MaterialIcons
+                          name="price-change"
+                          size={24}
+                          color="black"
+                        />
+                      </Pressable>
+
+                      {/* TOOLTIP WARNING */}
                       {hovered && (
-                        <View style={styles.tooltip}>
+                        <View style={styles.tooltip} pointerEvents="none">
                           <Text style={styles.tooltipText}>
-                            Ver números restingidos
+                            Ver números restringidos
                           </Text>
                         </View>
                       )}
+
+                      {/* TOOLTIP TOTAL */}
+                      {totalHovered && (
+                        <View style={styles.tooltip} pointerEvents="none">
+                          <Text style={styles.tooltipText}>
+                            Ver desglose total
+                          </Text>
+                        </View>
+                      )}
+
+                      <RestringidosModal
+                        visible={restringidosModalVisible}
+                        onClose={() => setRestringidosModalVisible(false)}
+                        onSelect={() => {}}
+                        data={restringidosDisponibles}
+                        useReventado={mSorteo.useReventado}
+                      />
                     </>
                   )}
                 </View>
+
+                {/* DERECHA → TOTAL */}
                 <View style={styles.totalTextGroup}>
-                  {/* <Text style={styles.totalText}>TOTAL: </Text> */}
                   <Text style={styles.totalValue}>
                     TOTAL: ₡{total?.toFixed(0)}
                   </Text>
@@ -4583,6 +4708,101 @@ export default function VentaScreen({ navigation, route }) {
           </Dialog.Actions>
         </Dialog>
         {/* )} */}
+
+        <Dialog
+          visible={dialogDesgloseVentaVisible}
+          onDismiss={closeDialogDesgloseVenta}
+          style={[
+            {
+              backgroundColor: "white", // Fondo blanco
+              borderRadius: 10, // Bordes redondeados
+              marginHorizontal: 20, // Margen lateral
+            },
+            isWeb && {
+              position: "absolute",
+              // right: 0,
+              // top: 10,
+              bottom: 55,
+              left: 0,
+              width: 400,
+              maxHeight: "90%",
+              elevation: 4, // sombra en Android
+              shadowColor: "#000", // sombra en iOS
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.3,
+              shadowRadius: 4,
+            },
+          ]}
+        >
+          <Dialog.Content>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <MaterialIcons name="info" size={35} color="#000" />
+              <Text
+                style={{
+                  marginLeft: 8,
+                  fontWeight: "bold",
+                  color: "#000",
+                  fontSize: 18,
+                }}
+              >
+                DESGLOCE DE VENTA
+              </Text>
+            </View>
+            <>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  alignItems: "center", // opcional: centra verticalmente también
+                  pointerEvents: "none",
+                }}
+              ></View>
+              <View style={{ alignItems: "center", marginTop: 10 }}>
+                {useReventado && (
+                  <>
+                    <View style={{ flexDirection: "row", marginBottom: 4 }}>
+                      <Text style={styles.labelLeft}>NORMAL:</Text>
+                      <Text style={styles.labelRight}>
+                        ₡{ventaTotalNormalFloat}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: "row", marginBottom: 4 }}>
+                      <Text style={styles.labelLeft}>REVENTADOS:</Text>
+                      <Text style={styles.labelRight}>
+                        ₡{ventaTotalReventadosFloat}
+                      </Text>
+                    </View>
+                  </>
+                )}
+
+                <View style={{ flexDirection: "row", marginBottom: 4 }}>
+                  <Text style={styles.labelLeft}>TOTAL:</Text>
+                  <Text style={styles.labelRight}>₡{ventaTotalTotalFloat}</Text>
+                </View>
+              </View>
+            </>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button
+              textColor="red"
+              style={{
+                backgroundColor: "white", // Fondo blanco
+                marginBottom: 10,
+                borderRadius: 3,
+              }}
+              onPress={closeDialogDesgloseVenta}
+            >
+              CERRAR
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
       </Portal>
 
       <SorteoSelectorModal
@@ -4618,6 +4838,24 @@ const styles = StyleSheet.create({
     paddingLeft: 16,
     paddingBottom: 16,
     justifyContent: "flex-start",
+  },
+  labelLeft: {
+    padding: 8,
+    marginBottom: 10,
+    fontWeight: "bold",
+    minWidth: 140,
+    marginTop: 0,
+    textAlign: "left",
+    width: 140,
+  },
+  labelRight: {
+    padding: 8,
+    marginBottom: 10,
+    fontWeight: "bold",
+    minWidth: 140,
+    marginTop: 0,
+    textAlign: "right",
+    width: 140,
   },
   header: {
     flexDirection: "row",
@@ -4709,7 +4947,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     minWidth: 90,
     maxWidth: 90,
-    
   },
   itemRight: {
     fontWeight: "bold",
@@ -4862,15 +5099,18 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -24,
     left: 0,
+    minWidth: 160,
     backgroundColor: "#4CAF50",
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 4,
     zIndex: 10,
+    alignItems: "center",
   },
   tooltipText: {
     color: "white",
     fontSize: 12,
+    flexWrap: "wrap",
   },
   reventarHeader: {
     flexDirection: "row",
