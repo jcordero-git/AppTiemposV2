@@ -1,20 +1,62 @@
 import React, { useState, useEffect } from "react";
-import { ScrollView, TextInput, View, Text, StyleSheet } from "react-native";
+import {
+  ScrollView,
+  TextInput,
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Platform,
+} from "react-native";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 export default function TablaRestricciones({ data, useReventado }) {
-  //   const [searchText, setSearchText] = useState("");
-  //   const [filteredData, setFilteredData] = useState(data);
+  // Componente interno para manejar el hover de cada icono individualmente
+  const ScopeIconWithTooltip = ({ scope }) => {
+    const [hovered, setHovered] = useState(false);
 
-  //   useEffect(() => {
-  //     if (!searchText) {
-  //       setFilteredData(data);
-  //     } else {
-  //       const lower = searchText.toLowerCase();
-  //       setFilteredData(
-  //         data.filter((item) => item.numero.toString().includes(lower)),
-  //       );
-  //     }
-  //   }, [searchText, data]);
+    let iconName = "";
+    let tooltipText = "";
+
+    switch (scope) {
+      case "global":
+        iconName = "public";
+        tooltipText = "Global";
+        break;
+      case "group":
+      case "grupal":
+        iconName = "group";
+        tooltipText = "Grupal";
+        break;
+      case "user":
+      case "usuario":
+      case "individual":
+      case "individuo":
+        iconName = "person";
+        tooltipText = "Individual";
+        break;
+    }
+
+    if (!iconName) return null;
+
+    return (
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
+        <Pressable
+          onHoverIn={() => Platform.OS === "web" && setHovered(true)}
+          onHoverOut={() => Platform.OS === "web" && setHovered(false)}
+          onPressIn={() => Platform.OS !== "web" && setHovered(true)}
+          onPressOut={() => Platform.OS !== "web" && setHovered(false)}
+        >
+          <MaterialIcons name={iconName} size={20} color="#555" />
+        </Pressable>
+        {hovered && (
+          <View style={styles.tooltip} pointerEvents="none">
+            <Text style={styles.tooltipText}>{tooltipText}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -27,16 +69,26 @@ export default function TablaRestricciones({ data, useReventado }) {
             {useReventado && (
               <Text style={[styles.cell, styles.headerCell]}>Reventado</Text>
             )}
+            <Text style={[styles.cell, styles.headerCell]}>Alcance</Text>
           </View>
 
           {/* Filas */}
           {data.map((item, index) => (
             <View key={index} style={styles.row}>
               <Text style={styles.cell}>{item.numero}</Text>
-              <Text style={styles.cell}>₡{item.monto.toFixed(0)}</Text>
+              <Text style={styles.cell}>
+                ₡{Number(item.monto || 0).toFixed(0)}
+              </Text>
               {useReventado && (
-                <Text style={styles.cell}>₡{item.rev_monto.toFixed(0)}</Text>
+                <Text style={styles.cell}>
+                  {item.rev_monto
+                    ? `₡${Number(item.rev_monto).toFixed(0)}`
+                    : "-"}
+                </Text>
               )}
+              <View style={[styles.cell, { alignItems: "center" }]}>
+                <ScopeIconWithTooltip scope={item.scope} />
+              </View>
             </View>
           ))}
         </View>
@@ -72,4 +124,22 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
   },
+  tooltip: {
+    position: "absolute",
+    top: -24,
+    backgroundColor: "#4CAF50",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    zIndex: 10,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  tooltipText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
 });
+
+

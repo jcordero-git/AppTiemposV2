@@ -9,16 +9,17 @@ import {
   TextInput,
   useWindowDimensions,
   StyleSheet,
+  Pressable,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { formatHourStr } from "../utils/datetimeUtils";
 import { convertNumero, validateMonto } from "../utils/numeroUtils";
 
 export default function SorteoDetalleScreen({ navigation, route }) {
   const { sorteo, userData } = route.params;
   const [reventar, setReventar] = useState(false);
-  const [fechaRestringida, setFechaRestringida] = useState(false);
   const [restricciones, setRestricciones] = useState([]);
+  const [fechaConsulta, setFechaConsulta] = useState("");
   const [hora, setHora] = useState("");
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
@@ -36,20 +37,61 @@ export default function SorteoDetalleScreen({ navigation, route }) {
       setReventar(sorteo.useReventado);
     if (!userData?.id || !sorteo?.id) return;
 
-    const endpoint = `${backend_url}/api/restrictedNumbers/byUser/${userData.id}/${sorteo.id}`;
+    const endpoint = `${backend_url}/api/v2/restrictedNumbers/status?drawCategoryId=${sorteo.id}&token=${userData.token}`;
     fetch(endpoint)
       .then((res) => res.json())
       .then((data) => {
-        setRestricciones(data);
-        const tieneFecha = data.some((regla) => regla.restricted === "{DATE}");
-        setFechaRestringida(tieneFecha);
+        if (data && data.rules) {
+          if (data.date) setFechaConsulta(data.date);
+          const groupedRules = data.rules.reduce((acc, rule) => {
+            const num = rule.number;
+            if (!acc[num] || rule.available < acc[num].available) {
+              acc[num] = rule;
+            }
+            return acc;
+          }, {});
+
+          const processed = Object.values(groupedRules)
+            .map((rule) => ({
+              restricted: rule.number,
+              scope: rule.scope,
+              limitType: rule.limitType,
+              limit: rule.limit,
+              percentage: rule.percentage,
+            }))
+            .sort((a, b) => parseInt(a.restricted) - parseInt(b.restricted));
+          setRestricciones(processed);
+        } else {
+          setRestricciones([]);
+        }
       })
       .catch((err) => console.error("Error al cargar restricciones:", err));
-  }, [sorteo, userData]);
+  }, [sorteo, userData, backend_url]);
 
   useLayoutEffect(() => {
     navigation.setOptions({ title: sorteo.name });
   }, [navigation, sorteo]);
+
+  const ScopeIcon = ({ scope }) => {
+    let iconName = "";
+    switch (scope) {
+      case "global":
+        iconName = "public";
+        break;
+      case "group":
+      case "grupal":
+        iconName = "group";
+        break;
+      case "user":
+      case "usuario":
+      case "individual":
+      case "individuo":
+        iconName = "person";
+        break;
+    }
+    if (!iconName) return null;
+    return <MaterialIcons name={iconName} size={20} color="#555" />;
+  };
 
   const renderRestriccion = ({ item }) => {
     const isFecha = item.restricted === "{DATE}";
@@ -66,42 +108,20 @@ export default function SorteoDetalleScreen({ navigation, route }) {
       </Text>
     );
 
-    // return (
-    //   <View style={styles.restriccionItem}>
-    //     <View style={styles.rowCenter}>{contenido}</View>
-    //     <View style={styles.rowCenter}>
-    //       <Text style={styles.restriccionAmount}>
-    //         (₡{item.restrictedAmount})
-    //       </Text>
-    //       <Text style={styles.restriccionPercent}>
-    //         %{item.sellerRestrictedPercent}
-    //       </Text>
-    //     </View>
-    //   </View>
-    // );
     return (
       <View style={styles.restriccionItem}>
         <View style={styles.restriccionRow}>
-          {/* Columna de contenido (números o fecha) */}
-          <View style={styles.restriccionCol}>{contenido}</View>
-
-          {/* Columna derecha: monto y porcentaje */}
-          <View style={styles.restriccionValores}>
-            <Text
-              style={[
-                styles.restriccionAmount,
-                { minWidth: 60, textAlign: "right" },
-              ]}
-            >
-              (₡{item.restrictedAmount})
+          <View style={[styles.restriccionCol, { flex: 1 }]}>{contenido}</View>
+          <View style={[styles.restriccionValores, { flex: 5, justifyContent: "space-between" }]}>
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <ScopeIcon scope={item.scope} />
+            </View>
+            <Text style={[styles.cellText, { flex: 2, textAlign: "center" }]} numberOfLines={1}>{item.limitType || "--"}</Text>
+            <Text style={[styles.cellText, { flex: 2, textAlign: "right" }]} numberOfLines={1}>
+              {item.limit != null ? `₡${item.limit}` : "--"}
             </Text>
-            <Text
-              style={[
-                styles.restriccionPercent,
-                { minWidth: 30, textAlign: "right" },
-              ]}
-            >
-              %{item.sellerRestrictedPercent}
+            <Text style={[styles.cellText, { flex: 1, textAlign: "right" }]} numberOfLines={1}>
+              {item.limitType === "percentage" ? `${item.percentage}%` : "--"}
             </Text>
           </View>
         </View>
@@ -191,34 +211,42 @@ export default function SorteoDetalleScreen({ navigation, route }) {
           </View>
         </View>
 
-        <View style={[styles.listContainer, !isWeb && { marginTop: 0 }]}>
+        <View style={[styles.listContainer, isWeb ? { flex: 1, alignSelf: 'flex-start' } : { marginTop: 0, width: '100%' }]}>
           <View style={styles.restriccionesHeader}>
             <View style={styles.line} />
             <Text style={styles.restriccionesTitle}>
               Reglas de restringidos
             </Text>
+
+            {fechaConsulta ? (
+              <Text style={styles.restriccionesTitle}>
+                {fechaConsulta}
+              </Text>
+            ) : null}
+
+
+
             <View style={styles.line} />
-            {/* <TouchableOpacity
-              disabled={true}
-              style={styles.restriccionesAddButton}
-            >
-              <Ionicons name="add" size={24} />
-            </TouchableOpacity> */}
           </View>
 
-          <View style={styles.switchRow}>
-            <Text style={styles.label}>Restringir Fecha</Text>
-            <Switch
-              value={fechaRestringida}
-              disabled={true}
-              onValueChange={setFechaRestringida}
-            />
-          </View>
+
 
           <FlatList
             data={restricciones}
             keyExtractor={(_, idx) => idx.toString()}
             renderItem={renderRestriccion}
+            style={styles.tableContainer}
+            ListHeaderComponent={() => (
+              <View style={styles.headerRow}>
+                <Text style={[styles.headerText, { flex: 1 }]}>#</Text>
+                <View style={[styles.headerRowValues, { flex: 5, flexDirection: "row" }]}>
+                  <Text style={[styles.headerText, { flex: 1, textAlign: "center" }]}>Alcance</Text>
+                  <Text style={[styles.headerText, { flex: 2, textAlign: "center" }]}>Tipo</Text>
+                  <Text style={[styles.headerText, { flex: 2, textAlign: "right" }]}>Límite</Text>
+                  <Text style={[styles.headerText, { flex: 1, textAlign: "right" }]}>%</Text>
+                </View>
+              </View>
+            )}
           />
         </View>
       </View>
@@ -248,8 +276,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   listContainer: {
-    flex: 1,
-    maxHeight: 900, // puedes ajustar esto según el diseño deseado
+    maxHeight: 900,
   },
   webPanelLeft: {
     marginRight: 20,
@@ -399,7 +426,7 @@ const styles = StyleSheet.create({
     width: "100%",
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
+    borderBottomColor: "#eee",
   },
 
   restriccionRow: {
@@ -435,5 +462,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "bold",
     color: "#c00",
+  },
+
+  fechaConsultaText: {
+    fontSize: 12,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 10,
+    fontStyle: "italic",
+  },
+
+  // Taget: header
+  headerRow: {
+    flexDirection: "row",
+    backgroundColor: "rgba(76, 175, 80, 0.80)",
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+
+  headerRowValues: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  headerText: {
+    fontWeight: "bold",
+    fontSize: 14,
+    color: "#333",
+  },
+
+  cellText: {
+    fontSize: 14,
+    color: "#333",
+  },
+
+  tableContainer: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    overflow: "hidden",
+    width: "100%",
+    maxHeight: 500,
+    flexGrow: 0, // Evita que crezca si el contenido es pequeño
   },
 });
