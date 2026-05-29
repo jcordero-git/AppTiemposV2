@@ -53,7 +53,7 @@ import RestringidosModal from "../components/RestringidosModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton";
 import { useTiempo } from "../models/mTiempoContext";
-import { convertNumero, validateMonto } from "../utils/numeroUtils";
+import { convertNumero, validateMonto, expandRestrictedRules } from "../utils/numeroUtils";
 import { parseMessage } from "../utils/UtilParseMessageAI";
 import Constants from "expo-constants";
 import { formatDate, formatDateLocal } from "../utils/datetimeUtils"; // ajusta el path si es necesario
@@ -876,7 +876,8 @@ export default function VentaScreen({ navigation, route }) {
 
       if (data && data.rules) {
         // Agrupar por número y quedarse con el de menor monto disponible
-        const groupedRules = data.rules.reduce((acc, rule) => {
+        const expandedRules = expandRestrictedRules(data.rules, "number");
+        const groupedRules = expandedRules.reduce((acc, rule) => {
           const num = rule.number;
           if (!acc[num] || rule.available < acc[num].available) {
             acc[num] = rule;

@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { formatHourStr } from "../utils/datetimeUtils";
-import { convertNumero, validateMonto } from "../utils/numeroUtils";
+import { convertNumero, validateMonto, expandRestrictedRules } from "../utils/numeroUtils";
 
 export default function SorteoDetalleScreen({ navigation, route }) {
   const { sorteo, userData } = route.params;
@@ -43,7 +43,8 @@ export default function SorteoDetalleScreen({ navigation, route }) {
       .then((data) => {
         if (data && data.rules) {
           if (data.date) setFechaConsulta(data.date);
-          const groupedRules = data.rules.reduce((acc, rule) => {
+          const expandedRules = expandRestrictedRules(data.rules, "number");
+          const groupedRules = expandedRules.reduce((acc, rule) => {
             const num = rule.number;
             if (!acc[num] || rule.available < acc[num].available) {
               acc[num] = rule;
@@ -211,7 +212,7 @@ export default function SorteoDetalleScreen({ navigation, route }) {
           </View>
         </View>
 
-        <View style={[styles.listContainer, isWeb ? { flex: 1, alignSelf: 'flex-start' } : { marginTop: 0, width: '100%' }]}>
+        <View style={[styles.listContainer, isWeb ? { flex: 1 } : { marginTop: 0, width: '100%' }]}>
           <View style={styles.restriccionesHeader}>
             <View style={styles.line} />
             <Text style={styles.restriccionesTitle}>
@@ -235,7 +236,7 @@ export default function SorteoDetalleScreen({ navigation, route }) {
             data={restricciones}
             keyExtractor={(_, idx) => idx.toString()}
             renderItem={renderRestriccion}
-            style={styles.tableContainer}
+            style={[styles.tableContainer, isWeb && { maxHeight: 'none', flex: 1 }]}
             ListHeaderComponent={() => (
               <View style={styles.headerRow}>
                 <Text style={[styles.headerText, { flex: 1 }]}>#</Text>
@@ -267,7 +268,6 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     padding: 20,
     flex: 1,
-    pointerEvents: "none",
   },
   webLayout: {
     flexDirection: "row",
@@ -505,6 +505,5 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     width: "100%",
     maxHeight: 500,
-    flexGrow: 0, // Evita que crezca si el contenido es pequeño
   },
 });
