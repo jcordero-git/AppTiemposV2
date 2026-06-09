@@ -315,8 +315,9 @@ export default function VentaGeneralScreen({ navigation, route }) {
               };
             }
 
-            agrupados[numero].monto += monto;
-            agrupados[numero].montoReventado += montoReventado;
+            // Forzamos suma numérica
+            agrupados[numero].monto += Number(monto || 0);
+            agrupados[numero].montoReventado += Number(montoReventado || 0);
 
             // Si al menos uno es reventado, se marca como true
             if (reventado) {
@@ -338,12 +339,12 @@ export default function VentaGeneralScreen({ navigation, route }) {
             };
       });
 
-      // 🔴 Aquí sumás los montos normales + reventados
+      // 🔴 Aseguramos que la suma sea numérica forzando Number()
       const total = items.reduce(
-        (acc, item) => acc + item.monto + item.montoReventado,
+        (acc, item) => acc + Number(item.monto || 0) + Number(item.montoReventado || 0),
         0,
       );
-      setMontoTotal(total); // ⬅️ Guardás en el estado
+      setMontoTotal(total);
 
       // Ordenar verticalmente: columnas de 25
       const columnas = [[], [], [], []]; // 4 columnas
@@ -379,53 +380,39 @@ export default function VentaGeneralScreen({ navigation, route }) {
   const skipNextEffect = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-
       const load = async () => {
-        // 1. Obtener y setear fecha
+        // 1. Snapshot inmediato de la realidad (Singleton)
         const fechaActual = mFechaSeleccionada.getFecha();
-
-        skipNextEffect.current = true;
+        const currentDrawId = mSorteo.id;
+        
+        // 2. Sincronizar UI
         setFecha(fechaActual);
+        setSorteoId(currentDrawId);
+        setSorteoNombre(mSorteo.name);
 
-        // 2. Cargar sorteo
-        if (mSorteo.id !== 0) {
-          await cargaSorteoSeleccionado();
-        }
-
-        // 3. Esperar datos para fetch
-        const drawId = mSorteo.id || sorteoId;
-        if (fechaActual && drawId && userData?.id) {
-          mFechaSeleccionada.setFecha(fechaActual);
-          console.log("entro a actualizar desde useFocusEffect");
-          actualizaDesdeHeader(fechaActual, drawId, userData);
+        // 3. Ejecutar fetch solo si hay datos válidos
+        if (fechaActual && currentDrawId && currentDrawId !== 0) {
+          actualizaDesdeHeader(fechaActual, currentDrawId, userData);
+        } else {
+          setItemsGrid([]);
+          setMontoTotal(0);
         }
       };
 
       load();
-
+      
       return () => {
-        isActive = false;
+        // cleanup si fuera necesario
       };
-    }, [userData?.id, sorteoId, mSorteo.id]),
+    }, [userData?.id]), // Quitamos sorteoId para evitar disparos dobles
   );
 
+  // Hook para cambios de fecha (incluyendo Web)
   useEffect(() => {
-    // if (skipNextEffect.current) {
-    //   skipNextEffect.current = false;
-    //   return;
-    // }
-
-    if (!fecha || !sorteoId || !userData?.id) return;
-
-    const load = async () => {
-      mFechaSeleccionada.setFecha(fecha);
-      console.log("entro a actualizar desde useEfect");
-      actualizaDesdeHeader(fecha, sorteoId, userData);
-    };
-
-    load();
-  }, [fecha, sorteoId, userData?.id]);
+    if (fecha && mSorteo.id && mSorteo.id !== 0) {
+      actualizaDesdeHeader(fecha, mSorteo.id, userData);
+    }
+  }, [fecha]);
 
   // useFocusEffect(
   //   useCallback(() => {
@@ -579,19 +566,21 @@ export default function VentaGeneralScreen({ navigation, route }) {
                   <SorteoSelectorModal
                     visible={modalVisible}
                     onClose={() => setModalVisible(false)}
-                    onSelect={(sorteo) => {
-                      Object.assign(mSorteo, sorteo); // ✅ Copia las propiedades sin reemplazar el objeto
+                      onSelect={(sorteo) => {
+                        Object.assign(mSorteo, sorteo); 
 
-                      setSorteoId(mSorteo.id);
-                      setSorteoNombre(mSorteo.name);
-                      setUseReventado(mSorteo.useReventado);
-                      setReventar(false);
-                      setMontoReventado("");
-                      setTiempo((prev) => ({
-                        ...prev,
-                        sorteoId: sorteo.id,
-                      }));
-                    }}
+                        setSorteoId(mSorteo.id);
+                        setSorteoNombre(mSorteo.name);
+                        setUseReventado(mSorteo.useReventado);
+                        setReventar(false);
+                        setMontoReventado("");
+                        setTiempo((prev) => ({
+                          ...prev,
+                          sorteoId: sorteo.id,
+                        }));
+                        // Actualización inmediata al seleccionar
+                        actualizaDesdeHeader(fecha, mSorteo.id, userData);
+                      }}
                     leftPosition={true}
                   />
 
@@ -648,7 +637,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
             <View style={styles.totalBar}>
               {/* <Text style={styles.totalText}>TOTAL: </Text> */}
               <Text style={styles.totalValue}>
-                TOTAL: ₡{montoTotal?.toFixed(0)}
+                TOTAL: ₡{Number(montoTotal || 0).toFixed(0)}
               </Text>
             </View>
           </View>

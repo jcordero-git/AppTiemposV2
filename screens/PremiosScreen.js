@@ -67,8 +67,7 @@ export default function PremiosScreen({ navigation }) {
   const [numero, setNumero] = useState("");
   const numeroRef = useRef(null);
 
-  // 🔹 Ahora es un useRef
-  const tiemposAnterioresRef = useRef([]);
+  const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 
   const [colorIndex, setColorIndex] = useState(0);
   const colors = ["white", "red"];
@@ -77,7 +76,7 @@ export default function PremiosScreen({ navigation }) {
 
   const tiemposFiltrados =
     numero.trim().length === 2
-      ? tiemposAnterioresRef.current
+      ? tiemposAnteriores
           .filter((item) =>
             item.numbers?.some((n) => n.numero === numero.trim()),
           )
@@ -335,28 +334,26 @@ export default function PremiosScreen({ navigation }) {
 
   const handleDateChange = (event, selectedDate) => {
     setShowPicker(false);
-    if (event.type === "dismissed") return; // 🚫 ignorar cancel
-    if (selectedDate) setFecha(selectedDate);
+    if (event.type === "dismissed") return; 
+    if (selectedDate) {
+      setFecha(selectedDate);
+      fetchTiemposAnteriores(mSorteo.id, formatDate(selectedDate, "yyyy-MM-dd"));
+    }
   };
 
   const fetchTiemposAnteriores = async (drawCategoryId, drawDate) => {
     try {
-      if (drawCategoryId === 0 || !drawDate) {
-        tiemposAnterioresRef.current = [];
+      if (!drawCategoryId || drawCategoryId === 0 || !drawDate) {
+        setTiemposAnteriores([]);
         return;
       }
-      // const response = await fetch(
-      //   `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${token}`,
-      //   { method: "GET", headers: { "Content-Type": "application/json" } },
-      // );
-      const apkVersion =
-        Constants.manifest?.version || Constants.expoConfig?.version;
+      setLoading(true);
+      const apkVersion = Constants.manifest?.version || Constants.expoConfig?.version;
       const response = await fetch(
         `${backend_url}/api/ticket/${drawCategoryId}/${drawDate}/${userData.id}?token=${userData.token}`,
         {
           method: "GET",
           headers: {
-            //"x-access-token": `${token}`,
             "Content-Type": "application/json",
             "jj-apk-version": apkVersion,
           },
@@ -365,12 +362,12 @@ export default function PremiosScreen({ navigation }) {
       if (response.status === 403) {
         showSnackbar("⚠️ El usuario no tiene permisos.");
         logout();
-        tiemposAnterioresRef.current = [];
+        setTiemposAnteriores([]);
         return;
       }
       if (response.status !== 200) {
-        showSnackbar("⚠️ Error al obtener tiempos vendidos");
-        tiemposAnterioresRef.current = [];
+        // showSnackbar("⚠️ Error al obtener premios del sorteo");
+        setTiemposAnteriores([]);
         return;
       }
       const data = await response.json();
@@ -378,10 +375,12 @@ export default function PremiosScreen({ navigation }) {
         .filter((item) => item.status === 201)
         .sort((a, b) => b.id - a.id);
 
-      tiemposAnterioresRef.current = sortedData;
+      setTiemposAnteriores(sortedData);
     } catch (error) {
-      console.error("Error al cargar tiempos anteriores:", error);
-      tiemposAnterioresRef.current = [];
+      console.error("Error al cargar premios:", error);
+      setTiemposAnteriores([]);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -395,57 +394,39 @@ export default function PremiosScreen({ navigation }) {
   const skipNextEffect = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      let isActive = true;
-
       const load = async () => {
-        // 1. Obtener y setear fecha
+        // 1. Snapshot inmediato de la realidad (Singleton)
         const fechaActual = mFechaSeleccionada.getFecha();
-
-        skipNextEffect.current = true;
+        const currentDrawId = mSorteo.id;
+        
+        // 2. Sincronizar UI
         setFecha(fechaActual);
+        setSorteoId(currentDrawId);
+        setSorteoNombre(mSorteo.name);
+        setNumero("");
 
-        // 2. Cargar sorteo
-        if (mSorteo.id !== 0) {
-          await cargaSorteoSeleccionado();
-        }
-
-        // 3. Esperar datos para fetch
-        const drawId = mSorteo.id || sorteoId;
-        if (fechaActual && drawId && userData?.id) {
-          mFechaSeleccionada.setFecha(fechaActual);
+        // 3. Ejecutar fetch solo si hay datos válidos
+        if (fechaActual && currentDrawId && currentDrawId !== 0) {
           await fetchTiemposAnteriores(
-            drawId,
+            currentDrawId,
             formatDate(fechaActual, "yyyy-MM-dd"),
           );
+        } else {
+          setTiemposAnteriores([]);
         }
       };
 
       load();
-      setNumero("");
-
-      return () => {
-        isActive = false;
-      };
-    }, [userData?.id, sorteoId]),
+      
+    }, [userData?.id]), 
   );
 
+  // Hook para cambios de fecha (incluyendo Web)
   useEffect(() => {
-    // if (skipNextEffect.current) {
-    //   skipNextEffect.current = false;
-    //   return;
-    // }
-
-    if (!fecha || !sorteoId || !userData?.id) return;
-
-    const load = async () => {
-      mFechaSeleccionada.setFecha(fecha);
-      setNumero("");
-      console.log("entro a actualizar desde useEfect");
-      await fetchTiemposAnteriores(sorteoId, formatDate(fecha, "yyyy-MM-dd"));
-    };
-
-    load();
-  }, [fecha, sorteoId, userData?.id]);
+    if (fecha && mSorteo.id && mSorteo.id !== 0) {
+      fetchTiemposAnteriores(mSorteo.id, formatDate(fecha, "yyyy-MM-dd"));
+    }
+  }, [fecha]);
 
   // useFocusEffect(
   //   useCallback(() => {
@@ -634,6 +615,7 @@ export default function PremiosScreen({ navigation }) {
             Object.assign(mSorteo, sorteo);
             setSorteoId(mSorteo.id);
             setSorteoNombre(mSorteo.name);
+            fetchTiemposAnteriores(mSorteo.id, formatDate(fecha, "yyyy-MM-dd"));
           }}
           leftPosition
         />

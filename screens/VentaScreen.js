@@ -322,127 +322,116 @@ export default function VentaScreen({ navigation, route }) {
       }
     }
     setDialogVisible(false);
-    let currentItems = [...items]; // arranco con la lista actual
+    setLoading(true);
 
-    if (categoriaSeleccionada === "Parejitas") {
-      for (let i = 0; i <= 9; i++) {
-        const number = parseInt(`${i}${i}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          reventar,
-          montoRevTemp,
-          currentItems,
-          tiemposAnteriores,
-        );
-      }
-    }
-    if (categoriaSeleccionada === "Terminan en...") {
-      for (let i = 0; i <= 9; i++) {
-        const number = parseInt(`${i}${categoriasTerminaEn}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          reventar,
-          montoRevTemp,
-          currentItems,
-          tiemposAnteriores,
-        );
-      }
-    }
-    if (categoriaSeleccionada === "Inician con...") {
-      for (let i = 0; i <= 9; i++) {
-        const number = parseInt(`${categoriasInicianCon}${i}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          reventar,
-          montoRevTemp,
-          currentItems,
-          tiemposAnteriores,
-        );
-      }
-    }
-    if (categoriaSeleccionada === "Desde / Hasta") {
-      const desde = parseInt(categoriasDesde);
-      const hasta = parseInt(categoriasHasta);
-
-      for (let i = desde; i <= hasta; i++) {
-        const number = parseInt(`${i}`);
-        const numero = convertNumero(number);
-        [currentItems] = await verificaRestringidosYAgregaNumero(
-          montoTemp,
-          numero,
-          reventar,
-          montoRevTemp,
-          currentItems,
-          tiemposAnteriores,
-        );
-      }
-    }
-    if (categoriaSeleccionada === "Extraer de Texto") {
-      setLoading(true); // Mostrar loader
-
+    // Envolver todo el proceso de categorías en la cola de validación
+    validationPromiseRef.current = validationPromiseRef.current.then(async () => {
       try {
-        //const userDataUpdated = await handleLogin();
-        //userData.token = userDataUpdated.token;
+        let currentItems = [...itemsQueueRef.current];
 
-        const runGeminiExample = async () => {
-          // const setting = userData.settings.find(
-          //   (s) => s.promt_extrae !== undefined,
-          // );
-          // const prompt = setting ? setting.promt_extrae : "";
-
-          // const day = new Date().getDate();
-          //  const extraPrompt = prompt;
-          const text = categoriasExtraerTexto;
-          //const result = await parseMessage(text, day, extraPrompt);
-          const result = await fetchExtractNumbers(text);
-
-          return result;
+        const procesarLote = async (numerosALoad) => {
+          for (const numObj of numerosALoad) {
+            const [nextItems, isValid] = await verificaRestringidosYAgregaNumero(
+              numObj.monto,
+              numObj.numero,
+              numObj.reventar,
+              numObj.montoReventado,
+              currentItems,
+              tiemposAnteriores,
+            );
+            if (isValid) {
+              currentItems = nextItems;
+              itemsQueueRef.current = nextItems;
+              setItems([...nextItems]);
+            }
+          }
         };
 
-        const result = await runGeminiExample();
-        for (const item of result) {
-          const numero = convertNumero(parseInt(`${item.numero}`));
-          const monto = parseInt(`${item.monto}`);
-          [currentItems] = await verificaRestringidosYAgregaNumero(
-            monto,
-            numero,
-            false,
-            0,
-            currentItems,
-            tiemposAnteriores,
-          );
+        if (categoriaSeleccionada === "Parejitas") {
+          const lote = [];
+          for (let i = 0; i <= 9; i++) {
+            lote.push({
+              monto: montoTemp,
+              numero: convertNumero(parseInt(`${i}${i}`)),
+              reventar,
+              montoReventado: montoRevTemp,
+            });
+          }
+          await procesarLote(lote);
+        } else if (categoriaSeleccionada === "Terminan en...") {
+          const lote = [];
+          for (let i = 0; i <= 9; i++) {
+            lote.push({
+              monto: montoTemp,
+              numero: convertNumero(parseInt(`${i}${categoriasTerminaEn}`)),
+              reventar,
+              montoReventado: montoRevTemp,
+            });
+          }
+          await procesarLote(lote);
+        } else if (categoriaSeleccionada === "Inician con...") {
+          const lote = [];
+          for (let i = 0; i <= 9; i++) {
+            lote.push({
+              monto: montoTemp,
+              numero: convertNumero(parseInt(`${categoriasInicianCon}${i}`)),
+              reventar,
+              montoReventado: montoRevTemp,
+            });
+          }
+          await procesarLote(lote);
+        } else if (categoriaSeleccionada === "Desde / Hasta") {
+          const lote = [];
+          const desde = parseInt(categoriasDesde);
+          const hasta = parseInt(categoriasHasta);
+          for (let i = desde; i <= hasta; i++) {
+            lote.push({
+              monto: montoTemp,
+              numero: convertNumero(parseInt(`${i}`)),
+              reventar,
+              montoReventado: montoRevTemp,
+            });
+          }
+          await procesarLote(lote);
+        } else if (categoriaSeleccionada === "Extraer de Texto") {
+          const result = await fetchExtractNumbers(categoriasExtraerTexto);
+          if (result) {
+            const lote = result.map(item => ({
+              monto: parseInt(`${item.monto}`),
+              numero: convertNumero(parseInt(`${item.numero}`)),
+              reventar: false,
+              montoReventado: 0,
+            }));
+            await procesarLote(lote);
+          }
         }
-        //setLoading(false);
-      } catch {
+
+        // Actualizar estados finales
+        itemsQueueRef.current = currentItems;
+        setItems([...currentItems]);
+
+        const nuevosMontoNumeros = currentItems.map((item) => ({
+          monto: item.monto,
+          numero: item.numero,
+          reventado: item.reventado,
+          montoReventado: item.montoReventado,
+        }));
+        actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+
+      } catch (error) {
+        console.error("Error procesando categorías:", error);
+      } finally {
         setLoading(false);
+        setCategoriaSeleccionada(null);
+        setCategoriasMonto("");
+        setCategoriasMontoReventado("");
+        setCategoriasTerminaEn("");
+        setCategoriasInicianCon("");
+        setCategoriasDesde("");
+        setCategoriasHasta("");
+        setCategoriasExtraerTexto("");
       }
-    }
-
-    setItems(currentItems);
-
-    const nuevosMontoNumeros = currentItems?.map((item) => ({
-      monto: item.monto,
-      numero: item.numero,
-      reventado: item.reventado,
-      montoReventado: item.montoReventado,
-      //...(item.montoReventado ? { rev: item.montoReventado } : {}),
-    }));
-    actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
-    setCategoriaSeleccionada(null);
-    setCategoriasMonto("");
-    setCategoriasMontoReventado("");
-    setCategoriasTerminaEn("");
-    setCategoriasInicianCon("");
-    setCategoriasDesde("");
-    setCategoriasHasta("");
-    setCategoriasExtraerTexto("");
-    setLoading(false);
+    });
   };
 
   const fetchExtractNumbers = async (message) => {
@@ -819,8 +808,9 @@ export default function VentaScreen({ navigation, route }) {
           };
         }
 
-        agrupados[numero].monto += monto;
-        agrupados[numero].montoReventado += montoReventado;
+        // Forzamos suma numérica para evitar concatenación de strings
+        agrupados[numero].monto += Number(monto || 0);
+        agrupados[numero].montoReventado += Number(montoReventado || 0);
 
         // Si al menos uno es reventado, se marca como true
         if (reventado) {
@@ -841,18 +831,16 @@ export default function VentaScreen({ navigation, route }) {
         };
     });
 
-    //Aquí sumás los montos normales
-    const totalNormal = items.reduce((acc, item) => acc + item.monto, 0);
+    // 🔴 Aseguramos sumas numéricas en los reductores
+    const totalNormal = items.reduce((acc, item) => acc + Number(item.monto || 0), 0);
 
-    //Aquí sumás los montos normales
     const totalReventados = items.reduce(
-      (acc, item) => acc + item.montoReventado,
+      (acc, item) => acc + Number(item.montoReventado || 0),
       0,
     );
 
-    //Aquí sumás los montos normales + reventados
     const totalTotal = items.reduce(
-      (acc, item) => acc + item.monto + item.montoReventado,
+      (acc, item) => acc + Number(item.monto || 0) + Number(item.montoReventado || 0),
       0,
     );
 
@@ -1304,56 +1292,77 @@ export default function VentaScreen({ navigation, route }) {
     const mReventar = reventar;
     const mMontoReventado = montoReventado;
 
-    // Limpiar UI síncronamente
-    setNumero("");
-    if (!isMontoLocked) {
-      setMonto("");
-    }
-    if (!isMontoRevLocked) {
-      setMontoReventado("");
-    }
+    // 1. Inserción Optimista usando la COLA síncrona
+    const { updatedItems: optimisticItems, key } = addNumeroToListAdapter(
+      [...itemsQueueRef.current],
+      mMonto,
+      mNumero,
+      mReventar,
+      mMontoReventado,
+      true, // isValidating: true
+    );
+    itemsQueueRef.current = optimisticItems; // Actualización inmediata
+    setItems([...optimisticItems]); // Reflejo en UI
 
-    // Enfocar según locks
-    if (!isMontoLocked && !isMontoRevLocked) {
-      montoRef.current?.focus();
-    } else if (!isMontoLocked && isMontoRevLocked) {
-      montoRef.current?.focus();
-    } else if (isMontoLocked && !isMontoRevLocked) {
-      montoRevRef.current?.focus();
-    } else {
-      numeroRef.current?.focus();
-    }
-
-    setPendingValidations((prev) => prev + 1);
+    setPendingValidations((prev) => prev - 1 + 1); // Forzar actualización de UI si es necesario
 
     validationPromiseRef.current = validationPromiseRef.current.then(
       async () => {
         try {
-          const currentItems = itemsQueueRef.current;
-          const [updatedItems, isValid] =
-            await verificaRestringidosYAgregaNumero(
-              mMonto,
-              mNumero,
-              mReventar,
-              mMontoReventado,
-              currentItems,
-              tiemposAnteriores,
-            );
+          const targetItemInQueue = itemsQueueRef.current.find((i) => i.key === key);
+          const totalMontoProposed = targetItemInQueue ? targetItemInQueue.monto : mMonto;
+          const totalMontoRevProposed = targetItemInQueue ? targetItemInQueue.montoReventado : 0;
+
+          const currentSnapshot = itemsQueueRef.current.filter((i) => i.key !== key);
+
+          const [finalItems, isValid] = await verificaRestringidosYAgregaNumero(
+            totalMontoProposed,
+            mNumero,
+            mReventar,
+            totalMontoRevProposed,
+            currentSnapshot,
+            tiemposAnteriores,
+          );
 
           if (isValid) {
-            itemsQueueRef.current = updatedItems;
-            setItems(updatedItems);
-            const nuevosMontoNumeros = updatedItems.map((item) => ({
-              monto: item.monto,
-              numero: item.numero,
-              reventado: item.reventado,
-              montoReventado: item.montoReventado,
-            }));
-            actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+            const itemValidado = finalItems.find((i) => i.key === key);
+            
+            // Actualización Síncrona de la cola
+            itemsQueueRef.current = itemsQueueRef.current.map((i) =>
+              i.key === key ? { ...i, ...itemValidado, isValidating: false } : i,
+            );
+
+            setItems([...itemsQueueRef.current]);
+            
+            // Actualizar ticket oficial
+            const validados = itemsQueueRef.current.filter((i) => !i.isValidating);
+            actualizarMontoNumerosEnTiempo(validados.map(v => ({
+              monto: v.monto,
+              numero: v.numero,
+              reventado: v.reventado,
+              montoReventado: v.montoReventado,
+            })));
           } else {
-            itemsQueueRef.current = updatedItems;
-            setItems(updatedItems);
+            // Actualización Síncrona de la cola
+            itemsQueueRef.current = itemsQueueRef.current.filter((i) => i.key !== key);
+            setItems([...itemsQueueRef.current]);
+
+            // Actualizar ticket oficial (quitando el restringido)
+            const validados = itemsQueueRef.current.filter((i) => !i.isValidating);
+            actualizarMontoNumerosEnTiempo(validados.map(v => ({
+              monto: v.monto,
+              numero: v.numero,
+              reventado: v.reventado,
+              montoReventado: v.montoReventado,
+            })));
           }
+        } catch (error) {
+          console.error("Error validación reventado:", error);
+          setItems((prev) => {
+             const nextItems = prev.filter(i => i.key !== key);
+             itemsQueueRef.current = nextItems;
+             return nextItems;
+          });
         } finally {
           setPendingValidations((prev) => prev - 1);
         }
@@ -1537,16 +1546,27 @@ export default function VentaScreen({ navigation, route }) {
         //const userDataUpdated = await handleLogin();
         //userData.token = userDataUpdated.token;
 
-        ejecutadoPorRestringidoDialogRef.current = false;
-        tiempoNumerosBackup = tiempoRef.current;
-        const resultado = await inicializarYProcesar(tiempoNumerosBackup);
-        if (!resultado) {
-          return; // ⛔ No continúa si hay errores
-        }
+        // 🛡️ MODIFICACIÓN: Eliminamos la re-validación pesada de inicializarYProcesar
+        // porque el Backend ya valida y nosotros validamos optimistamente al insertar.
+        
+        // Preparamos el ticket directamente con los números que están en la tabla
+        const numbersFinales = itemsQueueRef.current.map(i => ({
+          monto: idTicketRechazado ? Number(i.monto) : i.monto, // 🚨 TEMPORAL: BE v2 edit-restricted requiere Number
+          numero: i.numero,
+          reventado: i.reventado,
+          montoReventado: idTicketRechazado ? Number(i.montoReventado || 0) : i.montoReventado, // 🚨 TEMPORAL: BE v2 edit-restricted requiere Number
+        }));
+
+        const tiempoParaImprimir = {
+          ...tiempoRef.current,
+          drawDate: formatDate(fecha, "yyyy-MM-dd"),
+          userId: userData.id,
+          drawCategoryId: mSorteo.id,
+          numbers: numbersFinales,
+        };
+
         setLoading(true);
-        const apkVersion =
-          Constants.manifest?.version || Constants.expoConfig?.version;
-        const tiempoParaImprimir = resultado;
+        const apkVersion = Constants.manifest?.version || Constants.expoConfig?.version;
         const url = idTicketRechazado
           ? `${backend_url}/api/v2/tickets/${idTicketRechazado}/edit-restricted?token=${userData.token}`
           : `${backend_url}/api/ticket?token=${userData.token}`;
@@ -2154,42 +2174,52 @@ export default function VentaScreen({ navigation, route }) {
     currentItems,
     monto,
     numero,
-    reventado,
+    reventar,
     montoReventado,
+    isValidating = false,
   ) => {
     const existingItemIndex = currentItems.findIndex(
-      (item) => item.numero === numero,
+      (item) => String(item.numero) === String(numero),
     );
     let updatedItems = [...currentItems];
+    let affectedKey = "";
 
     if (existingItemIndex !== -1) {
-      updatedItems[existingItemIndex].monto = (
-        parseInt(updatedItems[existingItemIndex].monto) + parseInt(monto)
-      ).toString();
+      const existingItem = updatedItems[existingItemIndex];
+      affectedKey = existingItem.key;
 
-      if (reventado) {
-        updatedItems[existingItemIndex].montoReventado = (
-          parseInt(updatedItems[existingItemIndex].montoReventado) +
-          parseInt(montoReventado)
+      const updatedItem = {
+        ...existingItem,
+        monto: (parseInt(existingItem.monto) + parseInt(monto)).toString(),
+        isValidating,
+      };
+
+      if (reventar) {
+        updatedItem.montoReventado = (
+          parseInt(existingItem.montoReventado || 0) + parseInt(montoReventado || 0)
         ).toString();
-        updatedItems[existingItemIndex].reventado = reventado;
+        updatedItem.reventado = true;
       }
+
+      updatedItems[existingItemIndex] = updatedItem;
 
       // Mover al principio
       const itemToMove = updatedItems.splice(existingItemIndex, 1)[0];
       updatedItems.unshift(itemToMove);
     } else {
+      affectedKey = generateKey();
       const newItem = {
-        key: generateKey(),
-        monto: parseInt(monto, 10),
+        key: affectedKey,
+        monto: parseInt(monto, 10).toString(),
         numero: numero.toString(),
-        reventado: reventado,
-        montoReventado: reventado ? parseInt(montoReventado, 10) : 0,
+        reventado: reventar,
+        montoReventado: reventar ? parseInt(montoReventado, 10).toString() : "0",
+        isValidating,
       };
       updatedItems = [newItem, ...updatedItems];
     }
 
-    return updatedItems;
+    return { updatedItems, key: affectedKey };
   };
 
   function generateKey() {
@@ -2506,11 +2536,16 @@ export default function VentaScreen({ navigation, route }) {
         // Si la validación falló y no lo agregó
         if (resultIsAllowedFromMethod === false) {
           isAllowed = false;
+        } else {
+          // Actualización en tiempo real para procesos largos (Pre-carga/Cambio sorteo)
+          itemsQueueRef.current = currentItems;
+          setItems([...currentItems]);
         }
       }
 
       // Paso 6: Actualizar estado final
-      setItems(currentItems);
+      itemsQueueRef.current = currentItems; 
+      setItems([...currentItems]);
       const nuevosMontoNumeros = currentItems
         .map((item) => ({
           monto: item.monto,
@@ -2549,6 +2584,12 @@ export default function VentaScreen({ navigation, route }) {
 
   useEffect(() => {
     if (!fecha || !sorteoId || !userData?.id) return;
+    
+    // 🛡️ PROTECCIÓN: Si hay validaciones en curso, no podemos inicializar y borrar todo
+    if (pendingValidations > 0) {
+      console.log("⚠️ Postergando inicialización: validaciones pendientes");
+      return;
+    }
 
     async function execute() {
       ejecutadoPorRestringidoDialogRef.current = false;
@@ -2591,8 +2632,7 @@ export default function VentaScreen({ navigation, route }) {
     currentItems,
     tiemposVendidosExternos,
   ) {
-    let tiemposVendidos = tiemposVendidosExternos ?? tiemposAnteriores; // fallback al estado
-    tiemposVendidos = tiemposVendidos.filter((item) => item.status === 201);
+
 
     const setting = userData.settings.find(
       (s) => s.porcentaje_reventado_restringido !== undefined,
@@ -2649,10 +2689,19 @@ export default function VentaScreen({ navigation, route }) {
 
       // La API v2 ahora es la ÚNICA fuente de la verdad para todas las restricciones (normales y reventados)
       if (!result.valid && result.violations && result.violations.length > 0) {
+        // Encontrar la violación más restrictiva
         const violation = result.violations.reduce(
           (min, v) => (v.limit < min.limit ? v : min),
           result.violations[0],
         );
+
+        // 🛡️ CRITICAL FIX: Solo bloquear si la violación es para el número que estamos validando ACTUALMENTE
+        // Si la violación es para OTRO número que ya estaba en la lista optimista, 
+        // lo ignoramos aquí porque ese otro número tendrá su propio turno de validación en la cola.
+        if (String(violation.number) !== String(numero)) {
+          console.log(`⚠️ Ignorando violación colateral del número ${violation.number} mientras se valida ${numero}`);
+          return [updatedItems, true]; // El número actual (numero) es válido por sí mismo
+        }
 
         let amountAlreadyInCartNormal = 0;
         let amountAlreadyInCartRev = 0;
@@ -2706,13 +2755,14 @@ export default function VentaScreen({ navigation, route }) {
         return [currentItems ?? items, false];
       }
 
-      updatedItems = addNumeroToListAdapter(
+      const adapterResult = addNumeroToListAdapter(
         updatedItems,
         monto,
         numero,
         reventar,
         montoReventado,
       );
+      updatedItems = adapterResult.updatedItems;
 
       return [updatedItems, true];
     } catch (e) {
@@ -2781,7 +2831,10 @@ export default function VentaScreen({ navigation, route }) {
         const mMonto = monto;
         const mNumero = numero;
 
-        // Limpiar inputs síncronamente para no bloquear la UI
+        // 1. Capturar estado previo para posible reversión
+        const previousItemsActual = [...items];
+
+        // 2. Limpiar inputs síncronamente
         setNumero("");
         if (!isMontoLocked) {
           setMonto("");
@@ -2793,46 +2846,87 @@ export default function VentaScreen({ navigation, route }) {
           setMontoReventado("");
         }
 
-        tiempoNumerosBackup = tiempoRef.current;
-        const nuevoNumero = {
-          monto: mMonto,
-          numero: mNumero,
-          reventado: false,
-          montoReventado: 0,
-        };
-        tiempoNumerosBackup.numbers.push(nuevoNumero);
+        // 3. Inserción Optimista usando la COLA síncrona como base (Evita borrar ingresos rápidos)
+        const { updatedItems: optimisticItems, key } = addNumeroToListAdapter(
+          [...itemsQueueRef.current],
+          mMonto,
+          mNumero,
+          false,
+          0,
+          true, // isValidating: true
+        );
+        itemsQueueRef.current = optimisticItems; // Actualización inmediata síncrona
+        setItems([...optimisticItems]); // Reflejo en UI
         ejecutadoPorRestringidoDialogRef.current = false;
 
         setPendingValidations((prev) => prev + 1);
 
+        // 4. Cola de validación
         validationPromiseRef.current = validationPromiseRef.current.then(
           async () => {
             try {
-              const currentItems = itemsQueueRef.current;
-              const [updatedItems, isValid] =
+              // Obtener el estado actual del ítem en la cola (que ya tiene el monto acumulado)
+              const targetItemInQueue = itemsQueueRef.current.find((i) => i.key === key);
+              const totalMontoProposed = targetItemInQueue ? targetItemInQueue.monto : mMonto;
+              const totalMontoRevProposed = targetItemInQueue ? targetItemInQueue.montoReventado : 0;
+
+              // Snapshot del resto de los items (excluyendo el que estamos validando)
+              const currentSnapshot = itemsQueueRef.current.filter(
+                (i) => i.key !== key,
+              );
+
+              const [finalItems, isValid] =
                 await verificaRestringidosYAgregaNumero(
-                  mMonto,
+                  totalMontoProposed, 
                   mNumero,
                   false,
-                  0,
-                  currentItems,
+                  totalMontoRevProposed,
+                  currentSnapshot,
                   tiemposAnteriores,
                 );
 
               if (isValid) {
-                itemsQueueRef.current = updatedItems;
-                setItems(updatedItems);
-                const nuevosMontoNumeros = updatedItems.map((item) => ({
-                  monto: item.monto,
-                  numero: item.numero,
-                  reventado: item.reventado,
-                  montoReventado: item.montoReventado,
-                }));
-                actualizarMontoNumerosEnTiempo(nuevosMontoNumeros);
+                // Éxito: Marcar como validado y actualizar montos finales
+                const itemValidado = finalItems.find((i) => i.key === key);
+                
+                // Actualización Síncrona de la cola (Fuente de verdad inmediata)
+                itemsQueueRef.current = itemsQueueRef.current.map((i) =>
+                  i.key === key ? { ...i, ...itemValidado, isValidating: false } : i,
+                );
+
+                setItems([...itemsQueueRef.current]);
+
+                // Actualizar ticket oficial usando la cola ya sincronizada
+                const validados = itemsQueueRef.current.filter((i) => !i.isValidating);
+                actualizarMontoNumerosEnTiempo(validados.map(v => ({
+                  monto: v.monto,
+                  numero: v.numero,
+                  reventado: v.reventado,
+                  montoReventado: v.montoReventado,
+                })));
               } else {
-                itemsQueueRef.current = updatedItems;
-                setItems(updatedItems);
+                // Restricción detectada: Eliminar de la lista
+                // Actualización Síncrona de la cola
+                itemsQueueRef.current = itemsQueueRef.current.filter((i) => i.key !== key);
+                setItems([...itemsQueueRef.current]);
+
+                // Actualizar ticket oficial
+                const validados = itemsQueueRef.current.filter((i) => !i.isValidating);
+                actualizarMontoNumerosEnTiempo(validados.map(v => ({
+                  monto: v.monto,
+                  numero: v.numero,
+                  reventado: v.reventado,
+                  montoReventado: v.montoReventado,
+                })));
               }
+            } catch (error) {
+              console.error("Error en validación de número:", error);
+              // En caso de error técnico, mejor revertir por seguridad
+              setItems((prev) => {
+                 const nextItems = prev.filter((i) => i.key !== key);
+                 itemsQueueRef.current = nextItems;
+                 return nextItems;
+              });
             } finally {
               setPendingValidations((prev) => prev - 1);
             }
@@ -2968,14 +3062,30 @@ export default function VentaScreen({ navigation, route }) {
           {/* Contenedor con número y botón de eliminar */}
           <View style={styles.rightRow}>
             <Text style={styles.itemRight}>{item.numero}</Text>
-            {Platform.OS === "web" && tiempoSeleccionado == null && (
-              <TouchableOpacity
-                onPress={() => solicitarEliminarItem(item)}
-                style={styles.deleteIcon}
+            {item.isValidating && (
+              <View
+                style={[
+                  styles.deleteIcon,
+                  Platform.OS !== "web" && { position: "absolute", right: 25 },
+                ]}
               >
-                <MaterialIcons name="delete" size={22} color="red" />
-              </TouchableOpacity>
+                <ActivityIndicator
+                  size={22}
+                  color="#4CAF50"
+                  style={{ width: 22, height: 22 }}
+                />
+              </View>
             )}
+            {Platform.OS === "web" &&
+              tiempoSeleccionado == null &&
+              !item.isValidating && (
+                <TouchableOpacity
+                  onPress={() => solicitarEliminarItem(item)}
+                  style={styles.deleteIcon}
+                >
+                  <MaterialIcons name="delete" size={22} color="red" />
+                </TouchableOpacity>
+              )}
           </View>
         </View>
 
@@ -2993,9 +3103,9 @@ export default function VentaScreen({ navigation, route }) {
     }
     return (
       <TouchableHighlight
-        onLongPress={() => solicitarEliminarItem(item)}
+        onLongPress={() => !item.isValidating && solicitarEliminarItem(item)}
         underlayColor="#eee"
-        disabled={tiempoSeleccionado !== null}
+        disabled={tiempoSeleccionado !== null || item.isValidating}
       >
         {content}
       </TouchableHighlight>
