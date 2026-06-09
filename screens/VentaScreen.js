@@ -1292,7 +1292,22 @@ export default function VentaScreen({ navigation, route }) {
     const mReventar = reventar;
     const mMontoReventado = montoReventado;
 
-    // 1. Inserción Optimista usando la COLA síncrona
+    // 2. Limpiar inputs síncronamente (igual que submitNumero)
+    setNumero("");
+    if (!isMontoLocked) {
+      setMonto("");
+      montoRef.current?.focus();
+    } else if (!isMontoRevLocked) {
+      setMontoReventado("");
+      montoRevRef.current?.focus();
+    } else {
+      numeroRef.current?.focus();
+    }
+    if (!isMontoRevLocked) {
+      setMontoReventado("");
+    }
+
+    // 3. Inserción Optimista usando la COLA síncrona
     const { updatedItems: optimisticItems, key } = addNumeroToListAdapter(
       [...itemsQueueRef.current],
       mMonto,
@@ -1304,7 +1319,7 @@ export default function VentaScreen({ navigation, route }) {
     itemsQueueRef.current = optimisticItems; // Actualización inmediata
     setItems([...optimisticItems]); // Reflejo en UI
 
-    setPendingValidations((prev) => prev - 1 + 1); // Forzar actualización de UI si es necesario
+    setPendingValidations((prev) => prev + 1); // Correcto: incrementar pendientes
 
     validationPromiseRef.current = validationPromiseRef.current.then(
       async () => {
@@ -1326,14 +1341,14 @@ export default function VentaScreen({ navigation, route }) {
 
           if (isValid) {
             const itemValidado = finalItems.find((i) => i.key === key);
-            
+
             // Actualización Síncrona de la cola
             itemsQueueRef.current = itemsQueueRef.current.map((i) =>
               i.key === key ? { ...i, ...itemValidado, isValidating: false } : i,
             );
 
             setItems([...itemsQueueRef.current]);
-            
+
             // Actualizar ticket oficial
             const validados = itemsQueueRef.current.filter((i) => !i.isValidating);
             actualizarMontoNumerosEnTiempo(validados.map(v => ({
@@ -1359,9 +1374,9 @@ export default function VentaScreen({ navigation, route }) {
         } catch (error) {
           console.error("Error validación reventado:", error);
           setItems((prev) => {
-             const nextItems = prev.filter(i => i.key !== key);
-             itemsQueueRef.current = nextItems;
-             return nextItems;
+            const nextItems = prev.filter(i => i.key !== key);
+            itemsQueueRef.current = nextItems;
+            return nextItems;
           });
         } finally {
           setPendingValidations((prev) => prev - 1);
@@ -1548,7 +1563,7 @@ export default function VentaScreen({ navigation, route }) {
 
         // 🛡️ MODIFICACIÓN: Eliminamos la re-validación pesada de inicializarYProcesar
         // porque el Backend ya valida y nosotros validamos optimistamente al insertar.
-        
+
         // Preparamos el ticket directamente con los números que están en la tabla
         const numbersFinales = itemsQueueRef.current.map(i => ({
           monto: idTicketRechazado ? Number(i.monto) : i.monto, // 🚨 TEMPORAL: BE v2 edit-restricted requiere Number
@@ -1641,7 +1656,7 @@ export default function VentaScreen({ navigation, route }) {
           if (queueStatus === "RJT") {
             showSnackbar(
               "Ticket rechazado por reglas de restricción. Por favor, edite los números e intente de nuevo.",
-              4,
+              3,
             );
             setIdTicketRechazado(tiempoSeleccionado.id);
             setLoading(false);
@@ -2544,7 +2559,7 @@ export default function VentaScreen({ navigation, route }) {
       }
 
       // Paso 6: Actualizar estado final
-      itemsQueueRef.current = currentItems; 
+      itemsQueueRef.current = currentItems;
       setItems([...currentItems]);
       const nuevosMontoNumeros = currentItems
         .map((item) => ({
@@ -2584,7 +2599,7 @@ export default function VentaScreen({ navigation, route }) {
 
   useEffect(() => {
     if (!fecha || !sorteoId || !userData?.id) return;
-    
+
     // 🛡️ PROTECCIÓN: Si hay validaciones en curso, no podemos inicializar y borrar todo
     if (pendingValidations > 0) {
       console.log("⚠️ Postergando inicialización: validaciones pendientes");
@@ -2877,7 +2892,7 @@ export default function VentaScreen({ navigation, route }) {
 
               const [finalItems, isValid] =
                 await verificaRestringidosYAgregaNumero(
-                  totalMontoProposed, 
+                  totalMontoProposed,
                   mNumero,
                   false,
                   totalMontoRevProposed,
@@ -2888,7 +2903,7 @@ export default function VentaScreen({ navigation, route }) {
               if (isValid) {
                 // Éxito: Marcar como validado y actualizar montos finales
                 const itemValidado = finalItems.find((i) => i.key === key);
-                
+
                 // Actualización Síncrona de la cola (Fuente de verdad inmediata)
                 itemsQueueRef.current = itemsQueueRef.current.map((i) =>
                   i.key === key ? { ...i, ...itemValidado, isValidating: false } : i,
@@ -2923,9 +2938,9 @@ export default function VentaScreen({ navigation, route }) {
               console.error("Error en validación de número:", error);
               // En caso de error técnico, mejor revertir por seguridad
               setItems((prev) => {
-                 const nextItems = prev.filter((i) => i.key !== key);
-                 itemsQueueRef.current = nextItems;
-                 return nextItems;
+                const nextItems = prev.filter((i) => i.key !== key);
+                itemsQueueRef.current = nextItems;
+                return nextItems;
               });
             } finally {
               setPendingValidations((prev) => prev - 1);
