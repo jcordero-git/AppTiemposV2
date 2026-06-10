@@ -1566,10 +1566,10 @@ export default function VentaScreen({ navigation, route }) {
 
         // Preparamos el ticket directamente con los números que están en la tabla
         const numbersFinales = itemsQueueRef.current.map(i => ({
-          monto: idTicketRechazado ? Number(i.monto) : i.monto, // 🚨 TEMPORAL: BE v2 edit-restricted requiere Number
+          monto: Number(i.monto),
           numero: i.numero,
           reventado: i.reventado,
-          montoReventado: idTicketRechazado ? Number(i.montoReventado || 0) : i.montoReventado, // 🚨 TEMPORAL: BE v2 edit-restricted requiere Number
+          montoReventado: Number(i.montoReventado || 0),
         }));
 
         const tiempoParaImprimir = {
