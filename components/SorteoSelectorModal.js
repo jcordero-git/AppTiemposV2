@@ -135,6 +135,7 @@ export default function SorteoSelectorModal({
             <FlatList
               data={sorteosFiltrados}
               keyExtractor={(item) => item.id.toString()}
+              style={{ maxHeight: isWeb ? height * 0.7 : height * 0.6 }}
               renderItem={({ item }) => {
                 // Formatear hora límite a HH:MM AM/PM
                 const formatHora = (limitTime) => {
