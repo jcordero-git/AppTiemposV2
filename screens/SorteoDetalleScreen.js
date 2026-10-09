@@ -212,7 +212,7 @@ export default function SorteoDetalleScreen({ navigation, route }) {
           </View>
         </View>
 
-        <View style={[styles.listContainer, isWeb ? { flex: 1 } : { marginTop: 0, width: '100%' }]}>
+        <View style={styles.listContainer}>
           <View style={styles.restriccionesHeader}>
             <View style={styles.line} />
             <Text style={styles.restriccionesTitle}>
@@ -225,18 +225,15 @@ export default function SorteoDetalleScreen({ navigation, route }) {
               </Text>
             ) : null}
 
-
-
             <View style={styles.line} />
           </View>
-
-
 
           <FlatList
             data={restricciones}
             keyExtractor={(_, idx) => idx.toString()}
             renderItem={renderRestriccion}
-            style={[styles.tableContainer, isWeb && { maxHeight: 'none', flex: 1 }]}
+            style={styles.tableContainer}
+            nestedScrollEnabled={true}
             ListHeaderComponent={() => (
               <View style={styles.headerRow}>
                 <Text style={[styles.headerText, { flex: 1 }]}>#</Text>
@@ -276,7 +273,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   listContainer: {
-    maxHeight: 900,
+    flex: 1,
+    width: "100%",
   },
   webPanelLeft: {
     marginRight: 20,
@@ -504,6 +502,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: "hidden",
     width: "100%",
-    maxHeight: 500,
+    flex: 1,
   },
 });

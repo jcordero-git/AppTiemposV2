@@ -82,12 +82,14 @@ export default function VentaScreen({ navigation, route }) {
   const [pendingValidations, setPendingValidations] = useState(0);
   const validationPromiseRef = useRef(Promise.resolve());
   const itemsQueueRef = useRef([]);
+  const galloTapadoKeysRef = useRef(new Set());
 
   useEffect(() => {
     itemsQueueRef.current = items;
   }, [items]);
 
   const { showSnackbar, showConfirm } = useSnackbar();
+
   const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
@@ -98,6 +100,7 @@ export default function VentaScreen({ navigation, route }) {
   const [dialogPrecargarVisible, setDialogPrecargarVisible] = useState(false);
   const [dialogDesgloseVentaVisible, setDialogDesgloseVentaVisible] =
     useState(false);
+
   const [codigo, setCodigo] = useState("");
   const [idTicketSeleccionado, setIdTicketSeleccionado] = useState(0);
   const [idTicketRechazado, setIdTicketRechazado] = useState(null);
@@ -403,6 +406,86 @@ export default function VentaScreen({ navigation, route }) {
               montoReventado: 0,
             }));
             await procesarLote(lote);
+          }
+        } else if (categoriaSeleccionada === "Gallo Tapado") {
+          // 1. Calcular venta total por numero del dia/sorteo actual
+          const ventaPorNumero = {};
+          for (let i = 0; i <= 99; i++) {
+            ventaPorNumero[convertNumero(i)] = 0;
+          }
+          const ticketsValidos = tiemposAnteriores.filter((t) => t.status !== 202);
+          ticketsValidos.forEach((ticket) => {
+            (ticket.numbers || []).forEach(({ numero, monto: m }) => {
+              const num = convertNumero(parseInt(numero, 10));
+              if (ventaPorNumero[num] !== undefined) {
+                ventaPorNumero[num] += Number(m || 0);
+              }
+            });
+          });
+
+          // 2. Excluir numeros ya en el ticket actual
+          const numerosEnTicketActual = new Set(currentItems.map((i) => i.numero));
+
+          // 3. Ordenar disponibles de menor a mayor venta total
+          const numerosDisponibles = Object.entries(ventaPorNumero)
+            .filter(([num]) => !numerosEnTicketActual.has(num))
+            .sort((a, b) => a[1] - b[1]);
+
+          // 4. Obtener la menor venta acumulada disponible y agrupar TODOS los números que tengan esa menor venta
+          // (Si hay muchos números con venta 0 o empatados en el monto mínimo, entran TODOS al sorteo aleatorio)
+          let candidatos = [];
+          if (numerosDisponibles.length > 0) {
+            const menorVenta = numerosDisponibles[0][1];
+            // Filtramos todos los que compartan el mismo monto de venta mínima (o al menos los 10 primeros si no hay suficientes empatados)
+            const empatadosMenorVenta = numerosDisponibles.filter(([, venta]) => venta === menorVenta);
+
+            if (empatadosMenorVenta.length >= 10) {
+              candidatos = empatadosMenorVenta.map(([num]) => num);
+            } else {
+              candidatos = numerosDisponibles.slice(0, 10).map(([num]) => num);
+            }
+          }
+
+          // Mezclar aleatoriamente el grupo completo de candidatos empatados (de 00 a 99 si la mayoría está en 0)
+          candidatos = candidatos.sort(() => Math.random() - 0.5);
+
+          if (candidatos.length === 0) {
+            showSnackbar("No hay números disponibles para Gallo Tapado.", 3);
+          } else {
+            // 5. Elegir el primer candidato aleatorio del grupo de 10 que no esté restringido
+            let numeroElegido = null;
+            for (const candidato of candidatos) {
+              const permitido = await esNumeroPermitido(
+                candidato,
+                montoTemp,
+                montoRevTemp,
+                reventar,
+                currentItems,
+                tiemposAnteriores,
+              );
+              if (permitido) {
+                numeroElegido = candidato;
+                break;
+              }
+            }
+
+            if (numeroElegido === null) {
+              showSnackbar("Todos los candidatos están restringidos. Intente más tarde.", 3);
+            } else {
+              // 6. Insertar el numero elegido y registrar su key en galloTapadoKeysRef
+              const { updatedItems, key } = addNumeroToListAdapter(
+                currentItems,
+                montoTemp,
+                numeroElegido,
+                reventar,
+                montoRevTemp,
+                false,
+              );
+              galloTapadoKeysRef.current.add(key);
+              currentItems = updatedItems;
+              itemsQueueRef.current = updatedItems;
+              setItems([...updatedItems]);
+            }
           }
         }
 
@@ -748,6 +831,8 @@ export default function VentaScreen({ navigation, route }) {
     setcamposBloqueados(false);
     setTiempoSeleccionado(null);
     setIdTicketRechazado(null);
+    // Limpiar keys de Gallo Tapado al iniciar nuevo tiempo
+    galloTapadoKeysRef.current = new Set();
   };
 
   // function convertirFecha(fechaPreCarga) {
@@ -1184,6 +1269,9 @@ export default function VentaScreen({ navigation, route }) {
     // Elimina el item de la lista
 
     if (!item) return; // 🔒 protección
+
+    // Limpiar del Set de Gallo Tapado si aplica
+    galloTapadoKeysRef.current.delete(item.key);
 
     const nuevosItems = items.filter((i) => i.key !== item.key);
     setItems(nuevosItems);
@@ -1928,6 +2016,9 @@ export default function VentaScreen({ navigation, route }) {
       setMontoReventado("");
       setMonto("");
       setNumero("");
+
+      // Limpiar keys de Gallo Tapado al limpiar el ticket
+      galloTapadoKeysRef.current = new Set();
     }
 
     //montoRef.current?.focus();
@@ -2476,6 +2567,101 @@ export default function VentaScreen({ navigation, route }) {
       return Math.min(...montosPermitidos);
     } else {
       return null;
+    }
+  }
+
+  /**
+   * Verifica silenciosamente si un numero esta permitido (sin mostrar dialogs ni snackbars).
+   * Valida llamando a /api/v2/restrictedNumbers/validate tal como en verificaRestringidosYAgregaNumero.
+   * Usado internamente por Gallo Tapado para elegir candidatos validos.
+   */
+  async function esNumeroPermitido(numero, monto, montoReventado, esReventado, currentItems, tiemposAnteriores) {
+    let updatedItems = currentItems ? [...currentItems] : [...items];
+
+    const proposedNumbersMap = new Map();
+    updatedItems.forEach((item) => {
+      proposedNumbersMap.set(String(item.numero), {
+        numero: String(item.numero),
+        monto: Number(item.monto),
+        reventado: item.reventado || false,
+        montoReventado: item.montoReventado || 0,
+      });
+    });
+
+    const parsedNumero = String(numero);
+    if (proposedNumbersMap.has(parsedNumero)) {
+      const existing = proposedNumbersMap.get(parsedNumero);
+      existing.monto += Number(monto);
+      if (esReventado) {
+        existing.reventado = true;
+        existing.montoReventado += Number(montoReventado);
+      }
+    } else {
+      proposedNumbersMap.set(parsedNumero, {
+        numero: parsedNumero,
+        monto: Number(monto),
+        reventado: esReventado,
+        montoReventado: Number(montoReventado),
+      });
+    }
+
+    const proposedNumbers = Array.from(proposedNumbersMap.values());
+
+    try {
+      const url = `${backend_url}/api/v2/restrictedNumbers/validate?token=${userData.token}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: userData?.id,
+          drawCategoryId: mSorteo.id,
+          numbers: proposedNumbers,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!result.valid && result.violations && result.violations.length > 0) {
+        // Si hay alguna violacion relacionada con el numero candidato
+        const hasViolation = result.violations.some(
+          (v) => String(v.number) === String(numero)
+        );
+        if (hasViolation) {
+          return false;
+        }
+      }
+
+      if (esReventado && mSorteo.useReventado !== true) {
+        return false;
+      }
+
+      // Validacion de cliente adicional como respaldo
+      const [isAllowedNormal] = allowRestringidoFunction(
+        numero,
+        monto,
+        currentItems,
+        tiemposAnteriores,
+      );
+      if (!isAllowedNormal) return false;
+
+      if (esReventado && montoReventado > 0) {
+        const porcentajeReventado = settingPorcentakeRevRestringido
+          ? settingPorcentakeRevRestringido.porcentaje_reventado_restringido
+          : 100;
+        const [isAllowedRev] = allowRestringidoReventadoFunction(
+          numero,
+          montoReventado,
+          porcentajeReventado,
+          currentItems,
+          tiemposAnteriores,
+        );
+        if (!isAllowedRev) return false;
+      }
+
+      return true;
+    } catch (e) {
+      console.error("Error al validar con api/v2/restrictedNumbers/validate en esNumeroPermitido:", e);
+      return false;
     }
   }
 
@@ -3069,6 +3255,9 @@ export default function VentaScreen({ navigation, route }) {
   };
 
   const renderItem = ({ item }) => {
+    const isGalloTapado = galloTapadoKeysRef.current.has(item.key);
+    const numeroDisplay = isGalloTapado ? "🐓 ##" : item.numero;
+
     const content = (
       <View style={styles.itemRowGeneral}>
         <View style={styles.itemRow}>
@@ -3076,7 +3265,9 @@ export default function VentaScreen({ navigation, route }) {
 
           {/* Contenedor con número y botón de eliminar */}
           <View style={styles.rightRow}>
-            <Text style={styles.itemRight}>{item.numero}</Text>
+            <Text style={[styles.itemRight, isGalloTapado && { color: "#000", fontWeight: "bold" }]}>
+              {numeroDisplay}
+            </Text>
             {item.isValidating && (
               <View
                 style={[
@@ -4584,6 +4775,16 @@ export default function VentaScreen({ navigation, route }) {
             >
               Extraer de Texto
             </Button>
+            {mSorteo.id !== 0 && (
+              <Button
+                onPress={() => seleccionarCategoria("Gallo Tapado")}
+                textColor="#000"
+                style={{ marginBottom: 10, width: "100%", borderRadius: 3 }}
+                contentStyle={{ justifyContent: "flex-start" }}
+              >
+                Gallo Tapado
+              </Button>
+            )}
           </Dialog.Content>
         </Dialog>
         {/* Diálogo para precargar tiempo */}

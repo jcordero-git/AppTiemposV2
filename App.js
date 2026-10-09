@@ -18,7 +18,7 @@ export default function App() {
         <TiempoProvider>
           <PaperProvider>
             <SnackbarProvider>
-              <MainNavigator></MainNavigator>
+              <MainNavigator />
             </SnackbarProvider>
           </PaperProvider>
         </TiempoProvider>
