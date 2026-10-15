@@ -48,6 +48,7 @@ import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import RestringidosModal from "../components/RestringidosModal";
 import mSorteo from "../models/mSorteoSingleton.js";
@@ -136,6 +137,7 @@ export default function VentaScreen({ navigation, route }) {
   const { tiempo, setTiempo, resetTiempo, setClientName } = useTiempo();
   const { userData, logout, ticketProfile, login, saveTicketProfile } =
     useAuth();
+  const { theme } = useTheme();
   //const token = userData.token;
 
   const menuAnchorRef = useRef(null);
@@ -171,7 +173,7 @@ export default function VentaScreen({ navigation, route }) {
 
   useFocusEffect(
     useCallback(() => {
-      StatusBar.setBackgroundColor("#4CAF50");
+      StatusBar.setBackgroundColor(theme.primary);
       StatusBar.setBarStyle("dark-content");
     }, []),
   );
@@ -714,7 +716,7 @@ export default function VentaScreen({ navigation, route }) {
     }
 
     navigation.setOptions({
-      headerStyle: { backgroundColor: "#4CAF50" },
+      headerStyle: { backgroundColor: theme.primary },
       headerTintColor: "#fff",
       headerRight: () => (
         <>
@@ -823,6 +825,7 @@ export default function VentaScreen({ navigation, route }) {
     tiempo,
     dialogPrintVisible,
     pendingValidations,
+    theme,
   ]);
 
   const handleNuevoTiempo = async (id) => {
@@ -3277,7 +3280,7 @@ export default function VentaScreen({ navigation, route }) {
               >
                 <ActivityIndicator
                   size={22}
-                  color="#4CAF50"
+                  color={theme?.primary || "#4CAF50"}
                   style={{ width: 22, height: 22 }}
                 />
               </View>
@@ -3456,7 +3459,12 @@ export default function VentaScreen({ navigation, route }) {
                         onPress={() => setLimpiar(!limpiar)}
                       >
                         <Text style={{ flex: 1 }}>Limpiar</Text>
-                        <Switch value={limpiar} onValueChange={setLimpiar} />
+                        <Switch
+                          value={limpiar}
+                          trackColor={{ false: "#ccc", true: theme.primary }}
+                          thumbColor={limpiar ? "#fff" : "#f4f3f4"}
+                          onValueChange={setLimpiar}
+                        />
                       </Pressable>
 
                       {/* <Text>Limpiar al imprimir</Text>
@@ -3471,6 +3479,8 @@ export default function VentaScreen({ navigation, route }) {
                             <Text style={{ flex: 1 }}>Reventar</Text>
                             <Switch
                               value={reventar}
+                              trackColor={{ false: "#ccc", true: theme.primary }}
+                              thumbColor={reventar ? "#fff" : "#f4f3f4"}
                               onValueChange={handleReventarChange}
                             />
                           </Pressable>
@@ -3900,7 +3910,11 @@ export default function VentaScreen({ navigation, route }) {
                         }
                         style={styles.iconButtonRestringidos}
                       >
-                        <MaterialIcons name="warning" size={24} color="green" />
+                        <MaterialIcons
+                          name="warning"
+                          size={24}
+                          color={theme?.primary || "#4CAF50"}
+                        />
                       </Pressable>
 
                       <Pressable
@@ -3922,7 +3936,13 @@ export default function VentaScreen({ navigation, route }) {
 
                       {/* TOOLTIP WARNING */}
                       {hovered && (
-                        <View style={styles.tooltip} pointerEvents="none">
+                        <View
+                          style={[
+                            styles.tooltip,
+                            { backgroundColor: theme.primary },
+                          ]}
+                          pointerEvents="none"
+                        >
                           <Text style={styles.tooltipText}>
                             Ver números restringidos
                           </Text>
@@ -3931,7 +3951,13 @@ export default function VentaScreen({ navigation, route }) {
 
                       {/* TOOLTIP TOTAL */}
                       {totalHovered && (
-                        <View style={styles.tooltip} pointerEvents="none">
+                        <View
+                          style={[
+                            styles.tooltip,
+                            { backgroundColor: theme.primary },
+                          ]}
+                          pointerEvents="none"
+                        >
                           <Text style={styles.tooltipText}>
                             Ver desglose total
                           </Text>
@@ -4238,7 +4264,7 @@ export default function VentaScreen({ navigation, route }) {
               CERRAR
             </Button>
             <Button
-              textColor="green"
+              textColor={theme?.primary || "#4CAF50"}
               style={{
                 backgroundColor: "white", // Fondo blanco
                 marginBottom: 10,
@@ -4257,7 +4283,7 @@ export default function VentaScreen({ navigation, route }) {
               COMPARTIR
             </Button>
             <Button
-              textColor="green"
+              textColor={theme?.primary || "#4CAF50"}
               style={{
                 backgroundColor: "white", // Fondo blanco
                 marginBottom: 10,
@@ -4435,7 +4461,7 @@ export default function VentaScreen({ navigation, route }) {
                         <MaterialIcons
                           name="check-circle"
                           size={24}
-                          color="green"
+                          color={theme?.primary || "#4CAF50"}
                         />
                       )}
 
@@ -4556,6 +4582,8 @@ export default function VentaScreen({ navigation, route }) {
                     <View style={[styles.line, { flex: 2 }]} />
                     <Switch
                       value={reventar}
+                      trackColor={{ false: "#ccc", true: theme.primary }}
+                      thumbColor={reventar ? "#fff" : "#f4f3f4"}
                       onValueChange={() => {
                         handleReventarChange();
                         setCategoriasMontoReventado("");
@@ -4673,7 +4701,7 @@ export default function VentaScreen({ navigation, route }) {
               CANCELAR
             </Button>
             <Button
-              textColor="#4CAF50"
+              textColor={theme?.primary || "#4CAF50"}
               style={{
                 backgroundColor: "white", // Fondo blanco
                 marginBottom: 10,
@@ -4989,7 +5017,7 @@ export default function VentaScreen({ navigation, route }) {
               CANCELAR
             </Button>
             <Button
-              textColor="#4CAF50"
+              textColor={theme?.primary || "#4CAF50"}
               style={{
                 backgroundColor: "white", // Fondo blanco
                 marginBottom: 10,

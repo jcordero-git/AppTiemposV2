@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { formatHourStr } from "../utils/datetimeUtils";
 let crashlytics;
 if (Platform.OS !== "web") {
@@ -30,6 +31,7 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
   //crashlytics().setAttributes({ screen: "sorteos" }); // atributos adicionales
   const route = useRoute();
   const { userData, logout } = useAuth();
+  const { theme } = useTheme();
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
   );
@@ -68,7 +70,7 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
 
     navigation.setOptions({
       title: "SORTEOS",
-      headerStyle: { backgroundColor: "#4CAF50" },
+      headerStyle: { backgroundColor: theme.primary },
       headerTintColor: "#fff",
       headerRight: () => (
         <>
@@ -84,7 +86,7 @@ const SorteosScreen = forwardRef(function SorteosScreen({ navigation }, ref) {
         </>
       ),
     });
-  }, [navigation, route.params]);
+  }, [navigation, route.params, theme]);
 
   // const formatHour = (timeStr) => {
   //   try {

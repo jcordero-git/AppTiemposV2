@@ -20,6 +20,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 import { useAuth } from "../context/AuthContext";
+import { useTheme, THEMES } from "../context/ThemeContext";
 import PrinterSizeSelectorModal from "../components/PrinterSizeSelectorModal";
 import PrinterSelectorModal from "../components/PrinterSelectorModal";
 import { useTiempo } from "../models/mTiempoContext";
@@ -135,7 +136,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
     setCategoriasExtraerTexto("");
   };
 
-  useEffect(() => {}, [categoriaDialogVisible]);
+  useEffect(() => { }, [categoriaDialogVisible]);
 
   const { tiempo, setTiempo, resetTiempo, setClientName } = useTiempo();
   const {
@@ -145,6 +146,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
     saveTicketProfile,
     logout,
   } = useAuth();
+  const { theme, setTheme } = useTheme();
 
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
@@ -182,7 +184,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       title: "CONFIGURACIÓN",
-      headerStyle: { backgroundColor: "#4CAF50" },
+      headerStyle: { backgroundColor: theme.primary },
       headerTintColor: "#fff",
       headerRight: () => (
         <>
@@ -257,7 +259,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, menuVisibleHeader, ticketProfile]);
+  }, [navigation, menuVisibleHeader, ticketProfile, theme]);
 
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 
@@ -410,7 +412,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
     <Provider>
       <View style={{ flex: 1 }}>
         {loading && (
-          <TouchableWithoutFeedback onPress={() => {}}>
+          <TouchableWithoutFeedback onPress={() => { }}>
             <View
               style={{
                 position: "absolute",
@@ -561,6 +563,8 @@ export default function ConfiguracionScreen({ navigation, route }) {
                             </Text>
                             <Switch
                               value={innerPrinter}
+                              trackColor={{ false: "#ccc", true: theme.primary }}
+                              thumbColor={innerPrinter ? "#fff" : "#f4f3f4"}
                               onValueChange={(val) => {
                                 setInnerPrinter(val);
                                 if (val) {
@@ -601,10 +605,10 @@ export default function ConfiguracionScreen({ navigation, route }) {
                               !innerPrinter && setModalPrinterVisible(true)
                             }
                             disabled={innerPrinter}
-                            // style={({ pressed }) => [
-                            //   styles.iconContainer,
-                            //   pressed && { opacity: 0.5 },
-                            // ]}
+                          // style={({ pressed }) => [
+                          //   styles.iconContainer,
+                          //   pressed && { opacity: 0.5 },
+                          // ]}
                           >
                             <MaterialIcons
                               name="search"
@@ -645,6 +649,8 @@ export default function ConfiguracionScreen({ navigation, route }) {
                       </Text>
                       <Switch
                         value={ticketProfile?.printBarCode}
+                        trackColor={{ false: "#ccc", true: theme.primary }}
+                        thumbColor={ticketProfile?.printBarCode ? "#fff" : "#f4f3f4"}
                         onValueChange={(val) =>
                           setTicketProfile((prev) => ({
                             ...prev,
@@ -654,6 +660,50 @@ export default function ConfiguracionScreen({ navigation, route }) {
                       />
                     </Pressable>
                   </View>
+
+                  {/* ── Selector de Tema Visual ── */}
+                  <View style={styles.themeSectionContainer}>
+                    <View style={styles.themeHeaderRow}>
+                      <Text style={styles.themeSectionTitle}>Tema</Text>
+                      <Text style={styles.themeSelectedName}>{theme.name}</Text>
+                    </View>
+                    <View style={styles.themeRow}>
+                      {Object.values(THEMES).map((t) => {
+                        const isSelected = theme.key === t.key;
+                        const ringColor =
+                          t.key === "negro" ? "#121212" : t.primary;
+                        return (
+                          <Pressable
+                            key={t.key}
+                            onPress={() => setTheme(t.key)}
+                            style={[
+                              styles.themeCircleOuter,
+                              { backgroundColor: t.secondary },
+                              isSelected
+                                ? { borderColor: ringColor, borderWidth: 3 }
+                                : {
+                                  borderColor: "rgba(0, 0, 0, 0.08)",
+                                  borderWidth: 1,
+                                },
+                            ]}
+                          >
+                            {/* Círculo interior: Color primario */}
+                            <View
+                              style={[
+                                styles.themeCircleInner,
+                                { backgroundColor: t.primary },
+                                t.key === "negro" &&
+                                styles.themeCircleInnerNegro,
+                              ]}
+                            />
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <Text style={styles.themeCaption}>
+                    </Text>
+                  </View>
+
                 </View>
 
                 {/* Lista */}
@@ -1163,5 +1213,59 @@ const styles = StyleSheet.create({
   iconContainer: {
     marginLeft: 8,
     padding: 6,
+  },
+  themeSectionContainer: {
+    marginTop: 15,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  themeHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+    gap: 8,
+  },
+  themeSectionTitle: {
+    fontSize: 15,
+    color: "#222",
+    fontWeight: "700",
+  },
+  themeSelectedName: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  themeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 8,
+  },
+  themeCircleOuter: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  themeCircleInner: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+  },
+  themeCircleInnerNegro: {
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
+  },
+  themeCaption: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 8,
   },
 });

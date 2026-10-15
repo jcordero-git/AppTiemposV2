@@ -23,6 +23,7 @@ import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 import DateTimePicker from "@react-native-community/datetimepicker";
 import DatePickerWeb from "../components/DatePickerWeb";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import mSorteo from "../models/mSorteoSingleton.js";
 import { useTiempo } from "../models/mTiempoContext";
@@ -54,6 +55,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
 
   const [refreshHeader, setRefreshHeader] = useState(0);
   const { userData, logout } = useAuth();
+  const { theme } = useTheme();
   const token = userData.token;
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
@@ -499,7 +501,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       title: "VENTA GENERAL",
-      headerStyle: { backgroundColor: "#4CAF50" },
+      headerStyle: { backgroundColor: theme.primary },
       headerTintColor: "#fff",
       headerRight: () => (
         <>
@@ -514,7 +516,7 @@ export default function VentaGeneralScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, actualizaDesdeHeader, fecha, sorteoId, userData]);
+  }, [navigation, actualizaDesdeHeader, fecha, sorteoId, userData, theme]);
 
   useEffect(() => {
     tiempoRef.current = tiempo;

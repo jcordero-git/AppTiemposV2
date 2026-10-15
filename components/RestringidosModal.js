@@ -23,6 +23,7 @@ import {
   Snackbar,
 } from "react-native-paper";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import mSorteo from "../models/mSorteoSingleton.js";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import SorteoSelectorModal from "./SorteoSelectorModal";
@@ -35,6 +36,7 @@ export default function RestringidosModal({
   data = [],
   useReventado = false,
 }) {
+  const { theme } = useTheme();
   const { width, height } = useWindowDimensions();
   const isWeb = width > 710;
   const [searchText, setSearchText] = useState("");
@@ -95,7 +97,11 @@ export default function RestringidosModal({
               marginBottom: 10,
             }}
           >
-            <MaterialIcons name="warning" size={35} color="#4CAF50" />
+            <MaterialIcons
+              name="warning"
+              size={35}
+              color={theme?.primary || "#4CAF50"}
+            />
             <Text
               style={{
                 marginLeft: 8,

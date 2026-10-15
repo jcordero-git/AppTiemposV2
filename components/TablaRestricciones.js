@@ -9,8 +9,10 @@ import {
   Platform,
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useTheme } from "../context/ThemeContext";
 
 export default function TablaRestricciones({ data, useReventado }) {
+  const { theme } = useTheme();
   // Componente interno para manejar el hover de cada icono individualmente
   const ScopeIconWithTooltip = ({ scope }) => {
     const [hovered, setHovered] = useState(false);
@@ -50,7 +52,13 @@ export default function TablaRestricciones({ data, useReventado }) {
           <MaterialIcons name={iconName} size={20} color="#555" />
         </Pressable>
         {hovered && (
-          <View style={styles.tooltip} pointerEvents="none">
+          <View
+            style={[
+              styles.tooltip,
+              { backgroundColor: theme?.primary || "#4CAF50" },
+            ]}
+            pointerEvents="none"
+          >
             <Text style={styles.tooltipText}>{tooltipText}</Text>
           </View>
         )}
@@ -58,18 +66,26 @@ export default function TablaRestricciones({ data, useReventado }) {
     );
   };
 
+  const headerTextColor = theme?.isDarkSecondary ? "#ffffff" : "#222222";
+
   return (
     <View style={{ flex: 1 }}>
       <ScrollView style={styles.scrollContainer}>
         <View style={styles.table}>
           {/* Encabezado */}
-          <View style={[styles.row, styles.header]}>
-            <Text style={[styles.cell, styles.headerCell]}>#</Text>
-            <Text style={[styles.cell, styles.headerCell]}>Normal</Text>
+          <View
+            style={[
+              styles.row,
+              styles.header,
+              { backgroundColor: theme?.secondary || "rgba(76, 175, 80, 0.80)" },
+            ]}
+          >
+            <Text style={[styles.cell, styles.headerCell, { color: headerTextColor }]}>#</Text>
+            <Text style={[styles.cell, styles.headerCell, { color: headerTextColor }]}>Normal</Text>
             {useReventado && (
-              <Text style={[styles.cell, styles.headerCell]}>Reventado</Text>
+              <Text style={[styles.cell, styles.headerCell, { color: headerTextColor }]}>Reventado</Text>
             )}
-            <Text style={[styles.cell, styles.headerCell]}>Alcance</Text>
+            <Text style={[styles.cell, styles.headerCell, { color: headerTextColor }]}>Alcance</Text>
           </View>
 
           {/* Filas */}

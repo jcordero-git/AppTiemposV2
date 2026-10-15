@@ -22,11 +22,13 @@ import {
   Snackbar,
 } from "react-native-paper";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import mSorteo from "../models/mSorteoSingleton.js";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import SorteoSelectorModal from "../components/SorteoSelectorModal";
 
 export default function PreCargarModal({ visible, onClose, onSelect }) {
+  const { theme } = useTheme();
   //const { userData } = useAuth();
   //const [sorteoItems, setSorteoItems] = useState([]);
   const { width, height } = useWindowDimensions();
@@ -201,7 +203,7 @@ export default function PreCargarModal({ visible, onClose, onSelect }) {
             CANCELAR
           </Button>
           <Button
-            textColor="#4CAF50"
+            textColor={theme?.primary || "#4CAF50"}
             style={{
               backgroundColor: "white", // Fondo blanco
               marginBottom: 10,

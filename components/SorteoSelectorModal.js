@@ -15,6 +15,7 @@ import {
 import { Dialog, Button } from "react-native-paper";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { mSorteo } from "../models/mSorteo";
 
 export default function SorteoSelectorModal({
@@ -24,6 +25,7 @@ export default function SorteoSelectorModal({
   leftPosition,
 }) {
   const { userData } = useAuth();
+  const { theme } = useTheme();
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
   );
@@ -111,7 +113,7 @@ export default function SorteoSelectorModal({
           {/* Header: ícono + título + toggle */}
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
-              <MaterialIcons name="event" size={28} color="#000" />
+              <MaterialIcons name="event" size={28} color={theme?.primary || "#000"} />
               <Text style={styles.title}>SORTEOS</Text>
             </View>
             <View style={styles.toggleRow}>
@@ -119,7 +121,7 @@ export default function SorteoSelectorModal({
               <Switch
                 value={showJugados}
                 onValueChange={setShowJugados}
-                trackColor={{ false: "#ccc", true: "#4CAF50" }}
+                trackColor={{ false: "#ccc", true: theme?.primary || "#4CAF50" }}
                 thumbColor={showJugados ? "#fff" : "#f4f3f4"}
               />
             </View>
@@ -128,7 +130,7 @@ export default function SorteoSelectorModal({
           {/* Lista de sorteos */}
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="green" />
+              <ActivityIndicator size="large" color={theme?.primary || "green"} />
               <Text style={{ marginTop: 10 }}>Cargando sorteos...</Text>
             </View>
           ) : (

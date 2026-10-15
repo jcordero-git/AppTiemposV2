@@ -24,6 +24,7 @@ import SorteoSelectorModal from "../components/SorteoSelectorModal";
 import { formatDate, formatHour_custom } from "../utils/datetimeUtils";
 import Constants from "expo-constants";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import mFechaSeleccionada from "../models/mFechaSeleccionadaSingleton.js";
 import PrinterUtils from "../utils/print/printerUtils";
 import { generateHTMLPremios } from "../utils/share/generateHTMLPremios";
@@ -52,6 +53,7 @@ export default function PremiosScreen({ navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
 
   const { userData, logout, ticketProfile } = useAuth();
+  const { theme } = useTheme();
   const token = userData.token;
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
@@ -117,7 +119,7 @@ export default function PremiosScreen({ navigation }) {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       title: "PREMIOS",
-      headerStyle: { backgroundColor: "#4CAF50" },
+      headerStyle: { backgroundColor: theme.primary },
       headerTintColor: "#fff",
       headerRight: () => (
         // <TouchableOpacity onPress={handlePrintBt} style={{ marginRight: 16 }}>
@@ -126,7 +128,7 @@ export default function PremiosScreen({ navigation }) {
         </TouchableOpacity>
       ),
     });
-  }, [navigation, tiemposFiltrados, total, numero, currentColor]);
+  }, [navigation, tiemposFiltrados, total, numero, currentColor, theme]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;

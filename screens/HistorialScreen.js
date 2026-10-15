@@ -35,6 +35,7 @@ import Constants from "expo-constants";
 import { es } from "date-fns/locale"; // idioma español
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import mDraws from "../models/mDraws";
 import mBanking from "../models/mBanking";
 import { toFloat } from "../utils/numeroUtils";
@@ -56,6 +57,7 @@ export default function HistorialScreen({ navigation, route }) {
   //crashlytics().setAttributes({ screen: "historial" }); // atributos adicionales
   const { showSnackbar, showConfirm } = useSnackbar();
   const { userData, logout } = useAuth();
+  const { theme } = useTheme();
   const settingBackendURL = userData.settings.find(
     (s) => s.backend_url !== undefined,
   );
@@ -446,7 +448,7 @@ export default function HistorialScreen({ navigation, route }) {
   React.useLayoutEffect(() => {
     navigation.setOptions({
       title: "HISTORIAL",
-      headerStyle: { backgroundColor: "#4CAF50" },
+      headerStyle: { backgroundColor: theme.primary },
       headerTintColor: "#fff",
       headerRight: () => (
         <>
@@ -471,7 +473,7 @@ export default function HistorialScreen({ navigation, route }) {
         </>
       ),
     });
-  }, [navigation, fechaDesde, fechaHasta]);
+  }, [navigation, fechaDesde, fechaHasta, theme]);
 
   useFocusEffect(
     useCallback(() => {

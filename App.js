@@ -4,6 +4,7 @@ import { Provider as PaperProvider } from "react-native-paper";
 import { useOrientationLock } from "./components/useOrientationLock";
 
 import { AuthProvider } from "./context/AuthContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { TiempoProvider } from "./models/mTiempoContext";
 import { SnackbarProvider } from "./context/SnackbarContext"; // Ajusta el path
 
@@ -15,13 +16,15 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <TiempoProvider>
-          <PaperProvider>
-            <SnackbarProvider>
-              <MainNavigator />
-            </SnackbarProvider>
-          </PaperProvider>
-        </TiempoProvider>
+        <ThemeProvider>
+          <TiempoProvider>
+            <PaperProvider>
+              <SnackbarProvider>
+                <MainNavigator />
+              </SnackbarProvider>
+            </PaperProvider>
+          </TiempoProvider>
+        </ThemeProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

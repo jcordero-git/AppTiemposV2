@@ -5,6 +5,7 @@ import { NavigationContainer } from "@react-navigation/native";
 import { ActivityIndicator, View } from "react-native";
 
 import { AuthContext } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import LoginScreen from "../screens/LoginScreen";
 import ResetPasswordScreen from "../screens/ResetPasswordScreen";
 import DrawerNavigator from "../screens/DrawerNavigator";
@@ -30,13 +31,14 @@ const linking = {
 
 export default function MainNavigator() {
   const context = useContext(AuthContext);
+  const { theme } = useTheme();
 
   const { userData, loading } = useContext(AuthContext);
 
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
@@ -46,7 +48,7 @@ export default function MainNavigator() {
       <Stack.Navigator
         initialRouteName={userData ? "Home" : "Login"}
         screenOptions={{
-          headerStyle: { backgroundColor: "#4CAF50" },
+          headerStyle: { backgroundColor: theme.primary },
           headerTintColor: "#fff",
         }}
       >

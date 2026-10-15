@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import { Ionicons } from "@expo/vector-icons";
-import { Alert, Platform, useWindowDimensions } from "react-native"; // Importar Alert para mostrar el mensaje
+import { Alert, Platform, useWindowDimensions } from "react-native";
+import { useTheme } from "../context/ThemeContext";
 
 import VentaScreen from "./VentaScreen";
 import PremiosScreen from "./PremiosScreen";
@@ -17,6 +18,7 @@ export default function DrawerNavigator() {
   const [sorteo, setSorteo] = useState(""); // Estado para Sorteo
   const [fecha, setFecha] = useState(new Date()); // Estado para Fecha
   const { width } = useWindowDimensions();
+  const { theme } = useTheme();
   // const isWeb = Platform.OS === "web" && width > 768;
   const isWeb = width > 768;
   const drawerWidth = Platform.OS === "web" ? "250px" : 250;
@@ -25,17 +27,23 @@ export default function DrawerNavigator() {
     <Drawer.Navigator
       initialRouteName="Venta"
       screenOptions={{
-        headerStyle: { backgroundColor: "#4CAF50" },
+        headerStyle: { backgroundColor: theme.primary },
         headerTintColor: "#fff",
-        drawerActiveTintColor: "#000",
-        drawerLabelStyle: { fontSize: 16 },
-        // Cambiar el color de fondo del Drawer aquí
+        drawerActiveTintColor: theme.isDarkSecondary ? "#ffffff" : theme.primary,
+        drawerInactiveTintColor: theme.isDarkSecondary ? "#cbd5e1" : "#475569",
+        drawerActiveBackgroundColor: theme.isDarkSecondary
+          ? "rgba(255, 255, 255, 0.12)"
+          : "rgba(0, 0, 0, 0.06)",
+        drawerLabelStyle: { fontSize: 16, fontWeight: "500" },
+        // Color de fondo del Drawer (sidebar) usando el color secundario
         drawerStyle: {
-          backgroundColor: "#4CAF50", // Color de fondo del Drawer
-          width: drawerWidth, // Aquí defines el ancho del Drawer (en este caso, 250px)
+          backgroundColor: theme.secondary,
+          width: drawerWidth,
         },
         drawerItemStyle: {
-          borderRadius: 0, // Eliminando bordes redondeados
+          borderRadius: 6,
+          marginHorizontal: 8,
+          marginVertical: 2,
         },
         drawerType: "slide",
         swipeEnabled: true,
