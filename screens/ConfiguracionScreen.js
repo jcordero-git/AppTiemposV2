@@ -13,14 +13,12 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
 } from "react-native";
-import { Menu, Provider } from "react-native-paper";
-//import { Ionicons } from "@expo/vector-icons";
-
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useSnackbar } from "../context/SnackbarContext"; // Ajusta el path
 
 import { useAuth } from "../context/AuthContext";
-import { useTheme, THEMES } from "../context/ThemeContext";
+import { useTheme } from "../context/ThemeContext";
+import CuentaModal from "../components/CuentaModal";
 import PrinterSizeSelectorModal from "../components/PrinterSizeSelectorModal";
 import PrinterSelectorModal from "../components/PrinterSelectorModal";
 import { useTiempo } from "../models/mTiempoContext";
@@ -39,7 +37,7 @@ if (Platform.OS !== "web") {
 export default function ConfiguracionScreen({ navigation, route }) {
   //crashlytics().setAttributes({ screen: "configuracion" }); // atributos adicionales
   const { showSnackbar } = useSnackbar();
-  const [menuVisibleHeader, setMenuVisibleHeader] = useState(false);
+  const [cuentaModalVisible, setCuentaModalVisible] = useState(false);
   const [dialogVisible, setDialogVisible] = useState(false);
   const [categoriaDialogVisible, setCategoriaDialogVisible] = useState(false); // Diálogo selector de categoría
   const [dialogTicketsVisible, setDialogTicketsVisible] = useState(false);
@@ -76,8 +74,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
     if (dialogVisible) setCategoriasMontoTemporal(categoriasMonto);
   }, [dialogVisible]);
 
-  const openMenuHeader = () => setMenuVisibleHeader(true);
-  const closeMenuHeader = () => setMenuVisibleHeader(false);
   const apkVersion =
     Constants.manifest?.version || Constants.expoConfig?.version;
 
@@ -121,7 +117,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
   //   setDialogVisible(true);
   // };
   const openDialogCategorias = useCallback(() => {
-    closeMenuHeader();
     setDialogVisible(true);
   }, []);
 
@@ -153,12 +148,29 @@ export default function ConfiguracionScreen({ navigation, route }) {
   );
   const backend_url = settingBackendURL ? settingBackendURL.backend_url : "";
 
-  // El botón que actuará como anchor para el menú
-  const MenuAnchor = (
-    <TouchableOpacity onPress={openMenuHeader} style={{ marginRight: 10 }}>
-      <MaterialIcons name="more-vert" size={24} color="#fff" />
-    </TouchableOpacity>
-  );
+  const getInitials = (name) => {
+    if (!name) return "U";
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+    }
+    return parts[0].slice(0, 2).toUpperCase();
+  };
+
+  const displayName =
+    userData?.name ||
+    ticketProfile?.sellerName ||
+    userData?.username ||
+    "U";
+  const userInitials = getInitials(displayName);
+
+  const handleLogout = () => {
+    setCuentaModalVisible(false);
+    mSorteo.id = 0;
+    mFechaSeleccionada.resetFecha();
+    logout();
+  };
+
   const [innerPrinter, setInnerPrinter] = useState(false);
 
   // Detectar si ya viene asignado "00:11:22:33:44:55"
@@ -187,7 +199,7 @@ export default function ConfiguracionScreen({ navigation, route }) {
       headerStyle: { backgroundColor: theme.primary },
       headerTintColor: "#fff",
       headerRight: () => (
-        <>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
           <MaterialIcons
             name="save"
             size={24}
@@ -204,62 +216,17 @@ export default function ConfiguracionScreen({ navigation, route }) {
               onPress={checkVersion}
             />
           )}
-          {/* <MaterialIcons
-            name="download"
-            size={24}
-            color="#fff" // Blanco para contraste con fondo verde
-            style={{ marginRight: 15 }}
-          /> */}
-          {/* Menú anclado al botón visible */}
-          <Menu
-            visible={menuVisibleHeader}
-            onDismiss={closeMenuHeader}
-            anchor={MenuAnchor}
-            contentStyle={{ backgroundColor: "white", marginRight: 15 }} // Fondo blanco
+          <TouchableOpacity
+            onPress={() => setCuentaModalVisible(true)}
+            style={styles.avatarButton}
+            activeOpacity={0.8}
           >
-            {/* <Menu.Item
-              onPress={() => {
-                closeMenuHeader();
-              }}
-              title="Exportar Datos"
-              titleStyle={{ color: "#000" }} // Texto negro opcional
-            /> */}
-            {/* <Menu.Item
-              onPress={() => {
-                closeMenuHeader();
-              }}
-              title="Borrar Datos"
-              titleStyle={{ color: "#000" }} // Texto negro opcional
-            /> */}
-            {/* <Menu.Item
-              onPress={() => {
-                closeMenuHeader();
-              }}
-              title="Acerca..."
-              titleStyle={{ color: "#000" }} // Texto negro opcional
-            /> */}
-            {/* <Menu.Item
-              onPress={() => {
-                handleCambiarContrasena();
-              }}
-              title="Cambiar contraseña"
-              titleStyle={{ color: "#000" }} // Texto negro opcional
-            /> */}
-            <Menu.Item
-              onPress={() => {
-                closeMenuHeader();
-                mSorteo.id = 0;
-                mFechaSeleccionada.resetFecha();
-                logout();
-              }}
-              title="Cerrar Sesión"
-              titleStyle={{ color: "red" }} // Texto negro opcional
-            />
-          </Menu>
-        </>
+            <Text style={styles.avatarText}>{userInitials}</Text>
+          </TouchableOpacity>
+        </View>
       ),
     });
-  }, [navigation, menuVisibleHeader, ticketProfile, theme]);
+  }, [navigation, userInitials, theme]);
 
   const [tiemposAnteriores, setTiemposAnteriores] = useState([]);
 
@@ -288,7 +255,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
   const isWeb = width > 710;
   const isLandscape = width > height;
   const handleCambiarContrasena = async () => {
-    closeMenuHeader();
     const tokenCambiarContrasena = await fetchTokenCambiarContrasena();
     navigation.navigate("ResetPassword", {
       token: tokenCambiarContrasena,
@@ -409,9 +375,14 @@ export default function ConfiguracionScreen({ navigation, route }) {
   }, [ticketProfile]);
 
   return (
-    <Provider>
-      <View style={{ flex: 1 }}>
-        {loading && (
+    <View style={{ flex: 1 }}>
+      <CuentaModal
+        visible={cuentaModalVisible}
+        onClose={() => setCuentaModalVisible(false)}
+        onLogout={handleLogout}
+        apkVersion={apkVersion}
+      />
+      {loading && (
           <TouchableWithoutFeedback onPress={() => { }}>
             <View
               style={{
@@ -660,50 +631,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
                       />
                     </Pressable>
                   </View>
-
-                  {/* ── Selector de Tema Visual ── */}
-                  <View style={styles.themeSectionContainer}>
-                    <View style={styles.themeHeaderRow}>
-                      <Text style={styles.themeSectionTitle}>Tema</Text>
-                      <Text style={styles.themeSelectedName}>{theme.name}</Text>
-                    </View>
-                    <View style={styles.themeRow}>
-                      {Object.values(THEMES).map((t) => {
-                        const isSelected = theme.key === t.key;
-                        const ringColor =
-                          t.key === "negro" ? "#121212" : t.primary;
-                        return (
-                          <Pressable
-                            key={t.key}
-                            onPress={() => setTheme(t.key)}
-                            style={[
-                              styles.themeCircleOuter,
-                              { backgroundColor: t.secondary },
-                              isSelected
-                                ? { borderColor: ringColor, borderWidth: 3 }
-                                : {
-                                  borderColor: "rgba(0, 0, 0, 0.08)",
-                                  borderWidth: 1,
-                                },
-                            ]}
-                          >
-                            {/* Círculo interior: Color primario */}
-                            <View
-                              style={[
-                                styles.themeCircleInner,
-                                { backgroundColor: t.primary },
-                                t.key === "negro" &&
-                                styles.themeCircleInnerNegro,
-                              ]}
-                            />
-                          </Pressable>
-                        );
-                      })}
-                    </View>
-                    <Text style={styles.themeCaption}>
-                    </Text>
-                  </View>
-
                 </View>
 
                 {/* Lista */}
@@ -1004,7 +931,6 @@ export default function ConfiguracionScreen({ navigation, route }) {
           </View>
         </>
       </View>
-    </Provider>
   );
 }
 
@@ -1214,58 +1140,18 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     padding: 6,
   },
-  themeSectionContainer: {
-    marginTop: 15,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-  },
-  themeHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 14,
-    gap: 8,
-  },
-  themeSectionTitle: {
-    fontSize: 15,
-    color: "#222",
-    fontWeight: "700",
-  },
-  themeSelectedName: {
-    fontSize: 14,
-    color: "#666",
-    fontWeight: "500",
-  },
-  themeRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 8,
-  },
-  themeCircleOuter: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
+  avatarButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 8,
+    backgroundColor: "rgba(0, 0, 0, 0.18)",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
+    alignItems: "center",
+    marginRight: 10,
   },
-  themeCircleInner: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-  },
-  themeCircleInnerNegro: {
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.25)",
-  },
-  themeCaption: {
-    fontSize: 12,
-    color: "#888",
-    marginTop: 8,
+  avatarText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "bold",
   },
 });
